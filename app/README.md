@@ -31,6 +31,30 @@ You can use components inside your Markdown (stored in `/site/components`):
 
 Edit `site/config.php` to change your theme or site name.
 
+## Developer Scripts
+
+### Merge All Open PRs
+
+Use `scripts/merge-open-prs.sh` to merge open PRs targeting `main`. It merges
+the first PR (by number), then merges `main` into the remaining PR branches
+and merges those PRs.
+
+Requirements:
+- `gh auth login` completed for this repo
+- Clean working tree
+
+Optional overrides:
+- `BASE_BRANCH=main` (default)
+- `REMOTE=origin` (default)
+- `LIMIT=200` (max PRs to fetch)
+- `MERGE_METHOD=--merge` (or `--squash`, `--rebase`)
+
+Example:
+
+```bash
+scripts/merge-open-prs.sh
+```
+
 ## Themes
 
 Themes are located in `/site/themes`. The default theme is **Motion**, which features a clean, modern design. Themes use Tailwind CSS by default via CDN.
