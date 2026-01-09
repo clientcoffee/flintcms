@@ -44,6 +44,7 @@ class Admin
         return <<<JS
 // Admin functionality JavaScript
 (function() {
+    const init = () => {
     // Current path for API calls
     const currentPath = {$escapedPath};
 
@@ -52,6 +53,7 @@ class Admin
     const saveButton = document.getElementById('save-btn');
     const cancelButton = document.getElementById('cancel-btn');
     const contentDisplay = document.getElementById('content-display');
+    const contentEditorWrap = document.getElementById('content-editor-wrap');
     const contentEditor = document.getElementById('content-editor');
     const logoutButton = document.getElementById('admin-logout-btn');
 
@@ -65,6 +67,9 @@ class Admin
             return;
         }
         contentDisplay.classList.toggle('hidden', shouldEnable);
+        if (contentEditorWrap) {
+            contentEditorWrap.classList.toggle('hidden', !shouldEnable);
+        }
         contentEditor.classList.toggle('hidden', !shouldEnable);
         editButton.classList.toggle('hidden', shouldEnable);
         saveButton.classList.toggle('hidden', !shouldEnable);
@@ -79,7 +84,7 @@ class Admin
         }
 
         try {
-            const fetchResponse = await fetch(`/api/content?path=\${encodeURIComponent(currentPath)}`);
+            const fetchResponse = await fetch(`/api/site?path=\${encodeURIComponent(currentPath)}`);
             const responseData = await fetchResponse.json();
             if (!responseData.success) {
                 alert('Failed to load content for editing');
@@ -381,22 +386,15 @@ class Admin
             successModal.style.display = 'none';
         }
     });
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();
 JS;
-    }
-
-    /**
-     * Generate logout button HTML.
-     */
-    public function getLogoutButtonHtml(): string
-    {
-        return <<<HTML
-<div class="admin-logout-container" style="text-align: right;">
-    <button id="admin-logout-btn" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md nav-link">
-        Logout
-    </button>
-</div>
-HTML;
     }
 
     /**
@@ -405,7 +403,7 @@ HTML;
     public function getEditControlsHtml(): string
     {
         return <<<HTML
-<div id="admin-edit-controls" class="inline-flex gap-2 ml-3 align-middle">
+<div id="admin-edit-controls" class="inline-flex items-start gap-2 ml-3 align-top">
     <button id="edit-btn" class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition" title="Edit page">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
@@ -432,7 +430,7 @@ HTML;
     {
         if ($pageStatus === 'draft') {
             return <<<HTML
-<div class="admin-status-badge mt-4">
+<div class="admin-status-badge mt-4 w-full">
     <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
         <svg class="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
@@ -443,7 +441,7 @@ HTML;
 HTML;
         } elseif ($pageStatus === 'hidden') {
             return <<<HTML
-<div class="admin-status-badge mt-4">
+<div class="admin-status-badge mt-4 w-full">
     <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
@@ -463,7 +461,9 @@ HTML;
     public function getEditorTextareaHtml(): string
     {
         return <<<HTML
-<textarea id="content-editor" class="hidden w-full min-h-[500px] p-4 border border-gray-300 rounded-md font-mono text-sm" placeholder="Edit markdown content..."></textarea>
+<div id="content-editor-wrap" class="hidden max-w-3xl mx-auto px-6 sm:px-12 pb-16">
+    <textarea id="content-editor" class="w-full p-4 border border-gray-300 rounded-md font-mono text-sm" style="min-height: 60vh;" placeholder="Edit markdown content..."></textarea>
+</div>
 HTML;
     }
 
@@ -479,10 +479,7 @@ HTML;
         // 1. Inject edit controls + status badge after first <h1>
         $html = $this->injectEditControls($html, $pageStatus);
 
-        // 2. Inject logout button before </footer> or </body>
-        $html = $this->injectLogoutButton($html);
-
-        // 3. Inject editor textarea before </body>
+        // 2. Inject editor textarea before </body>
         $html = $this->injectEditorTextarea($html);
 
         return $html;
@@ -508,31 +505,18 @@ HTML;
     }
 
     /**
-     * Inject logout button before </footer> or </body>.
-     */
-    private function injectLogoutButton(string $html): string
-    {
-        $logoutHtml = $this->getLogoutButtonHtml();
-
-        // Try to inject before </footer>
-        if (strpos($html, '</footer>') !== false) {
-            $html = str_replace('</footer>', $logoutHtml . "\n</footer>", $html);
-        } elseif (strpos($html, '</body>') !== false) {
-            // Fallback: inject before </body>
-            $html = str_replace('</body>', $logoutHtml . "\n</body>", $html);
-        }
-
-        return $html;
-    }
-
-    /**
      * Inject editor textarea before </body>.
      */
     private function injectEditorTextarea(string $html): string
     {
         $textareaHtml = $this->getEditorTextareaHtml();
 
-        // Inject before </body>
+        if (strpos($html, '</main>') !== false) {
+            $html = str_replace('</main>', $textareaHtml . "\n</main>", $html);
+            return $html;
+        }
+
+        // Fallback: inject before </body>.
         if (strpos($html, '</body>') !== false) {
             $html = str_replace('</body>', $textareaHtml . "\n</body>", $html);
         }

@@ -1,13 +1,14 @@
 <?php
+
 /**
  * Flint Configuration Example
  *
- * Copy this file to config.php and update with your settings.
+ * Copy this file to site/config.php and update with your settings.
  * The password should be hashed using password_hash().
- * Run setup to generate a proper config.php with hashed password.
+ * Run setup to generate a proper site/config.php with hashed password.
  *
  * This file contains sensitive configuration. Keep secure permissions (0600).
- * DO NOT commit config.php to version control.
+ * DO NOT commit site/config.php to version control.
  */
 
 return [
@@ -22,6 +23,8 @@ return [
     ],
     'system' => [
         'cache_enabled' => false,
+        // Internal environment flag: development, local, or production
+        'environment' => 'production',
         // Show detailed errors (SECURITY: Only enable during development!)
         // false = Production mode (generic errors, logs only)
         // true = Development mode (detailed errors with file, line, trace)

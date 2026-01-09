@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Flint Configuration
  *
@@ -7,27 +8,27 @@
  */
 
 return array (
-  'site' => 
+  'site' =>
   array (
     'name' => 'TEST',
     'theme' => 'motion',
   ),
-  'mail' => 
+  'mail' =>
   array (
     'admin_email' => 'chrismewhort@gmail.com',
     'smtp_host' => 'localhost',
   ),
-  'admin' => 
+  'admin' =>
   array (
     'password' => '$2y$12$8vurOMM1cWgXfi8iAgN6bekru/YLRkE.16TQQQnrQsxL/rgowgYB.',
   ),
-  'system' => 
+  'system' =>
   array (
     'cache_enabled' => false,
     'show_errors' => true,
     'debug' => false,
   ),
-  'updates' => 
+  'updates' =>
   array (
     'auto_update' => 'ask',
   ),

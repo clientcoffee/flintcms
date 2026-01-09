@@ -41,9 +41,14 @@ done
 
 workspace_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 app_root="${workspace_root}/app"
-content_root="${workspace_root}/content"
+site_root="${workspace_root}/site"
 dist_root="${workspace_root}/dist"
 buildignore="${workspace_root}/.buildignore"
+
+# Ensure dist/ is wiped before anything else runs so build output is always fresh.
+if [[ -d "${dist_root}" ]]; then
+  rm -rf "${dist_root}"
+fi
 
 echo -e "${BLUE}=== Flint Build Process ===${NC}"
 echo ""
@@ -81,9 +86,8 @@ else
   echo ""
 fi
 
-# Clean and create dist directory
+# Prepare build directory (dist/ was already wiped)
 echo -e "${BLUE}Preparing build directory...${NC}"
-rm -rf "${dist_root}"
 mkdir -p "${dist_root}"
 
 # Build rsync exclude arguments from .buildignore
@@ -112,28 +116,53 @@ else
     "${dist_root}/app/" 2>&1 | grep -v "^$" || true
 fi
 
-# Copy content directory
-echo -e "${BLUE}Copying content/ to dist/content/...${NC}"
+# Copy index-dist.php to dist root if present
+index_dist_src="${app_root}/index-dist.php"
+if [[ -f "${index_dist_src}" ]]; then
+  echo -e "${BLUE}Copying app/index-dist.php to dist/index.php...${NC}"
+  cp "${index_dist_src}" "${dist_root}/index.php"
+fi
+
+# Copy site directory
+echo -e "${BLUE}Copying site/ to dist/site/...${NC}"
 if [[ "${VERBOSE}" == "true" ]]; then
   rsync -av \
     --delete \
     --exclude="uploads/" \
-    "${content_root}/" \
-    "${dist_root}/content/"
+    "${site_root}/" \
+    "${dist_root}/site/"
 else
   rsync -a \
     --delete \
     --exclude="uploads/" \
-    "${content_root}/" \
-    "${dist_root}/content/" 2>&1 | grep -v "^$" || true
+    "${site_root}/" \
+    "${dist_root}/site/" 2>&1 | grep -v "^$" || true
 fi
 
 # Create empty uploads directory
-mkdir -p "${dist_root}/content/uploads"
+mkdir -p "${dist_root}/site/uploads"
 
-# Copy config.example.php to app directory
+# Restore minimal uploads guard files from site/ (without copying user uploads)
+for upload_stub in ".htaccess" "index.php"; do
+  stub_src="${site_root}/uploads/${upload_stub}"
+  if [[ -f "${stub_src}" ]]; then
+    echo -e "${BLUE}Copying site/uploads/${upload_stub}...${NC}"
+    cp "${stub_src}" "${dist_root}/site/uploads/${upload_stub}"
+  fi
+done
+
+# Copy default project imagery from core/content/uploads into the build so themes can reference it.
+core_uploads_dir="${app_root}/core/content/uploads"
+if [[ -d "${core_uploads_dir}" ]]; then
+  echo -e "${BLUE}Copying core content uploads...${NC}"
+  rsync -a \
+    "${core_uploads_dir}/" \
+    "${dist_root}/site/uploads/" 2>&1 | grep -v "^$" || true
+fi
+
+# Copy config.example.php to root
 echo -e "${BLUE}Copying config.example.php...${NC}"
-cp "${app_root}/config.example.php" "${dist_root}/app/config.example.php"
+cp "${workspace_root}/config.example.php" "${dist_root}/config.example.php"
 
 # Copy LICENSE to root (if exists)
 if [[ -f "${workspace_root}/LICENSE" ]]; then
@@ -154,7 +183,7 @@ build_hash=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 cat > "${dist_root}/.build-info" <<EOF
 Build Date: ${build_date}
 Commit: ${build_hash}
-Built From: app/ and content/
+Built From: app/ and site/
 Build Script: scripts/build.sh
 EOF
 
@@ -163,7 +192,7 @@ echo -e "${BLUE}Validating build...${NC}"
 validation_errors=0
 
 # Check for required files
-required_files=("app/index.php" "app/config.example.php" "app/core/App.php" "content/themes")
+required_files=("app/index.php" "config.example.php" "app/core/App.php" "site/themes")
 for file in "${required_files[@]}"; do
   if [[ ! -e "${dist_root}/${file}" ]]; then
     echo -e "${RED}✗ Missing required file/directory: ${file}${NC}"

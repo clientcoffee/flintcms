@@ -12,14 +12,14 @@ That's it.
 
 ## Writing Content
 
-Create Markdown files in the `/content` directory.
+Create Markdown files in the `/site` directory.
 
-*   `/content/pages/index.md` -> Your Homepage
-*   `/content/pages/about.md` -> /about
+*   `/site/pages/index.md` -> Your Homepage
+*   `/site/pages/about.md` -> /about
 
 ### Using Components
 
-You can use components inside your Markdown (stored in `/content/components`):
+You can use components inside your Markdown (stored in `/site/components`):
 
 ```markdown
 # My Page
@@ -29,11 +29,11 @@ You can use components inside your Markdown (stored in `/content/components`):
 
 ## Configuration
 
-Edit `config.php` to change your theme or site name.
+Edit `site/config.php` to change your theme or site name.
 
 ## Themes
 
-Themes are located in `/themes`. The default theme is **Motion**, which features a clean, modern design. Themes use Tailwind CSS by default via CDN.
+Themes are located in `/site/themes`. The default theme is **Motion**, which features a clean, modern design. Themes use Tailwind CSS by default via CDN.
 
 ## Requirements
 

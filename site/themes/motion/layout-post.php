@@ -3,39 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($page['meta']['title'] ?? $site['name']) ?> | <?= htmlspecialchars($site['name']) ?></title>
-    <?php if (!empty($page['meta']['keywords'])) : ?>
-    <meta name="keywords" content="<?= htmlspecialchars($page['meta']['keywords']) ?>">
+    <title><?= page_meta('title', $site['name']) ?> | <?= esc_html($site['name']) ?></title>
+    <?php $keywords = page_meta('keywords'); ?>
+    <?php if ($keywords !== '') : ?>
+    <meta name="keywords" content="<?= $keywords ?>">
     <?php endif; ?>
-    <link rel="stylesheet" href="/themes/motion/tailwind.min.css">
-
-    <?php if (!empty($componentAssets['styles'] ?? [])) : ?>
-        <?php foreach ($componentAssets['styles'] as $style) : ?>
-            <link rel="stylesheet" href="<?= htmlspecialchars($style['href']) ?>">
-        <?php endforeach; ?>
-    <?php endif; ?>
-
-    <?php if (!empty($componentAssets['inline_styles'] ?? [])) : ?>
-        <style>
-            <?php foreach ($componentAssets['inline_styles'] as $style) : ?>
-                <?= $style['content'] ?>
-
-            <?php endforeach; ?>
-        </style>
-    <?php endif; ?>
-
-    <?php
-    // Head scripts (if any component needs them)
-    if (!empty($componentAssets['scripts'] ?? [])) :
-        foreach ($componentAssets['scripts'] as $script) :
-            if (($script['position'] ?? 'footer') === 'head') :
-                ?>
-        <script src="<?= htmlspecialchars($script['src']) ?>"<?= !empty($script['type']) ? ' type="' . htmlspecialchars($script['type']) . '"' : '' ?>></script>
-                <?php
-            endif;
-        endforeach;
-    endif;
-    ?>
+    <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
+    <?php render_assets('head'); ?>
+    <?php theme_styles(); ?>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -89,26 +64,26 @@
             <?php endif; ?>
 
             <h1 class="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
-                <?= htmlspecialchars($page['meta']['title'] ?? 'Untitled Post') ?>
+                <?= page_meta('title', 'Untitled Post') ?>
             </h1>
 
             <?php if (!empty($page['meta']['description'])) : ?>
                 <p class="text-xl text-white/90 mb-6 leading-relaxed">
-                    <?= htmlspecialchars($page['meta']['description']) ?>
+                    <?= esc_html($page['meta']['description']) ?>
                 </p>
             <?php endif; ?>
 
             <div class="post-meta flex items-center gap-4">
                 <?php if (!empty($page['meta']['author'])) : ?>
-                    <span>By <?= htmlspecialchars($page['meta']['author']) ?></span>
+                    <span>By <?= esc_html($page['meta']['author']) ?></span>
                 <?php endif; ?>
                 <?php if (!empty($page['meta']['date'])) : ?>
                     <span>•</span>
-                    <time><?= htmlspecialchars($page['meta']['date']) ?></time>
+                    <time><?= esc_html($page['meta']['date']) ?></time>
                 <?php endif; ?>
                 <?php if (!empty($page['meta']['readtime'])) : ?>
                     <span>•</span>
-                    <span><?= htmlspecialchars($page['meta']['readtime']) ?> min read</span>
+                    <span><?= esc_html($page['meta']['readtime']) ?> min read</span>
                 <?php endif; ?>
             </div>
         </div>
@@ -124,33 +99,19 @@
     <!-- Footer -->
     <footer class="border-t border-gray-200 bg-white">
         <div class="max-w-3xl mx-auto px-6 sm:px-12 py-8 flex items-center justify-between">
+            <!-- Copyright/Branding. I'd appreciate it if you left this in your themes. -->
             <p class="text-sm text-gray-500">
-                Powered by <a href="#" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
+                Powered by <a href="https://flintcms.com" target="_blank" title="A flat file CMS built on Markdown" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
             </p>
             <?php if (!empty($isAdmin)) : ?>
-                <a href="/admin" class="text-sm text-gray-700 hover:text-gray-900 font-medium">Admin</a>
+                <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
+            <?php else : ?>
+                <a href="/login" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>
             <?php endif; ?>
         </div>
     </footer>
 
-    <?php if (!empty($componentAssets['scripts'] ?? [])) : ?>
-        <?php foreach ($componentAssets['scripts'] as $script) : ?>
-            <?php if (($script['position'] ?? 'footer') === 'footer') : ?>
-                <script src="<?= htmlspecialchars($script['src']) ?>"<?= !empty($script['type']) ? ' type="' . htmlspecialchars($script['type']) . '"' : '' ?>></script>
-            <?php endif; ?>
-        <?php endforeach; ?>
-    <?php endif; ?>
-
-    <?php if (!empty($componentAssets['inline_scripts'] ?? [])) : ?>
-        <?php foreach ($componentAssets['inline_scripts'] as $script) : ?>
-            <?php if (($script['position'] ?? 'footer') === 'footer') : ?>
-                <script<?= !empty($script['type']) ? ' type="' . htmlspecialchars($script['type']) . '"' : '' ?>>
-                    <?= $script['content'] ?>
-
-                </script>
-            <?php endif; ?>
-        <?php endforeach; ?>
-    <?php endif; ?>
+    <?php render_assets('foot'); ?>
 
     <!-- Reading progress script -->
     <script>
@@ -161,5 +122,6 @@
             document.getElementById('reading-progress').style.width = scrolled + '%';
         });
     </script>
+    <?php theme_scripts(); ?>
 </body>
 </html>

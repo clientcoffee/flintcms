@@ -14,7 +14,7 @@
         "psr-4": {
             "Flint\\": "app/core/",
             "Components\\": "app/core/components/",
-            "Modules\\": "content/themes/"
+            "Modules\\": "site/themes/"
         }
     },
     "autoload-dev": {

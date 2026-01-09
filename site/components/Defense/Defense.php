@@ -28,8 +28,8 @@ class Defense extends BaseComponent
     protected static function onInit(): void
     {
         self::$clientIp = self::getClientIp();
-        // Store defense events in content/submissions/defense (event log)
-        self::$storageDir = self::$app->root . '/content/submissions/defense';
+        // Store defense events in site/submissions/defense (event log)
+        self::$storageDir = self::$app->root . '/site/submissions/defense';
         self::ensureStorageDir(self::$storageDir);
 
         // Ensure component config exists (self-setup)
@@ -41,7 +41,7 @@ class Defense extends BaseComponent
      */
     private static function ensureConfig(): void
     {
-        $configPath = self::$app->root . '/content/components/Defense/config.php';
+        $configPath = self::$app->root . '/site/components/Defense/config.php';
 
         // If config already exists, nothing to do
         if (file_exists($configPath)) {
@@ -929,7 +929,7 @@ HTML;
             '/wp-admin', '/wp-login', '/wp-content',
             '/admin', '/administrator', '/admin.php',
             '/phpmyadmin', '/pma', '/mysql',
-            '/.env', '/.git', '/config.php',
+            '/.env', '/.git', '/config.php', '/site/config.php',
             '/backup', '/db', '/database',
             '/xmlrpc.php', '/wp-cron.php'
         ];

@@ -1,4 +1,5 @@
 <?php
+
 namespace Tests\Security;
 
 use PHPUnit\Framework\TestCase;
@@ -11,7 +12,7 @@ class PathTraversalTest extends TestCase
 {
     public function testBlocksDoubleDotInRequestPath(): void
     {
-        $requestPath = '/content/uploads/../../config.ini';
+        $requestPath = '/site/uploads/../../config.ini';
         $this->assertStringContainsString('..', $requestPath);
         // App should block this at line 37
     }
@@ -31,48 +32,50 @@ class PathTraversalTest extends TestCase
     public function testRealpathValidatesUploadDirectory(): void
     {
         $testRoot = sys_get_temp_dir() . '/flint_path_test_' . uniqid();
-        mkdir($testRoot . '/content/uploads', 0755, true);
+        mkdir($testRoot . '/site/uploads', 0755, true);
 
         // Valid path
-        $validPath = $testRoot . '/content/uploads/image.jpg';
+        $validPath = $testRoot . '/site/uploads/image.jpg';
         touch($validPath);
         $realPath = realpath($validPath);
-        $realUploadsDir = realpath($testRoot . '/content/uploads');
+        $realUploadsDir = realpath($testRoot . '/site/uploads');
 
         $this->assertStringStartsWith($realUploadsDir, $realPath);
 
         // Cleanup
         unlink($validPath);
-        rmdir($testRoot . '/content/uploads');
-        rmdir($testRoot . '/content');
+        rmdir($testRoot . '/site/uploads');
+        rmdir($testRoot . '/site');
         rmdir($testRoot);
     }
 
     public function testSymlinkNotFollowedOutsideUploads(): void
     {
         $testRoot = sys_get_temp_dir() . '/flint_symlink_test_' . uniqid();
-        mkdir($testRoot . '/content/uploads', 0755, true);
+        mkdir($testRoot . '/site/uploads', 0755, true);
 
         // Create symlink to config.ini
         $configPath = $testRoot . '/config.ini';
-        $symlinkPath = $testRoot . '/content/uploads/evil.ini';
+        $symlinkPath = $testRoot . '/site/uploads/evil.ini';
         file_put_contents($configPath, 'secret');
 
         if (symlink($configPath, $symlinkPath)) {
             $realPath = realpath($symlinkPath);
-            $realUploadsDir = realpath($testRoot . '/content/uploads');
+            $realUploadsDir = realpath($testRoot . '/site/uploads');
 
             // realpath follows symlinks, so this should NOT start with uploads dir
-            $this->assertFalse(str_starts_with($realPath, $realUploadsDir),
-                "Symlink should resolve outside uploads directory");
+            $this->assertFalse(
+                str_starts_with($realPath, $realUploadsDir),
+                "Symlink should resolve outside uploads directory"
+            );
 
             unlink($symlinkPath);
         }
 
         // Cleanup
         unlink($configPath);
-        rmdir($testRoot . '/content/uploads');
-        rmdir($testRoot . '/content');
+        rmdir($testRoot . '/site/uploads');
+        rmdir($testRoot . '/site');
         rmdir($testRoot);
     }
 }

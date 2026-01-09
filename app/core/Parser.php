@@ -17,8 +17,8 @@ namespace Flint;
  *
  * COMPONENT CASCADE SYSTEM:
  * Components are resolved in this priority order:
- * - Theme components (content/themes/{theme}/*.php) → \Modules\ namespace
- * - Site components (content/components/*.php) → \Components\ namespace
+* - Theme components (site/themes/{theme}/*.php) → \Modules\ namespace
+* - Site components (site/components/*.php) → \Components\ namespace
  * - Core components (app/core/components/*.php) → \Components\ namespace
  *
  * This allows themes to override default components for custom styling.
@@ -240,8 +240,8 @@ class Parser
      *
      * COMPONENT CASCADE:
      * Components are resolved in priority order:
-     * 1. Theme components (content/themes/{theme}/ → \Modules\ComponentName)
-     * 2. Site components (content/components/ → \Components\ComponentName)
+     * 1. Theme components (site/themes/{theme}/ → \Modules\ComponentName)
+     * 2. Site components (site/components/ → \Components\ComponentName)
      * 3. Core components (app/core/components/ → \Components\ComponentName)
      *
      * WHY THIS ORDER?
@@ -279,7 +279,7 @@ class Parser
             // Variable to hold the resolved component class name
             $resolvedComponentClass = null;
 
-            // PRIORITY 1: Try theme components first (content/themes/{theme}/)
+            // PRIORITY 1: Try theme components first (site/themes/{theme}/)
             $themeComponentClassName = "\\Modules\\{$componentName}";
 
             // Check if theme component class is already loaded
@@ -305,7 +305,7 @@ class Parser
             // PRIORITY 2: Fall back to site components if theme component not found
             if (!$resolvedComponentClass) {
                 $siteComponentClassName = "\\Components\\{$componentName}";
-                $siteComponentDirectory = $this->application->root . '/content/components';
+                $siteComponentDirectory = $this->application->root . '/site/components';
 
                 // Try to find component file in site components directory
                 $siteComponentFilePath = $this->getComponentPath($siteComponentDirectory, $componentName);

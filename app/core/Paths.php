@@ -10,7 +10,7 @@ namespace Flint;
  * from any component without needing to pass App instance around.
  *
  * WHY STATIC PATHS?
- * - Eliminates repeated string concatenation: $this->root . '/content/pages'
+ * - Eliminates repeated string concatenation: $this->root . '/site/pages'
  * - Provides single source of truth for all directory locations
  * - Makes refactoring easier (change path in one place)
  * - Type-safe: IDE autocomplete knows these are strings
@@ -19,7 +19,7 @@ namespace Flint;
  * USAGE:
  * ```php
  * // Instead of:
- * $uploadPath = $app->root . '/content/uploads';
+ * $uploadPath = $app->root . '/site/uploads';
  *
  * // Use:
  * $uploadPath = Paths::$uploadsDir;
@@ -51,20 +51,19 @@ class Paths
     public static string $appDir;
 
     // ==========================================
-    // CONTENT DIRECTORIES
+    // SITE DIRECTORIES
     // ==========================================
 
     /**
-     * Main content directory (all user content)
-     * Example: /var/www/flint/content
+     * Main site directory (all user content, themes, and operational data)
+     * Example: /var/www/flint/site
      *
      * @var string
      */
-    public static string $contentDir;
-
+    public static string $siteDir;
     /**
      * Pages directory (markdown page files)
-     * Example: /var/www/flint/content/pages
+     * Example: /var/www/flint/site/pages
      *
      * @var string
      */
@@ -72,7 +71,7 @@ class Paths
 
     /**
      * Blocks directory (reusable content blocks)
-     * Example: /var/www/flint/content/blocks
+     * Example: /var/www/flint/site/blocks
      *
      * @var string
      */
@@ -80,7 +79,7 @@ class Paths
 
     /**
      * Uploads directory (user-uploaded files)
-     * Example: /var/www/flint/content/uploads
+     * Example: /var/www/flint/site/uploads
      *
      * @var string
      */
@@ -88,7 +87,7 @@ class Paths
 
     /**
      * Themes directory (site themes)
-     * Example: /var/www/flint/content/themes
+     * Example: /var/www/flint/site/themes
      *
      * @var string
      */
@@ -96,7 +95,7 @@ class Paths
 
     /**
      * Site components directory (user-installed components)
-     * Example: /var/www/flint/content/components
+     * Example: /var/www/flint/site/components
      *
      * @var string
      */
@@ -104,7 +103,7 @@ class Paths
 
     /**
      * Submissions directory (form submissions, defense logs)
-     * Example: /var/www/flint/content/submissions
+     * Example: /var/www/flint/site/submissions
      *
      * @var string
      */
@@ -172,7 +171,7 @@ class Paths
 
     /**
      * Configuration file path
-     * Example: /var/www/flint/app/config.php
+     * Example: /var/www/flint/site/config.php
      *
      * @var string
      */
@@ -212,14 +211,14 @@ class Paths
         self::$rootDir = $rootDirectory;
         self::$appDir = $appDirectory;
 
-        // Compute content directories
-        self::$contentDir = $rootDirectory . '/content';
-        self::$pagesDir = $rootDirectory . '/content/pages';
-        self::$blocksDir = $rootDirectory . '/content/blocks';
-        self::$uploadsDir = $rootDirectory . '/content/uploads';
-        self::$themesDir = $rootDirectory . '/content/themes';
-        self::$siteComponentsDir = $rootDirectory . '/content/components';
-        self::$submissionsDir = $rootDirectory . '/content/submissions';
+        // Compute site directories
+        self::$siteDir = $rootDirectory . '/site';
+        self::$pagesDir = self::$siteDir . '/pages';
+        self::$blocksDir = self::$siteDir . '/blocks';
+        self::$uploadsDir = self::$siteDir . '/uploads';
+        self::$themesDir = self::$siteDir . '/themes';
+        self::$siteComponentsDir = self::$siteDir . '/components';
+        self::$submissionsDir = self::$siteDir . '/submissions';
 
         // Compute core directories
         self::$coreDir = $appDirectory . '/core';
@@ -232,7 +231,7 @@ class Paths
         self::$backupsDir = $appDirectory . '/storage/backups';
 
         // Compute file paths
-        self::$configFile = $appDirectory . '/config.php';
+        self::$configFile = self::$siteDir . '/config.php';
 
         // Mark as initialized
         self::$initialized = true;

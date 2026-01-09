@@ -472,7 +472,7 @@ abstract class RenderComponent
      * 3. Parser provides access to Application
      *
      * WHEN TO USE:
-     * - Reading files from content directory
+     * - Reading files from the site bundle
      * - Accessing configuration
      * - Getting path information
      *
@@ -480,7 +480,7 @@ abstract class RenderComponent
      * ```php
      * $app = self::getApp();
      * if ($app) {
-     *     $imagePath = $app->root . '/content/images/logo.png';
+     *     $imagePath = $app->root . '/site/images/logo.png';
      *     if (file_exists($imagePath)) {
      *         // Use image
      *     }

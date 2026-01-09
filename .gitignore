@@ -31,15 +31,16 @@ _project/
 # Update check cache
 app/.update-admin-check.json
 
-# Content directories (user-generated)
-content/pages/
-content/blocks/
-content/uploads/
-content/submissions/
+# Site directories (user-generated)
+site/config.php
+site/pages/
+site/blocks/
+site/uploads/
+site/submissions/
 
 # Components (except Defense which ships with dist)
-content/components/*/
-!content/components/Defense/
+site/components/*/
+!site/components/Defense/
 
 
 composer.lock

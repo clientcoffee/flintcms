@@ -7,7 +7,7 @@ use Flint\RenderComponent;
 class Block extends RenderComponent
 {
     /**
-     * Render a reusable content block from /content/blocks/
+     * Render a reusable content block from /site/blocks/
      */
     public static function render(array $props, string $content): string
     {
@@ -24,15 +24,7 @@ class Block extends RenderComponent
             return '<!-- Block component: application context not available -->';
         }
 
-        // Locate the block file (try .mdx first, then .md)
-        $blockPath = null;
-        foreach (['.mdx', '.md'] as $extension) {
-            $testPath = $app->root . '/content/blocks/' . $blockName . $extension;
-            if (file_exists($testPath) && is_file($testPath)) {
-                $blockPath = $testPath;
-                break;
-            }
-        }
+        $blockPath = self::resolveMarkdownBlockPath($app->root, $blockName);
 
         if ($blockPath === null) {
             return '<!-- Block "' . self::escape($blockName) . '" not found -->';
@@ -47,5 +39,50 @@ class Block extends RenderComponent
 
         // Return the rendered HTML
         return $parsedBlock['content_html'];
+    }
+
+    /**
+     * Resolve a markdown block path for the given root and block name.
+     */
+    public static function resolveMarkdownBlockPath(string $root, string $blockName): ?string
+    {
+        foreach (self::blockFileCandidates($root, $blockName) as $candidate) {
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Build candidate block file paths (supporting nested directories).
+     */
+    private static function blockFileCandidates(string $root, string $blockName): array
+    {
+        $directory = self::blockDirectoryName($blockName);
+        $candidates = [];
+
+        foreach (['.md', '.mdx'] as $extension) {
+            $candidates[] = "{$root}/site/blocks/{$directory}/{$blockName}{$extension}";
+            $candidates[] = "{$root}/site/blocks/{$blockName}{$extension}";
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * Convert a block name such as "nav" or "contact-email" into a directory name.
+     */
+    private static function blockDirectoryName(string $blockName): string
+    {
+        $parts = preg_split('/[\\s\\-_]+/', $blockName);
+        $parts = array_filter($parts, 'strlen');
+
+        if (empty($parts)) {
+            return ucfirst($blockName);
+        }
+
+        return implode('', array_map(fn($part) => ucfirst(strtolower($part)), $parts));
     }
 }

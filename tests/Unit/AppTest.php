@@ -1,4 +1,5 @@
 <?php
+
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
@@ -10,15 +11,56 @@ use Flint\App;
  */
 class AppTest extends TestCase
 {
+    private const TEST_ROOT_SUFFIX = '/flint_site_test';
+
     private string $testRoot;
     private App $app;
 
     protected function setUp(): void
     {
         // Create test environment
-        $this->testRoot = sys_get_temp_dir() . '/flint_unit_test_' . uniqid();
+        $this->testRoot = sys_get_temp_dir() . self::TEST_ROOT_SUFFIX;
+        if (is_dir($this->testRoot)) {
+            $this->recursiveRemoveDirectory($this->testRoot);
+        }
         mkdir($this->testRoot . '/app', 0755, true);
-        file_put_contents($this->testRoot . '/app/config.ini', "[site]\nname=Test\ntheme=test\n[admin]\npassword=test");
+        mkdir($this->testRoot . '/site/pages', 0755, true);
+        mkdir($this->testRoot . '/site/blocks', 0755, true);
+        mkdir($this->testRoot . '/site/uploads', 0755, true);
+        mkdir($this->testRoot . '/site/themes', 0755, true);
+        mkdir($this->testRoot . '/site/components', 0755, true);
+        mkdir($this->testRoot . '/site/submissions', 0755, true);
+
+        $configContent = <<<'PHP'
+<?php
+return array (
+  'site' => 
+  array (
+    'name' => 'TEST',
+    'theme' => 'motion',
+  ),
+  'mail' => 
+  array (
+    'admin_email' => 'test@example.com',
+    'smtp_host' => 'localhost',
+  ),
+  'admin' => 
+  array (
+    'password' => '$2y$12$8vurOMM1cWgXfi8iAgN6bekru/YLRkE.16TQQQnrQsxL/rgowgYB.',
+  ),
+  'system' => 
+  array (
+    'cache_enabled' => false,
+    'show_errors' => true,
+    'debug' => false,
+  ),
+  'updates' => 
+  array (
+    'auto_update' => 'ask',
+  ),
+);
+PHP;
+        file_put_contents($this->testRoot . '/config.php', $configContent);
         $this->app = new App($this->testRoot . '/app', $this->testRoot);
     }
 
@@ -34,8 +76,6 @@ class AppTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('getMimeType');
-        $method->setAccessible(true);
-
         $this->assertEquals('text/javascript', $method->invoke($this->app, 'js'));
         $this->assertEquals('text/javascript', $method->invoke($this->app, 'mjs'));
         $this->assertEquals('text/css', $method->invoke($this->app, 'css'));
@@ -54,8 +94,6 @@ class AppTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('getMimeType');
-        $method->setAccessible(true);
-
         $this->assertEquals('application/octet-stream', $method->invoke($this->app, 'unknown'));
     }
 
@@ -63,8 +101,6 @@ class AppTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('getMimeType');
-        $method->setAccessible(true);
-
         $this->assertEquals('text/javascript', $method->invoke($this->app, 'JS'));
         $this->assertEquals('image/jpeg', $method->invoke($this->app, 'JPG'));
     }
@@ -76,8 +112,6 @@ class AppTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('sanitizeFilename');
-        $method->setAccessible(true);
-
         $this->assertEquals('my-file', $method->invoke($this->app, 'my file'));
         $this->assertEquals('multiple-spaces-here', $method->invoke($this->app, 'multiple   spaces   here'));
     }
@@ -86,8 +120,6 @@ class AppTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('sanitizeFilename');
-        $method->setAccessible(true);
-
         $this->assertEquals('myfile', $method->invoke($this->app, 'my@file!'));
         $this->assertEquals('testphp', $method->invoke($this->app, 'test.php'));
         $this->assertEquals('helloworld', $method->invoke($this->app, 'hello$world%'));
@@ -97,8 +129,6 @@ class AppTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('sanitizeFilename');
-        $method->setAccessible(true);
-
         $this->assertEquals('myfile', $method->invoke($this->app, 'MyFile'));
         $this->assertEquals('uppercase', $method->invoke($this->app, 'UPPERCASE'));
     }
@@ -107,8 +137,6 @@ class AppTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('sanitizeFilename');
-        $method->setAccessible(true);
-
         $this->assertEquals('my-file', $method->invoke($this->app, 'my---file'));
     }
 
@@ -116,8 +144,6 @@ class AppTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('sanitizeFilename');
-        $method->setAccessible(true);
-
         $this->assertEquals('myfile', $method->invoke($this->app, '-myfile-'));
     }
 
@@ -125,8 +151,6 @@ class AppTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('sanitizeFilename');
-        $method->setAccessible(true);
-
         $this->assertEquals('upload', $method->invoke($this->app, ''));
         $this->assertEquals('upload', $method->invoke($this->app, '!!!'));
     }
@@ -141,8 +165,6 @@ class AppTest extends TestCase
 
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('recursiveRemoveDirectory');
-        $method->setAccessible(true);
-
         $this->assertTrue(is_dir($testDir));
         $method->invoke($this->app, $testDir);
         $this->assertFalse(is_dir($testDir));
@@ -157,8 +179,6 @@ class AppTest extends TestCase
 
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('recursiveRemoveDirectory');
-        $method->setAccessible(true);
-
         $this->assertTrue(is_dir($testDir));
         $method->invoke($this->app, $testDir);
         $this->assertFalse(is_dir($testDir));
@@ -172,7 +192,6 @@ class AppTest extends TestCase
 
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('recursiveRemoveDirectory');
-        $method->setAccessible(true);
 
         $this->assertTrue(is_dir($testDir));
         $method->invoke($this->app, $testDir);
@@ -181,10 +200,14 @@ class AppTest extends TestCase
 
     private function recursiveRemoveDirectory(string $dir): void
     {
-        if (!is_dir($dir)) return;
+        if (!is_dir($dir)) {
+            return;
+        }
         $items = scandir($dir);
         foreach ($items as $item) {
-            if ($item === '.' || $item === '..') continue;
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
             $path = $dir . '/' . $item;
             is_dir($path) ? $this->recursiveRemoveDirectory($path) : unlink($path);
         }

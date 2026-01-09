@@ -16,7 +16,7 @@ class Sitemap extends RenderComponent
 
         $auth = new Auth($app);
         $isAdmin = $auth->isAdmin();
-        $pagesDir = $app->root . '/content/pages';
+        $pagesDir = $app->root . '/site/pages';
 
         $items = self::buildTree($pagesDir, '', $isAdmin);
         if (empty($items)) {

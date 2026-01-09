@@ -29,8 +29,8 @@ return [
         'font_family' => 'system-ui, -apple-system, sans-serif',
 
         // Layout
-        // Relative to /content (example: /uploads/default-banner.jpg)
-        'default_banner' => '/uploads/default-banner.jpg',
+        // Relative to /site (example: /uploads/default-banner.jpg)
+        'default_banner' => '/uploads/default-banner-1544x500.png',
         'max_content_width' => '1200px',
         'sidebar_width' => '300px',
     ],

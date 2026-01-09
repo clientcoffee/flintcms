@@ -31,10 +31,10 @@ class ContactForm extends RenderComponent
         $blockName = self::prop($props, 'fields', 'contact-form');
 
         // Load form fields from block.
-        $formFields = \Components\Block::render(['name' => $blockName], '');
+        $formFields = render_block($blockName);
 
         // Generate form token via hook system
-        $formToken = \Flint\HookManager::trigger('form_token_generate', ['form_type' => 'contact']);
+        $formToken = hook('form_token_generate', ['form_type' => 'contact']);
 
         // If no component provided a token, generate a basic one
         if ($formToken === null || $formToken === '') {

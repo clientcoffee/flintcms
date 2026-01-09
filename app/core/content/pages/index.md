@@ -1,13 +1,13 @@
 ---
-title: Welcome to Flint
-description: Your new flat-file CMS is ready to go!
+title: Welcome to Flint✨
+description: Your new flat-file experience awaits you!
 icon: home
 order: 1
 ---
 
-# 👋 Hello from Flint!
+# Hello from your content!
 
-Welcome to your new content management system. Everything is set up and ready for you to start creating.
+Everything is set up and ready for you to start creating.
 
 ## What's Flint?
 
@@ -21,7 +21,7 @@ A beautifully simple, flat-file CMS that just works:
 
 ## Get Started in 3 Steps
 
-1. **Login** - Click the login link in the footer to access the admin panel
+1. **Login** - If you find yourself logged out, there's a [login link](/login) in the footer on every page.
 2. **Edit** - Modify this page or create new content
 3. **Customize** - Change your theme and site settings
 
