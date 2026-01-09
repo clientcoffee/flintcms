@@ -1,0 +1,46 @@
+{
+    "name": "flintcms/flint",
+    "description": "Drop-in flat-file CMS with zero dependencies (for runtime)",
+    "type": "project",
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^1.10",
+        "phpunit/phpunit": "^10.0",
+        "squizlabs/php_codesniffer": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Flint\\": "app/core/",
+            "Components\\": "app/core/components/",
+            "Modules\\": "content/themes/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:security": "phpunit --testsuite Security",
+        "test:unit": "phpunit --testsuite Unit",
+        "test:integration": "phpunit --testsuite Integration",
+        "test:coverage": "phpunit --coverage-html coverage",
+        "analyse": "phpstan analyse app/core app/core/components --level=5",
+        "check": [
+            "@test",
+            "@analyse"
+        ],
+        "build": "bash scripts/build.sh",
+        "build:check": [
+            "@check",
+            "@build"
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

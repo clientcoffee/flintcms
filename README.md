@@ -1,0 +1,109 @@
+# Flint
+
+**A lightweight, file-based CMS built with pure PHP. No database, no build step, no complexity.**
+
+## Features
+
+- **Zero Database** - Everything stored in markdown, JSON, and PHP config files
+- **Modular Components** - Drop-in components extend functionality via hooks
+- **Security First** - Defense component blocks attacks, rate limits, and tracks threats
+- **Automated Backups** - Scheduled backups with secure time-limited download links
+- **Theme System** - Component cascade allows theme-level overrides
+- **Markdown Pages** - Write content in markdown with embedded components
+- **Admin Panel** - Built-in admin interface for content management
+- **Scheduler** - Pseudo-cron system for automated tasks
+- **Forms** - Built-in form handling with email delivery
+- **Defense** - Real-time threat detection and IP blocking
+
+## Requirements
+
+- PHP 8.2 or higher
+- Apache with mod_rewrite (or Nginx with rewrite rules)
+- `tar` command (for backups)
+- Write permissions on `content/` and `app/`
+
+## Quick Start
+
+1. **Clone repository**:
+   ```bash
+   git clone <repo-url> flint
+   cd flint
+   ```
+
+2. **Start local server**:
+   ```bash
+   php -S localhost:8000
+   ```
+
+3. **Run setup**:
+   - Visit `http://localhost:8000`
+   - Complete setup wizard
+   - Set admin password
+
+4. **Start creating**:
+   - Create pages in `content/pages/`
+   - Access admin at `/admin`
+
+## Documentation
+
+**For Developers**: See [docs/CLAUDE.md](docs/CLAUDE.md) - comprehensive developer guide
+
+**For Users**: See project wiki (coming soon)
+
+## Project Structure
+
+```
+flint/
+├── app/                    # Core application
+│   ├── core/              # Core classes
+│   └── config.php         # Configuration
+├── content/
+│   ├── pages/             # Markdown pages
+│   ├── blocks/            # Reusable blocks
+│   ├── components/        # Site components
+│   ├── themes/            # Theme files
+│   ├── uploads/           # User uploads
+│   └── submissions/       # Event log
+├── public/                # Static assets
+├── docs/                  # Documentation
+└── index.php             # Entry point
+```
+
+## Philosophy
+
+Flint is **opinionated**:
+
+- **Quality Over Speed** - Standards prevent bugs
+- **Security is Non-Negotiable** - Multiple defense layers
+- **Simplicity is Sophistication** - No frameworks, pure PHP
+- **Standards are Freedom** - PSR-12 + ESLint enforced
+- **Code is Communication** - Write for humans first
+
+## Components
+
+### Core Components
+- **Nav** - Navigation menus
+- **Block** - Reusable content blocks
+
+### Site Components
+- **Defense** - IP blocking, rate limiting, attack detection
+- **Backups** - Automated backups with secure downloads
+- **Form** - Form handling with email delivery
+
+## Contributing
+
+Read [docs/CLAUDE.md](docs/CLAUDE.md) before contributing.
+
+**Requirements**:
+- Follow feature-branch workflow
+- Pass phpcs (PSR-12) and ESLint
+- Pre-commit hooks enforce standards
+- Merge main before opening PR
+
+## License
+
+[Add license here]
+
+## Credits
+
+Built with care for simplicity, security, and maintainability.

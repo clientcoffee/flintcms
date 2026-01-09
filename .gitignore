@@ -1,0 +1,50 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+.github/
+.claude/
+
+# Dependencies
+vendor/
+app/vendor/
+node_modules/
+
+# Build artifacts
+dist/
+
+# Test artifacts
+.phpunit.cache/
+coverage/
+
+# Project files
+_project/
+
+# Update check cache
+app/.update-admin-check.json
+
+# Content directories (user-generated)
+content/pages/
+content/blocks/
+content/uploads/
+content/submissions/
+
+# Components (except Defense which ships with dist)
+content/components/*/
+!content/components/Defense/
+
+
+composer.lock
+package.lock
+
+
+docs/
+documentation/
