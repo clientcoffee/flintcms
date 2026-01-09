@@ -74,6 +74,7 @@ flint/
 │   ├── pages/              # Markdown page content
 │   ├── blocks/             # Reusable block fragments (nav, hero, etc.)
 │   ├── components/         # Site components (Defense, Backups, etc.)
+│   ├── config.example.php  # Template config (copy to site/config.php during setup)
 │   ├── themes/             # Theme templates and assets
 │   ├── uploads/            # Placeholder uploads directory
 │   └── submissions/        # Form/defense/scheduler logs
@@ -82,7 +83,6 @@ flint/
 │   ├── build.sh
 │   ├── build-and-serve.sh
 │   └── migrate-content-to-site.sh
-├── config.example.php      # Template config (copy to site/config.php during setup)
 ├── docs/
 ├── CLAUDE.md
 ├── README.md

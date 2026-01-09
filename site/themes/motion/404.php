@@ -23,6 +23,7 @@ $siteName = htmlspecialchars($site['name'] ?? 'Flint', ENT_QUOTES);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>404 - Page Not Found | <?= $siteName ?></title>
     <link rel="stylesheet" href="/themes/motion/tailwind.min.css">
+    <link rel="stylesheet" href="<?= theme_asset('motion.css') ?>">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
         body {

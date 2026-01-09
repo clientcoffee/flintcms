@@ -41,6 +41,7 @@
     <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
     <?php render_assets('head'); ?>
     <?php theme_styles(); ?>
+    <link rel="stylesheet" href="<?= theme_asset('motion.css') ?>">
 
     <!-- Theme Global Styles -->
     <style>
@@ -61,18 +62,6 @@
         h1 { font-weight: 700; letter-spacing: -0.02em; }
         h2 { font-weight: 600; letter-spacing: -0.01em; }
         h3, h4 { font-weight: 600; }
-
-        /* Navigation link hover effects with smooth transitions */
-        .nav-link {
-            transition: all 0.15s ease;
-        }
-
-        /* Global smooth transitions for color/background changes */
-        * {
-            transition-property: background-color, border-color, color, fill, stroke;
-            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-            transition-duration: 150ms;
-        }
 
         .nav-menu ul {
             flex-wrap: wrap;

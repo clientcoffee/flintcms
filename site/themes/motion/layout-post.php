@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
     <?php render_assets('head'); ?>
     <?php theme_styles(); ?>
+    <link rel="stylesheet" href="<?= theme_asset('motion.css') ?>">
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -38,7 +39,6 @@
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
             width: 0%;
             z-index: 9999;
-            transition: width 0.1s ease;
         }
     </style>
 </head>

@@ -160,9 +160,9 @@ if [[ -d "${core_uploads_dir}" ]]; then
     "${dist_root}/site/uploads/" 2>&1 | grep -v "^$" || true
 fi
 
-# Copy config.example.php to root
-echo -e "${BLUE}Copying config.example.php...${NC}"
-cp "${workspace_root}/config.example.php" "${dist_root}/config.example.php"
+# Copy site config example into the build
+echo -e "${BLUE}Copying site/config.example.php...${NC}"
+cp "${site_root}/config.example.php" "${dist_root}/site/config.example.php"
 
 # Copy LICENSE to root (if exists)
 if [[ -f "${workspace_root}/LICENSE" ]]; then
@@ -192,7 +192,7 @@ echo -e "${BLUE}Validating build...${NC}"
 validation_errors=0
 
 # Check for required files
-required_files=("app/index.php" "config.example.php" "app/core/App.php" "site/themes")
+required_files=("app/index.php" "site/config.example.php" "app/core/App.php" "site/themes")
 for file in "${required_files[@]}"; do
   if [[ ! -e "${dist_root}/${file}" ]]; then
     echo -e "${RED}✗ Missing required file/directory: ${file}${NC}"
