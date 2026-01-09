@@ -286,7 +286,7 @@ class Parser
             if (!class_exists($themeComponentClassName)) {
                 // Get active theme name from config
                 $activeThemeName = $this->application->config['site']['theme'] ?? 'motion';
-                $themeComponentDirectory = $this->application->root . '/themes/' . $activeThemeName;
+                $themeComponentDirectory = Paths::themeDir($activeThemeName);
 
                 // Try to find component file in theme directory
                 $themeComponentFilePath = $this->getComponentPath($themeComponentDirectory, $componentName);
