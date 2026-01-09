@@ -1,4 +1,5 @@
 <?php
+
 namespace Tests\Security;
 
 use PHPUnit\Framework\TestCase;
@@ -10,20 +11,53 @@ use Flint\App;
  */
 class ZipSlipTest extends TestCase
 {
+    private const TEST_ROOT_SUFFIX = '/flint_site_test';
+
     private string $testRoot;
     private App $app;
 
     protected function setUp(): void
     {
         // Create temporary test environment
-        $this->testRoot = sys_get_temp_dir() . '/flint_test_' . uniqid();
+        $this->testRoot = sys_get_temp_dir() . self::TEST_ROOT_SUFFIX;
+        if (is_dir($this->testRoot)) {
+            $this->recursiveRemoveDirectory($this->testRoot);
+        }
         mkdir($this->testRoot . '/app', 0755, true);
-        mkdir($this->testRoot . '/content/themes', 0755, true);
-        mkdir($this->testRoot . '/content/uploads', 0755, true);
+        mkdir($this->testRoot . '/site/themes', 0755, true);
+        mkdir($this->testRoot . '/site/uploads', 0755, true);
 
         // Create minimal config
-        file_put_contents($this->testRoot . '/app/config.ini', "[site]\nname=Test\ntheme=test\n[admin]\npassword=test");
-
+        $configContent = <<<'PHP'
+<?php
+return array (
+  'site' => 
+  array (
+    'name' => 'TEST',
+    'theme' => 'motion',
+  ),
+  'mail' => 
+  array (
+    'admin_email' => 'test@example.com',
+    'smtp_host' => 'localhost',
+  ),
+  'admin' => 
+  array (
+    'password' => '$2y$12$8vurOMM1cWgXfi8iAgN6bekru/YLRkE.16TQQQnrQsxL/rgowgYB.',
+  ),
+  'system' => 
+  array (
+    'cache_enabled' => false,
+    'show_errors' => true,
+    'debug' => false,
+  ),
+  'updates' => 
+  array (
+    'auto_update' => 'ask',
+  ),
+);
+PHP;
+        file_put_contents($this->testRoot . '/config.php', $configContent);
         $this->app = new App($this->testRoot . '/app', $this->testRoot);
     }
 
@@ -87,10 +121,14 @@ class ZipSlipTest extends TestCase
 
     private function recursiveRemoveDirectory(string $dir): void
     {
-        if (!is_dir($dir)) return;
+        if (!is_dir($dir)) {
+            return;
+        }
         $items = scandir($dir);
         foreach ($items as $item) {
-            if ($item === '.' || $item === '..') continue;
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
             $path = $dir . '/' . $item;
             is_dir($path) ? $this->recursiveRemoveDirectory($path) : unlink($path);
         }

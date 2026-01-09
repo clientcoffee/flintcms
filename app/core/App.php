@@ -27,8 +27,8 @@ class App
         // Initialize global path constants for use throughout the application.
         Paths::init($rootDir, $appDir);
 
-        // Load the configuration file from app directory.
-        $configPath = Paths::$configFile;
+        // Load the configuration file from the site bundle (fallback to legacy locations)
+        $configPath = $this->resolveConfigPath();
 
         if (!file_exists($configPath)) {
             throw new \Exception("Configuration file (config.php) missing. Run setup to generate it.");
@@ -94,6 +94,29 @@ class App
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host = $this->resolveSiteDomain();
         return $scheme . '://' . $host;
+    }
+
+    /**
+     * Resolve the active configuration file path, falling back to legacy locations.
+     */
+    private function resolveConfigPath(): string
+    {
+        $primary = Paths::$configFile;
+        if (file_exists($primary)) {
+            return $primary;
+        }
+
+        $legacyRoot = $this->root . '/config.php';
+        if (file_exists($legacyRoot)) {
+            return $legacyRoot;
+        }
+
+        $legacyApp = $this->appDir . '/config.php';
+        if (file_exists($legacyApp)) {
+            return $legacyApp;
+        }
+
+        return $primary;
     }
 
     /**
@@ -179,14 +202,14 @@ class App
             }
         }
 
-        // Serve static files from /content/uploads/.
-        if (str_starts_with($requestPath, '/content/uploads/')) {
+        // Serve static files from /site/uploads/.
+        if (str_starts_with($requestPath, '/site/uploads/')) {
             // Allow direct access to user-uploaded media.
             $uploadFilePath = $this->root . $requestPath;
 
             // Security: Validate path stays within uploads directory.
             $realUploadPath = realpath($uploadFilePath);
-            $realUploadsDir = realpath($this->root . '/content/uploads');
+            $realUploadsDir = realpath($this->root . '/site/uploads');
 
             if (
                 $realUploadPath !== false && $realUploadsDir !== false &&
@@ -211,7 +234,7 @@ class App
         if (preg_match('#^/themes/([a-zA-Z0-9_-]+)/(.+\.(js|mjs|css|jpg|jpeg|png|gif|svg|woff|woff2|ttf|eot))$#i', $requestPath, $themeMatches)) {
             $themeName = $themeMatches[1];
             $assetPath = $themeMatches[2];
-            $themeAssetPath = $this->root . '/content/themes/' . $themeName . '/' . $assetPath;
+            $themeAssetPath = $this->root . '/site/themes/' . $themeName . '/' . $assetPath;
 
             // Security: prevent directory traversal.
             if (strpos($assetPath, '..') !== false) {
@@ -231,7 +254,7 @@ class App
         if (preg_match('#^/components/([a-zA-Z0-9_-]+)/(.+\.(js|mjs|css|jpg|jpeg|png|gif|svg|woff|woff2|ttf|eot))$#i', $requestPath, $componentMatches)) {
             $componentName = $componentMatches[1];
             $assetPath = $componentMatches[2];
-            $componentAssetPath = $this->root . '/content/components/' . $componentName . '/' . $assetPath;
+            $componentAssetPath = $this->root . '/site/components/' . $componentName . '/' . $assetPath;
 
             // Security: prevent directory traversal.
             if (strpos($assetPath, '..') !== false) {
@@ -475,8 +498,7 @@ class App
                 'text/markdown', 'text/plain'
             ];
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            $mimeType = finfo_file($finfo, $file['tmp_name']);
-            finfo_close($finfo);
+            $mimeType = $finfo ? (finfo_file($finfo, $file['tmp_name']) ?: '') : '';
 
             if (!in_array($mimeType, $allowedTypes)) {
                 http_response_code(400);
@@ -486,7 +508,10 @@ class App
 
             // SECURITY: Comprehensive scan for dangerous code in uploaded files
             // Only markdown files are allowed to contain code (for documentation)
-            if (!in_array($extension, ['md', 'mdx'])) {
+            $scanTextTypes = str_starts_with($mimeType, 'text/')
+                || in_array($mimeType, ['image/svg+xml', 'application/xml', 'text/xml'], true);
+
+            if ($scanTextTypes && !in_array($extension, ['md', 'mdx'], true)) {
                 $fileContents = file_get_contents($file['tmp_name']);
                 if ($fileContents !== false) {
                     // Check for various PHP code patterns
@@ -525,11 +550,11 @@ class App
             if (in_array($extension, ['md', 'mdx'])) {
                 $safeFilename = $this->sanitizeFilename($originalName);
                 $finalFilename = $safeFilename . '.' . $extension;
-                $targetPath = $this->root . '/content/pages/' . $finalFilename;
+                $targetPath = $this->root . '/site/pages/' . $finalFilename;
 
                 // Ensure pages directory exists.
-                if (!is_dir($this->root . '/content/pages')) {
-                    mkdir($this->root . '/content/pages', 0755, true);
+                if (!is_dir($this->root . '/site/pages')) {
+                    mkdir($this->root . '/site/pages', 0755, true);
                 }
 
                 // SECURITY: Validate path to prevent symlink attacks
@@ -555,7 +580,7 @@ class App
                 umask($oldUmask);
                 chmod($validatedPath, 0644);
 
-                $fileUrl = '/content/pages/' . $finalFilename;
+                $fileUrl = '/site/pages/' . $finalFilename;
                 $fileType = 'markdown';
 
                 echo json_encode([
@@ -590,11 +615,11 @@ class App
                     if ($isTheme) {
                         // Extract as theme.
                         $themeName = $this->sanitizeFilename($originalName);
-                        $themeDir = $this->root . '/content/themes/' . $themeName;
+                        $themeDir = $this->root . '/site/themes/' . $themeName;
 
                         // Ensure themes directory exists.
-                        if (!is_dir($this->root . '/content/themes')) {
-                            mkdir($this->root . '/content/themes', 0755, true);
+                        if (!is_dir($this->root . '/site/themes')) {
+                            mkdir($this->root . '/site/themes', 0755, true);
                         }
 
                         // Remove existing theme if present.
@@ -603,7 +628,7 @@ class App
                         }
 
                         // Extract theme safely (prevent ZIP slip attack).
-                        $realThemeDir = realpath($this->root . '/content/themes');
+                        $realThemeDir = realpath($this->root . '/site/themes');
                         if ($realThemeDir === false) {
                             $zip->close();
                             http_response_code(500);
@@ -706,7 +731,7 @@ class App
 
             // Create month-based subdirectory.
             $yearMonth = date('Y-m');
-            $uploadDir = $this->root . '/content/uploads/' . $yearMonth;
+            $uploadDir = $this->root . '/site/uploads/' . $yearMonth;
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
             }
@@ -756,7 +781,7 @@ class App
             }
 
             // Return success with file URL.
-            $fileUrl = '/content/uploads/' . $yearMonth . '/' . $finalFilename;
+            $fileUrl = '/site/uploads/' . $yearMonth . '/' . $finalFilename;
             echo json_encode([
                 'success' => true,
                 'url' => $fileUrl,
@@ -878,7 +903,7 @@ class App
         }
 
         // List content tree (admin only).
-        if ($requestPath === '/api/content/list' && $requestMethod === 'GET') {
+        if ($requestPath === '/api/site/list' && $requestMethod === 'GET') {
             $items = $this->listContentTree();
             echo json_encode(['success' => true, 'items' => $items]);
             return;
@@ -963,7 +988,7 @@ class App
         }
 
         // Get raw content.
-        if ($requestPath === '/api/content' && $requestMethod === 'GET') {
+        if ($requestPath === '/api/site' && $requestMethod === 'GET') {
             // Resolve the requested content path.
             $requestedPath = (string)($_GET['path'] ?? '/');
             $resolvedContentPath = $this->resolveContentFile($requestedPath);
@@ -1020,7 +1045,7 @@ class App
         if ($requestPath === '/api/settings') {
             if ($requestMethod === 'GET') {
                 // Load config.php and return as flat key structure.
-                $configPath = $this->appDir . '/config.php';
+                $configPath = $this->resolveConfigPath();
                 if (!file_exists($configPath)) {
                     http_response_code(404);
                     echo json_encode(['success' => false, 'error' => 'Config file not found']);
@@ -1079,7 +1104,7 @@ class App
                 }
 
                 // Load existing config to preserve protected keys.
-                $configPath = $this->appDir . '/config.php';
+                $configPath = $this->resolveConfigPath();
                 $existingConfig = require $configPath;
 
                 // Merge with protected keys.
@@ -1263,7 +1288,7 @@ class App
     }
 
     /**
-     * Handle content export - creates tarball of content/ + config.php.
+     * Handle content export - creates tarball of site/ (including config.php).
      */
     private function handleExport(): void
     {
@@ -1275,17 +1300,22 @@ class App
             // Create temporary directory
             mkdir($tempDir, 0755, true);
 
-            // Copy content directory
-            $contentSource = $this->root . '/content';
-            $contentDest = $tempDir . '/content';
+        // Copy site directory
+            $contentSource = $this->root . '/site';
+            $contentDest = $tempDir . '/site';
             if (is_dir($contentSource)) {
                 $this->recursiveCopy($contentSource, $contentDest);
             }
 
-            // Copy config.php
-            $configSource = $this->appDir . '/config.php';
+        // Ensure config.php is included inside site/ for legacy installs.
+            $configSource = $this->resolveConfigPath();
+            $configDestination = $tempDir . '/site/config.php';
             if (file_exists($configSource)) {
-                copy($configSource, $tempDir . '/config.php');
+                $configDir = dirname($configDestination);
+                if (!is_dir($configDir)) {
+                    mkdir($configDir, 0755, true);
+                }
+                copy($configSource, $configDestination);
             }
 
             // Create tarball
@@ -1362,7 +1392,7 @@ class App
         }
 
         // Define directories that may contain pages.
-        $contentSearchDirectories = ['content/pages'];
+        $contentSearchDirectories = ['site/pages'];
 
         foreach ($contentSearchDirectories as $contentDirectory) {
             // Build candidate file paths for both Markdown and MDX.
@@ -1391,7 +1421,7 @@ class App
     }
 
     /**
-     * Build a hierarchical list of content files under content/pages.
+     * Build a hierarchical list of content files under site/pages.
      */
     private function listContentTree(): array
     {
@@ -1399,7 +1429,7 @@ class App
     }
 
     /**
-     * Build a hierarchical list of block files under content/blocks.
+     * Build a hierarchical list of block files under site/blocks.
      */
     private function listBlockTree(): array
     {
@@ -1478,7 +1508,7 @@ class App
     }
 
     /**
-     * Convert a content/pages relative file path into a URL slug.
+     * Convert a site/pages relative file path into a URL slug.
      */
     private function contentSlugFromRelative(string $relativeFile): string
     {
@@ -1523,6 +1553,8 @@ class App
      */
     private function render(string $filePath): void
     {
+        require_once $this->appDir . '/core/helpers.php';
+
         // Parse the content file into metadata and HTML.
         $parser = new Parser($this);
         $pagePayload = $parser->parseFile($filePath);
@@ -1542,7 +1574,7 @@ class App
 
         // Locate the active theme directory.
         $themeName = $this->config['site']['theme'] ?? 'motion';
-        $themeDirectory = $this->root . '/content/themes/' . $themeName;
+        $themeDirectory = $this->root . '/site/themes/' . $themeName;
 
         if (!is_dir($themeDirectory)) {
             throw new \Exception("Theme '$themeName' not found.");
@@ -1572,6 +1604,8 @@ class App
                 $adminAssets
             );
         }
+
+        ThemeContext::set($themeData);
 
         // Include theme helpers if they exist.
         if (file_exists($themeDirectory . '/helpers.php')) {
@@ -1621,6 +1655,8 @@ class App
 
         // Output final HTML.
         echo $finalHtml;
+
+        ThemeContext::clear();
     }
 
     /**
@@ -1631,7 +1667,7 @@ class App
         // Provide a consistent 404 response.
         http_response_code(404);
         $themeName = $this->config['site']['theme'] ?? 'motion';
-        $errorPagePath = $this->root . '/content/themes/' . $themeName . '/404.php';
+        $errorPagePath = $this->root . '/site/themes/' . $themeName . '/404.php';
         if (file_exists($errorPagePath)) {
             // Make site config and theme config available to 404 template.
             $site = $this->config['site'];
@@ -1721,7 +1757,7 @@ class App
             return;
         }
 
-        $configPath = $this->appDir . '/config.php';
+        $configPath = $this->resolveConfigPath();
         if (!file_exists($configPath)) {
             $this->renderMagicLinkPage(false, 'Configuration file missing.');
             return;
@@ -1840,7 +1876,7 @@ class App
      */
     private function isRateLimited(string $bucket, int $maxRequests, int $windowSeconds): bool
     {
-        $rateLimitDir = $this->root . '/content/submissions';
+        $rateLimitDir = $this->root . '/site/submissions';
         $this->ensureDir($rateLimitDir);
 
         $rateLimitFile = $rateLimitDir . '/.' . $bucket . '.json';
@@ -1873,6 +1909,11 @@ class App
      */
     private function shouldExposeMagicLink(): bool
     {
+        $environment = strtolower(trim((string)($this->config['system']['environment'] ?? '')));
+        if ($environment !== '') {
+            return in_array($environment, ['dev', 'development', 'local'], true);
+        }
+
         $debug = $this->config['system']['debug'] ?? false;
         $showErrors = $this->config['system']['show_errors'] ?? false;
         $devMode = $this->isTruthy($debug) || $this->isTruthy($showErrors);
@@ -1922,7 +1963,7 @@ class App
     {
         $ip = $this->getClientIp();
         $bucket = 'magic-link-fail-' . md5($ip);
-        $rateLimitDir = $this->root . '/content/submissions';
+        $rateLimitDir = $this->root . '/site/submissions';
         $this->ensureDir($rateLimitDir);
 
         $rateLimitFile = $rateLimitDir . '/.' . $bucket . '.json';
@@ -2015,6 +2056,14 @@ class App
         $blockName = MagicLink::defaultBlockForMode($mode);
         $subject = MagicLink::defaultSubjectForMode($mode, $siteName);
 
+        if ($this->shouldExposeMagicLink()) {
+            return [
+                'success' => true,
+                'message' => 'Magic link generated for local use.',
+                'magic_link' => $magicLink
+            ];
+        }
+
         $emailSent = MagicLink::sendEmail(
             $this->appDir,
             $this->root,
@@ -2027,14 +2076,6 @@ class App
         );
 
         if (!$emailSent) {
-            if ($this->shouldExposeMagicLink()) {
-                return [
-                    'success' => true,
-                    'message' => 'Magic link generated for local use.',
-                    'magic_link' => $magicLink
-                ];
-            }
-
             MagicLink::clearTokenStore($this->appDir);
             return ['success' => false, 'error' => 'Failed to send magic link email'];
         }
@@ -2402,10 +2443,10 @@ class App
     private function sendContactEmail(string $senderName, string $senderEmail, string $messageBody): bool
     {
         // Load email template.
-        $templatePath = $this->root . '/content/blocks/contact-email.md';
+        $templatePath = \Components\Block::resolveMarkdownBlockPath($this->root, 'contact-email');
 
-        if (!file_exists($templatePath)) {
-            error_log("Contact email template not found: {$templatePath}");
+        if ($templatePath === null || !file_exists($templatePath)) {
+            error_log("Contact email template not found");
             return false;
         }
 
@@ -2909,8 +2950,8 @@ class App
      */
     private function storeSubmission(array $data): void
     {
-        // Store in content/submissions/forms/ (event log structure)
-        $formsDir = $this->root . '/content/submissions/forms';
+        // Store in site/submissions/forms/ (event log structure)
+        $formsDir = $this->root . '/site/submissions/forms';
 
         // Create directory if it doesn't exist.
         if (!is_dir($formsDir)) {
@@ -2918,7 +2959,7 @@ class App
         }
 
         // Create .htaccess in root submissions directory if it doesn't exist.
-        $submissionsDir = $this->root . '/content/submissions';
+        $submissionsDir = $this->root . '/site/submissions';
         $htaccessPath = $submissionsDir . '/.htaccess';
         if (!file_exists($htaccessPath)) {
             file_put_contents(
@@ -2953,7 +2994,7 @@ class App
      */
     private function loadSubmissions(): array
     {
-        $formsDir = $this->root . '/content/submissions/forms';
+        $formsDir = $this->root . '/site/submissions/forms';
 
         if (!is_dir($formsDir)) {
             return [];
@@ -2990,7 +3031,7 @@ class App
      */
     private function clearSubmissions(): void
     {
-        $formsDir = $this->root . '/content/submissions/forms';
+        $formsDir = $this->root . '/site/submissions/forms';
 
         if (!is_dir($formsDir)) {
             return;
@@ -3013,7 +3054,7 @@ class App
      */
     private function listInstalledComponents(): array
     {
-        $componentsDir = $this->root . '/content/components';
+        $componentsDir = $this->root . '/site/components';
         $components = [];
 
         if (!is_dir($componentsDir)) {
@@ -3133,7 +3174,7 @@ class App
             return ['success' => false, 'error' => 'Invalid repository format'];
         }
 
-        $componentsDir = $this->root . '/content/components';
+        $componentsDir = $this->root . '/site/components';
         if (!is_dir($componentsDir)) {
             mkdir($componentsDir, 0755, true);
         }
@@ -3227,7 +3268,7 @@ class App
      */
     private function updateComponent(string $name): array
     {
-        $componentDir = $this->root . '/content/components/' . $name;
+        $componentDir = $this->root . '/site/components/' . $name;
         $configPath = $componentDir . '/config.php';
 
         if (!is_dir($componentDir) || !file_exists($configPath)) {
@@ -3271,7 +3312,7 @@ class App
      */
     private function toggleComponent(string $name, bool $enabled): array
     {
-        $componentDir = $this->root . '/content/components/' . $name;
+        $componentDir = $this->root . '/site/components/' . $name;
         $configPath = $componentDir . '/config.php';
 
         if (!file_exists($configPath)) {
@@ -3295,7 +3336,7 @@ class App
      */
     private function deleteComponent(string $name): array
     {
-        $componentDir = $this->root . '/content/components/' . $name;
+        $componentDir = $this->root . '/site/components/' . $name;
 
         if (!is_dir($componentDir)) {
             return ['success' => false, 'error' => 'Component not found'];
@@ -3362,7 +3403,7 @@ class App
      */
     private function loadThemeConfig(string $themeName): array
     {
-        $themeConfigPath = $this->root . '/content/themes/' . $themeName . '/config.php';
+        $themeConfigPath = $this->root . '/site/themes/' . $themeName . '/config.php';
 
         if (file_exists($themeConfigPath)) {
             // SECURITY: Validate path to prevent symlink attacks
@@ -3386,7 +3427,7 @@ class App
     {
         // Define .htaccess rules for each directory.
         $htaccessRules = [
-            $this->root . '/content/uploads/.htaccess' => [
+            $this->root . '/site/uploads/.htaccess' => [
                 '# Prevent PHP execution in uploads directory',
                 '<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi)$">',
                 '    Order Allow,Deny',
@@ -3399,7 +3440,7 @@ class App
                 '    Deny from all',
                 '</Files>',
             ],
-            $this->root . '/content/pages/.htaccess' => [
+            $this->root . '/site/pages/.htaccess' => [
                 '# Block direct access to markdown files',
                 '<FilesMatch "\.md$|\.mdx$">',
                 '    Order Allow,Deny',
@@ -3412,7 +3453,7 @@ class App
                 '    Deny from all',
                 '</FilesMatch>',
             ],
-            $this->root . '/content/blocks/.htaccess' => [
+            $this->root . '/site/blocks/.htaccess' => [
                 '# Block direct access to block files',
                 '<FilesMatch "\.md$|\.mdx$">',
                 '    Order Allow,Deny',
@@ -3425,7 +3466,7 @@ class App
                 '    Deny from all',
                 '</FilesMatch>',
             ],
-            $this->root . '/content/components/.htaccess' => [
+            $this->root . '/site/components/.htaccess' => [
                 '# Prevent direct web execution of components',
                 '<FilesMatch "\.php$">',
                 '    Order Allow,Deny',
@@ -3451,13 +3492,13 @@ class App
 
         // Define directories that need index.php sentinel files.
         $sentinelDirs = [
-            $this->root . '/content',
-            $this->root . '/content/uploads',
-            $this->root . '/content/pages',
-            $this->root . '/content/blocks',
-            $this->root . '/content/submissions',
-            $this->root . '/content/components',
-            $this->root . '/content/themes',
+            $this->root . '/site',
+            $this->root . '/site/uploads',
+            $this->root . '/site/pages',
+            $this->root . '/site/blocks',
+            $this->root . '/site/submissions',
+            $this->root . '/site/components',
+            $this->root . '/site/themes',
             $this->appDir . '/core',
             $this->appDir . '/core/components',
         ];
@@ -3485,12 +3526,12 @@ class App
      * Get current month upload directory (yyyymm format)
      *
      * @param int|null $timestamp Optional timestamp (defaults to now)
-     * @return string Path like '/content/uploads/202501'
+     * @return string Path like '/site/uploads/202501'
      */
     public function getUploadDir(?int $timestamp = null): string
     {
         $yearMonth = date('Ym', $timestamp ?? time());
-        return $this->root . '/content/uploads/' . $yearMonth;
+        return $this->root . '/site/uploads/' . $yearMonth;
     }
 
     /**
@@ -3583,7 +3624,7 @@ class App
      */
     public function log(string $message, string $level = 'info', string $category = 'app'): void
     {
-        $logDir = $this->root . '/content/submissions/logs';
+        $logDir = $this->root . '/site/submissions/logs';
         if (!is_dir($logDir)) {
             mkdir($logDir, 0750, true);
         }
@@ -3669,7 +3710,7 @@ class App
      * ATTACK EXAMPLE:
      * ```bash
      * # Attacker creates:
-     * ln -s /etc/passwd content/uploads/passwords.txt
+     * ln -s /etc/passwd site/uploads/passwords.txt
      * # Then requests: /api/upload?file=passwords.txt
      * # Without this check, app would read /etc/passwd
      * ```
@@ -3680,15 +3721,15 @@ class App
      * - If path escapes allowed dirs, it's rejected
      *
      * @param string $filePath Path to validate
-     * @param string $allowedBaseDir Base directory path must be within (default: content dir)
+     * @param string $allowedBaseDir Base directory path must be within (default: site dir)
      * @return string Validated real path
      * @throws \Exception If path is invalid or outside allowed directory
      */
-    private function validateSecurePath(string $filePath, string $allowedBaseDir = null): string
+    private function validateSecurePath(string $filePath, ?string $allowedBaseDir = null): string
     {
-        // Default to content directory if not specified
+        // Default to site directory if not specified
         if ($allowedBaseDir === null) {
-            $allowedBaseDir = Paths::$contentDir;
+            $allowedBaseDir = Paths::$siteDir;
         }
 
         // Resolve the real path (follows symlinks)

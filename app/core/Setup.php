@@ -33,17 +33,29 @@ class Setup
     }
 
     /**
-     * Handle setup form submission and persist config.php.
+     * Handle setup form submission and persist site/config.php.
      */
     private static function handlePost(array $formData): array
     {
         // Resolve the configuration path once for reuse.
-        $appDir = __DIR__ . '/..';
-        $rootDir = dirname($appDir);
-        $configPath = $appDir . '/config.php';
+        $appDir = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
+        $rootDir = realpath($appDir . '/..') ?: dirname($appDir);
+        $configPath = $rootDir . '/site/config.php';
+        $legacyConfigPaths = [
+            $rootDir . '/config.php',
+            $appDir . '/config.php',
+        ];
 
         // Refuse to overwrite an existing install.
-        if (file_exists($configPath)) {
+        $legacyConfigExists = false;
+        foreach ($legacyConfigPaths as $legacyConfigPath) {
+            if (file_exists($legacyConfigPath)) {
+                $legacyConfigExists = true;
+                break;
+            }
+        }
+
+        if (file_exists($configPath) || $legacyConfigExists) {
             return [
                 'success' => false,
                 'message' => 'Config already exists. Setup will not overwrite an existing install.',
@@ -67,13 +79,13 @@ class Setup
 
         // Create content directories non-destructively.
         $directories = [
-            $rootDir . '/content',
-            $rootDir . '/content/pages',
-            $rootDir . '/content/blocks',
-            $rootDir . '/content/uploads',
-            $rootDir . '/content/themes',
-            $rootDir . '/content/components',
-            $rootDir . '/content/submissions',
+            $rootDir . '/site',
+            $rootDir . '/site/pages',
+            $rootDir . '/site/blocks',
+            $rootDir . '/site/uploads',
+            $rootDir . '/site/themes',
+            $rootDir . '/site/components',
+            $rootDir . '/site/submissions',
         ];
 
         foreach ($directories as $dir) {
@@ -82,8 +94,10 @@ class Setup
             }
         }
 
+        self::seedDefaultContent($rootDir);
+
         // Create welcome page if it doesn't exist.
-        $welcomePage = $rootDir . '/content/pages/index.md';
+        $welcomePage = $rootDir . '/site/pages/index.md';
         if (!file_exists($welcomePage)) {
             $welcomeContent = <<<'MD'
 ---
@@ -130,6 +144,7 @@ MD;
         $magicPair = MagicLink::generateTokenPair();
         $magicExpiresAt = time() + MagicLink::defaultTtlSeconds(MagicLink::MODE_SETUP);
 
+        $environment = self::shouldExposeMagicLink() ? 'development' : 'production';
         $configData = [
             'site' => [
                 'name' => $formData['site_name'],
@@ -145,6 +160,7 @@ MD;
             ],
             'system' => [
                 'cache_enabled' => false,
+                'environment' => $environment,
                 'show_errors' => false,
             ],
             'updates' => [
@@ -160,6 +176,13 @@ MD;
             ];
         }
 
+        // Remove any legacy config files inside app/ or app/core/ to avoid confusion.
+        foreach (array_merge($legacyConfigPaths, [$appDir . '/core/config.php']) as $legacyConfig) {
+            if (file_exists($legacyConfig)) {
+                @unlink($legacyConfig);
+            }
+        }
+
         $tokenEntry = MagicLink::buildConfigEntry(
             MagicLink::MODE_SETUP,
             $magicPair['hash'],
@@ -169,27 +192,60 @@ MD;
         MagicLink::writeTokenStore($appDir, $tokenEntry);
 
         $magicLink = MagicLink::buildMagicLink($formData['site_website'], $magicPair['token']);
-        $emailSent = MagicLink::sendEmail(
-            $appDir,
-            $rootDir,
-            $formData['admin_email'],
-            $formData['site_name'],
-            $formData['site_website'],
-            $magicLink,
-            MagicLink::defaultBlockForMode(MagicLink::MODE_SETUP),
-            MagicLink::defaultSubjectForMode(MagicLink::MODE_SETUP, $formData['site_name'])
-        );
+        $exposeMagicLink = self::shouldExposeMagicLink($environment);
+        $emailSent = false;
 
-        $message = $emailSent
-            ? 'Setup complete! Check your email for a magic link to finish sign-in.'
-            : 'Setup complete, but the magic link email could not be sent.';
+        if (!$exposeMagicLink) {
+            $emailSent = MagicLink::sendEmail(
+                $appDir,
+                $rootDir,
+                $formData['admin_email'],
+                $formData['site_name'],
+                $formData['site_website'],
+                $magicLink,
+                MagicLink::defaultBlockForMode(MagicLink::MODE_SETUP),
+                MagicLink::defaultSubjectForMode(MagicLink::MODE_SETUP, $formData['site_name'])
+            );
+        }
+
+        if ($exposeMagicLink) {
+            $message = 'Setup complete! Use this magic link to finish sign-in: [Open magic link](' . $magicLink . ')';
+        } else {
+            $message = $emailSent
+                ? 'Setup complete! Check your email for a magic link to finish sign-in.'
+                : 'Setup complete, but the magic link email could not be sent.';
+        }
 
         return [
             'success' => true,
             'message' => $message,
-            'magic_link' => $emailSent ? null : $magicLink,
+            'magic_link' => ($emailSent || $exposeMagicLink) ? null : $magicLink,
             'form' => $formData,
         ];
+    }
+
+    /**
+     * Determine if magic links can be exposed during setup for local development.
+     */
+    private static function shouldExposeMagicLink(?string $environment = null): bool
+    {
+        $environment = strtolower(trim((string)$environment));
+        if ($environment !== '') {
+            return in_array($environment, ['dev', 'development', 'local'], true);
+        }
+
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        if (in_array($ip, ['127.0.0.1', '::1'], true)) {
+            return true;
+        }
+
+        $hostHeader = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '');
+        $host = parse_url('http://' . $hostHeader, PHP_URL_HOST) ?: $hostHeader;
+        if ($host === 'localhost') {
+            return true;
+        }
+
+        return str_ends_with($host, '.local') || str_ends_with($host, '.test');
     }
 
     /**
@@ -226,7 +282,7 @@ MD;
     }
 
     /**
-     * Write the config.php file with safe permissions.
+     * Write the site/config.php file with safe permissions.
      */
     private static function writeConfig(string $path, array $config): bool
     {
@@ -240,5 +296,54 @@ MD;
 
         chmod($path, 0600);
         return true;
+    }
+
+    /**
+     * Seed default pages and blocks from the core content library.
+     */
+    private static function seedDefaultContent(string $rootDir): void
+    {
+        $coreContentDir = $rootDir . '/app/core/content';
+        self::copyMissingFiles($coreContentDir . '/pages', $rootDir . '/site/pages');
+        self::copyMissingFiles($coreContentDir . '/blocks', $rootDir . '/site/blocks');
+        self::copyMissingFiles($coreContentDir . '/uploads', $rootDir . '/site/uploads');
+    }
+
+    /**
+     * Copy files from source to destination, skipping anything that already exists.
+     */
+    private static function copyMissingFiles(string $source, string $destination): void
+    {
+        $source = rtrim($source, DIRECTORY_SEPARATOR);
+        $destination = rtrim($destination, DIRECTORY_SEPARATOR);
+
+        if (!is_dir($source)) {
+            return;
+        }
+
+        if (!is_dir($destination)) {
+            mkdir($destination, 0755, true);
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            $relativePath = substr($item->getPathname(), strlen($source) + 1);
+            $targetPath = $destination . DIRECTORY_SEPARATOR . $relativePath;
+
+            if ($item->isDir()) {
+                if (!is_dir($targetPath)) {
+                    mkdir($targetPath, 0755, true);
+                }
+                continue;
+            }
+
+            if (!file_exists($targetPath)) {
+                copy($item->getPathname(), $targetPath);
+            }
+        }
     }
 }

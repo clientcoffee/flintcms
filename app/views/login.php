@@ -30,6 +30,32 @@ ob_start();
     const loginEmailLink = document.getElementById("login-email-link");
     const forgotPasswordLink = document.getElementById("forgot-password-link");
 
+    const escapeFlashHtml = (value) => {
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    };
+
+    const renderFlashMarkdown = (message) => {
+        if (!message) {
+            return "";
+        }
+
+        let safe = escapeFlashHtml(message);
+        safe = safe.replace(/`([^`]+)`/g, '<code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">$1</code>');
+        safe = safe.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (match, label, url) => {
+            if (!/^(https?:\/\/|\/)/i.test(url)) {
+                return match;
+            }
+            return `<a href="${url}" class="text-indigo-600 underline break-all hover:text-indigo-700">${label}</a>`;
+        });
+
+        return safe;
+    };
+
     const setLoginMessage = (message, tone = "info", link = null) => {
         loginMessage.classList.add("hidden");
         loginMessage.classList.remove(
@@ -44,24 +70,17 @@ ob_start();
             "text-indigo-700"
         );
 
-        loginMessage.textContent = message;
+        let fullMessage = message || "";
+        if (link) {
+            fullMessage = `${fullMessage} [Open magic link](${link})`;
+        }
+        loginMessage.innerHTML = renderFlashMarkdown(fullMessage);
         if (tone === "success") {
             loginMessage.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
         } else if (tone === "error") {
             loginMessage.classList.add("border-red-200", "bg-red-50", "text-red-700");
         } else {
             loginMessage.classList.add("border-indigo-200", "bg-indigo-50", "text-indigo-700");
-        }
-
-        if (link) {
-            const linkWrapper = document.createElement("div");
-            linkWrapper.className = "mt-2 text-xs";
-            const linkEl = document.createElement("a");
-            linkEl.href = link;
-            linkEl.textContent = "Open magic link";
-            linkEl.className = "text-indigo-600 hover:text-indigo-700 underline break-all";
-            linkWrapper.appendChild(linkEl);
-            loginMessage.appendChild(linkWrapper);
         }
 
         loginMessage.classList.remove("hidden");

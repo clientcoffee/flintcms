@@ -19,8 +19,8 @@ class Scheduler
     public function __construct(App $app)
     {
         $this->app = $app;
-        $this->lockDir = $app->root . '/content/submissions/scheduler/locks';
-        $this->stateDir = $app->root . '/content/submissions/scheduler/state';
+        $this->lockDir = $app->root . '/site/submissions/scheduler/locks';
+        $this->stateDir = $app->root . '/site/submissions/scheduler/state';
 
         // Ensure directories exist
         $this->ensureDirectory($this->lockDir);

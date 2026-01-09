@@ -2,6 +2,8 @@
 
 namespace Flint;
 
+use Components\Block;
+
 class MagicLink
 {
     public const MODE_SETUP = 'setup';
@@ -168,7 +170,7 @@ class MagicLink
         string $blockName,
         string $subject
     ): bool {
-        $blockPath = $rootDir . '/content/blocks/' . $blockName . '.md';
+        $blockPath = Block::resolveMarkdownBlockPath($rootDir, $blockName);
         $markdown = file_exists($blockPath)
             ? file_get_contents($blockPath)
             : "# Finish setting up Flint\n\nClick the link below to finish:\n\n{{magic_link}}\n";

@@ -18,6 +18,8 @@ namespace Flint;
  * - 404_render: Before 404 page renders (context: path, theme)
  * - admin_panel_load: Admin interface loading (context: tab)
  * - response_send: Before sending response (context: status, headers)
+ * - theme_styles: After theme assets are inserted into <head>
+ * - theme_scripts: Before closing </body>, for footer scripts
  */
 class HookManager
 {
@@ -52,12 +54,12 @@ class HookManager
     }
 
     /**
-     * Discover and initialize components from content/components directory
+     * Discover and initialize components from site/components directory
      */
     private static function loadComponents(): void
     {
-        // Load site components from content/components
-        $siteComponentsDir = self::$app->root . '/content/components';
+        // Load site components from site/components
+        $siteComponentsDir = self::$app->root . '/site/components';
         self::scanComponentDirectory($siteComponentsDir, 'Components');
 
         // Load core components from app/core/components

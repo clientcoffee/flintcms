@@ -1,4 +1,5 @@
 <?php
+
 /** @var string $siteName */
 /** @var string $magicLink */
 /** @var string $contentHtml */

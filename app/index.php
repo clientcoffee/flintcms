@@ -17,6 +17,9 @@ header('Cross-Origin-Resource-Policy: same-site');
 header('X-Permitted-Cross-Domain-Policies: none');
 header("Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src https://www.youtube.com https://player.vimeo.com https://fast.wistia.net https://fast.wistia.com https://www.tiktok.com https://www.instagram.com https://www.facebook.com https://player.twitch.tv https://twitframe.com;");
 
+$appDir = __DIR__;
+$rootDir = dirname(__DIR__);
+
 // 1. Zero-Config Autoloader
 spl_autoload_register(function (string $class) {
     $appDir = __DIR__;
@@ -25,7 +28,7 @@ spl_autoload_register(function (string $class) {
     $map = [
         'Flint\\' => $appDir . '/core/',
         'Components\\' => $appDir . '/core/components/',  // System components
-        'Modules\\' => $rootDir . '/content/themes/',  // User themes
+        'Modules\\' => $rootDir . '/site/themes/',  // User themes
     ];
 
     foreach ($map as $prefix => $baseDir) {
@@ -51,10 +54,12 @@ spl_autoload_register(function (string $class) {
     }
 });
 
+require_once $appDir . '/core/helpers.php';
+
 // 2. Boot
 try {
     $appDir = __DIR__;  // App directory contains config
-    $rootDir = dirname(__DIR__);  // Parent directory contains content
+    $rootDir = dirname(__DIR__);  // Parent directory contains site bundle
 
     $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
     if (str_starts_with($requestPath, '/assets/')) {
@@ -78,8 +83,12 @@ try {
         }
     }
 
-    // Check for installation config.php
-    if (!file_exists($appDir . '/config.php')) {
+    // Check for installation config.php (site location preferred, fall back to legacy locations)
+    if (
+        !file_exists($rootDir . '/site/config.php') &&
+        !file_exists($rootDir . '/config.php') &&
+        !file_exists($appDir . '/config.php')
+    ) {
         \Flint\Setup::render();
         exit;
     }
@@ -91,7 +100,13 @@ try {
 
     // Determine if we should show detailed errors based on config
     $showDetailedErrors = false;
-    $configPath = $appDir . '/config.php';
+    $configPath = $rootDir . '/site/config.php';
+    if (!file_exists($configPath) && file_exists($rootDir . '/config.php')) {
+        $configPath = $rootDir . '/config.php';
+    }
+    if (!file_exists($configPath) && file_exists($appDir . '/config.php')) {
+        $configPath = $appDir . '/config.php';
+    }
 
     if (file_exists($configPath)) {
         try {

@@ -1,37 +1,41 @@
 <!-- Banner Image -->
 <?php
 $bannerUrl = $page['meta']['banner'] ?? ($themeConfig['settings']['default_banner'] ?? '');
+$hasBanner = !empty($bannerUrl);
 ?>
-<?php if (!empty($bannerUrl)) : ?>
+<?php if ($hasBanner) : ?>
     <?php
     // Handle relative URLs
     if (!preg_match('/^https?:\/\//', $bannerUrl)) {
-        $bannerUrl = '/content' . $bannerUrl; // /uploads/img.jpg becomes /content/uploads/img.jpg
+        $bannerUrl = '/site' . $bannerUrl; // /uploads/img.jpg becomes /site/uploads/img.jpg
     }
     ?>
-    <div class="page-banner mb-8 -mx-6 sm:-mx-12">
-        <img src="<?= htmlspecialchars($bannerUrl) ?>" alt="<?= htmlspecialchars($page['meta']['title'] ?? '') ?>" class="w-full h-64 object-cover rounded-lg" />
+    <div class="page-banner mb-8" style="margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw);">
+        <img src="<?= esc_html($bannerUrl) ?>" alt="<?= page_meta('title') ?>" class="w-full object-cover" style="height: clamp(12rem, 32vw, 20rem);" />
     </div>
 <?php endif; ?>
 
 <!-- Page Title with Edit Controls -->
 <?php if (!empty($page['meta']['title'])) : ?>
     <div class="mb-8 sm:mb-12">
-        <div class="flex items-center gap-3">
-            <?php if (!empty($page['meta']['icon'])) : ?>
-                <?php $iconEmoji = getEmojiFromSlug($page['meta']['icon']); ?>
-                <?php if ($iconEmoji) : ?>
-                    <span class="page-icon text-4xl sm:text-5xl"><?= $iconEmoji ?></span>
-                <?php endif; ?>
+        <?php if (!empty($page['meta']['icon'])) : ?>
+            <?php $iconEmoji = getEmojiFromSlug($page['meta']['icon']); ?>
+            <?php if ($iconEmoji) : ?>
+                <?php $iconStyle = $hasBanner ? 'transform: translateY(-60%);' : ''; ?>
+                <div class="mb-3 flex items-start relative z-10" style="<?= $iconStyle ?>">
+                    <span class="page-icon text-7xl sm:text-8xl leading-none align-top"><?= $iconEmoji ?></span>
+                </div>
             <?php endif; ?>
-            <h1 class="text-4xl sm:text-5xl font-bold text-gray-900 mb-3 leading-tight">
-                <?= htmlspecialchars($page['meta']['title']) ?>
+        <?php endif; ?>
+        <div class="flex flex-wrap items-start gap-3 mb-3">
+            <h1 class="font-bold text-gray-900 leading-tight" style="font-size: clamp(1.9rem, 3vw, 2.55rem);">
+                <?= page_meta('title') ?>
             </h1>
         </div>
 
         <?php if (!empty($page['meta']['description'])) : ?>
             <p class="text-lg text-gray-600 leading-relaxed">
-                <?= htmlspecialchars($page['meta']['description']) ?>
+                <?= page_meta('description') ?>
             </p>
         <?php endif; ?>
     </div>
