@@ -73,13 +73,17 @@
             transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
             transition-duration: 150ms;
         }
+
+        .nav-menu ul {
+            flex-wrap: wrap;
+        }
     </style>
 </head>
 <body class="bg-[#FAFAFA] text-gray-800 antialiased">
     <!-- Fixed Top Navigation Bar -->
     <!-- This stays at the top of the viewport as users scroll -->
     <div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200/60 shadow-sm z-50">
-        <div class="max-w-5xl mx-auto px-6 sm:px-12 py-3 flex justify-between items-center">
+        <div class="max-w-5xl mx-auto px-6 sm:px-12 py-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <!-- Site Logo/Home Link -->
             <a href="/" class="flex items-center gap-2 text-gray-900 hover:text-gray-600 font-semibold text-sm nav-link">
                 <!-- Home icon (SVG) -->
@@ -90,13 +94,20 @@
                 <?= esc_html($site['name']) ?>
             </a>
 
-            <!-- Navigation Menu (hidden on mobile, shown on tablet+) -->
-            <div class="hidden sm:flex items-center gap-3">
+            <!-- Navigation Menu -->
+            <div class="nav-menu flex items-center gap-3">
                 <?php
-                // Load navigation links from a markdown block file
-                // This allows site owners to edit navigation without touching code
-                // File location: site/blocks/Nav/nav.md
-                echo render_block('nav');
+                $navItems = '';
+                $navPath = \Components\Block::resolveMarkdownBlockPath(\Flint\Paths::$rootDir, 'nav');
+                if ($navPath !== null && is_readable($navPath)) {
+                    $navItems = file_get_contents($navPath);
+                }
+
+                if (trim($navItems) !== '') {
+                    echo \Components\Nav::render(['items' => $navItems], '');
+                } else {
+                    echo render_block('nav');
+                }
                 ?>
             </div>
         </div>
@@ -104,7 +115,7 @@
 
     <!-- Main Content Area -->
     <!-- pt-16 creates top padding to account for fixed header -->
-    <main class="pt-16 min-h-screen">
+    <main class="pt-24 sm:pt-16 min-h-screen">
         <div class="max-w-3xl mx-auto px-6 sm:px-12 py-12 sm:py-16">
             <?php
             // This is where the actual page content is rendered
