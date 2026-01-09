@@ -2037,15 +2037,18 @@ class App
         $pair = MagicLink::generateTokenPair();
         $expiresAt = time() + MagicLink::defaultTtlSeconds($mode);
         $issuedAt = time();
+        $exposeMagicLink = $this->shouldExposeMagicLink();
 
-        $existingMagicLink = MagicLink::readTokenStore($this->appDir);
-        if (is_array($existingMagicLink)) {
-            $existingIssuedAt = (int)($existingMagicLink['issued_at'] ?? 0);
-            if ($existingIssuedAt > 0 && (time() - $existingIssuedAt) < 120) {
-                return [
-                    'success' => true,
-                    'message' => 'A magic link was already sent. Please wait a moment before requesting another.'
-                ];
+        if (!$exposeMagicLink) {
+            $existingMagicLink = MagicLink::readTokenStore($this->appDir);
+            if (is_array($existingMagicLink)) {
+                $existingIssuedAt = (int)($existingMagicLink['issued_at'] ?? 0);
+                if ($existingIssuedAt > 0 && (time() - $existingIssuedAt) < 120) {
+                    return [
+                        'success' => true,
+                        'message' => 'A magic link was already sent. Please wait a moment before requesting another.'
+                    ];
+                }
             }
         }
 
@@ -2056,7 +2059,7 @@ class App
         $blockName = MagicLink::defaultBlockForMode($mode);
         $subject = MagicLink::defaultSubjectForMode($mode, $siteName);
 
-        if ($this->shouldExposeMagicLink()) {
+        if ($exposeMagicLink) {
             return [
                 'success' => true,
                 'message' => 'Magic link generated for local use.',
