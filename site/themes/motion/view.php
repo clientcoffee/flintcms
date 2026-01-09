@@ -93,7 +93,6 @@ $hasBanner = !empty($bannerUrl);
             text-decoration: underline;
             text-decoration-color: rgba(55, 53, 47, 0.4);
             text-underline-offset: 2px;
-            transition: all 0.15s ease;
         }
 
         .motion-content a:hover {
