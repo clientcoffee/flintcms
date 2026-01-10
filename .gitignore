@@ -33,14 +33,13 @@ app/.update-admin-check.json
 
 # Site directories (user-generated)
 site/config.php
-site/pages/
-site/blocks/
+# site/blocks/
 site/uploads/
 site/submissions/
 
 # Components (except Defense which ships with dist)
-site/components/*/
-!site/components/Defense/
+# site/components/*/
+# !site/components/Defense/
 
 
 composer.lock
