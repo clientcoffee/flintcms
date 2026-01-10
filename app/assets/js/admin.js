@@ -1,17 +1,31 @@
 (() => {
   "use strict";
 
-  // Constants for protected settings and shared UI text.
-  const PROTECTED_KEYS = new Set(["admin.password", "system.root"]);
+  // Constants for settings display and shared UI text.
+  const LABEL_ACRONYMS = {
+    api: "API",
+    css: "CSS",
+    html: "HTML",
+    id: "ID",
+    ip: "IP",
+    smtp: "SMTP",
+    url: "URL"
+  };
+  const SENSITIVE_KEY_PATTERN = /(password|secret|token|api_key|smtp_pass|smtp_password)/i;
   const SPINNER_ICON = "<svg class=\"animate-spin h-4 w-4 mr-2\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\" fill=\"none\"></circle><path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\"></path></svg>";
+  // Track non-removable site keys and pending deletions.
+  const settingsState = {
+    coreKeys: new Set(),
+    removed: new Set()
+  };
 
-  // Helper to query a single element.
+  // DOM helpers keep selectors terse.
   const qs = (selector, scope = document) => scope.querySelector(selector);
 
-  // Helper to query multiple elements.
+  // DOM helpers keep selectors terse.
   const qsa = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
-  // Helper to include CSRF token in all POST requests.
+  // Attach CSRF header on state-changing requests.
   const secureFetch = (url, options = {}) => {
     const headers = options.headers || {};
     if (typeof CSRF_TOKEN !== "undefined") {
@@ -20,14 +34,14 @@
     return fetch(url, { ...options, headers });
   };
 
-  // Helper to fetch JSON with consistent error handling.
+  // Fetch JSON while preserving the raw Response for status checks.
   const fetchJson = async (url, options = {}) => {
     const response = await secureFetch(url, options);
     const data = await response.json();
     return { response, data };
   };
 
-  // Helper to swap button state during async actions.
+  // Swap button state and label during async work.
   const setButtonState = (button, state) => {
     if (!button) {
       return;
@@ -44,7 +58,7 @@
     }
   };
 
-  // Helper to set a tone-aware banner message.
+  // Display tone-aware status messages in-place.
   const setMessage = (element, options) => {
     if (!element) {
       return;
@@ -85,7 +99,120 @@
     }
   };
 
-  // Helper to toggle editor UI state.
+  // Format config keys into friendly labels.
+  const formatSettingLabel = (key) => {
+    const segments = String(key || "").split(".");
+    return segments
+      .map((segment) => {
+        return segment
+          .split(/[_-]+/)
+          .map((word) => {
+            const lower = word.toLowerCase();
+            if (LABEL_ACRONYMS[lower]) {
+              return LABEL_ACRONYMS[lower];
+            }
+            return lower.charAt(0).toUpperCase() + lower.slice(1);
+          })
+          .join(" ");
+      })
+      .join(" ");
+  };
+
+  // Mask sensitive values for display-only settings.
+  const maskSettingValue = (key, value) => {
+    if (SENSITIVE_KEY_PATTERN.test(key)) {
+      return "******";
+    }
+
+    return value === "" ? "—" : value;
+  };
+
+  // Normalize new site setting keys.
+  const normalizeSiteKey = (raw) => {
+    const trimmed = String(raw || "").trim();
+    if (!trimmed) {
+      return "";
+    }
+    const withoutPrefix = trimmed.replace(/^site\./i, "");
+    return withoutPrefix.replace(/\s+/g, "_");
+  };
+
+  // Build an editable setting field element.
+  const createSettingField = (key, value) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "rounded-xl border border-gray-200 bg-white p-4 space-y-3";
+
+    const header = document.createElement("div");
+    header.className = "flex items-start justify-between gap-4";
+
+    const labelBlock = document.createElement("div");
+    const label = document.createElement("label");
+    label.className = "block text-sm font-medium text-gray-700";
+    label.textContent = formatSettingLabel(key);
+
+    const meta = document.createElement("p");
+    meta.className = "text-xs text-gray-400";
+    meta.textContent = key;
+
+    labelBlock.appendChild(label);
+    labelBlock.appendChild(meta);
+    header.appendChild(labelBlock);
+
+    if (!settingsState.coreKeys.has(key)) {
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "text-xs text-red-600 hover:text-red-700 font-semibold";
+      removeButton.textContent = "Remove";
+      removeButton.addEventListener("click", () => {
+        if (!confirm(`Remove ${key}?`)) {
+          return;
+        }
+        settingsState.removed.add(key);
+        wrapper.remove();
+      });
+      header.appendChild(removeButton);
+    }
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.name = key;
+    input.value = value;
+    input.className = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200";
+
+    wrapper.appendChild(header);
+    wrapper.appendChild(input);
+
+    return wrapper;
+  };
+
+  // Build a read-only settings row element.
+  const createReadonlyRow = (key, value) => {
+    const row = document.createElement("div");
+    row.className = "flex items-start justify-between gap-4 border-b border-gray-100 pb-3";
+
+    const labelBlock = document.createElement("div");
+    const label = document.createElement("p");
+    label.className = "text-sm font-medium text-gray-700";
+    label.textContent = formatSettingLabel(key);
+
+    const meta = document.createElement("p");
+    meta.className = "text-xs text-gray-400";
+    meta.textContent = key;
+
+    labelBlock.appendChild(label);
+    labelBlock.appendChild(meta);
+
+    const valueEl = document.createElement("p");
+    valueEl.className = "text-sm text-gray-600 text-right break-all";
+    valueEl.textContent = maskSettingValue(key, value);
+
+    row.appendChild(labelBlock);
+    row.appendChild(valueEl);
+
+    return row;
+  };
+
+  // Toggle editor UI visibility and button state.
   const setEditorState = (editor, enabled) => {
     if (!editor.editorArea || !editor.placeholder || !editor.saveButton || !editor.cancelButton) {
       return;
@@ -97,7 +224,7 @@
     editor.cancelButton.disabled = !enabled;
   };
 
-  // Helper to toggle the active button styling.
+  // Toggle the active button styling in tree lists.
   const setActiveButton = (nextButton, currentButton) => {
     if (currentButton) {
       currentButton.classList.remove("bg-indigo-50", "text-indigo-700");
@@ -110,6 +237,14 @@
     }
 
     return nextButton;
+  };
+
+  // Open a named tab programmatically for cross-tab shortcuts.
+  const openTab = (tabName) => {
+    const link = qs(`.admin-nav-link[data-tab="${tabName}"]`);
+    if (link) {
+      link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    }
   };
 
   // Tab switching logic for the admin sidebar.
@@ -149,7 +284,7 @@
     });
   };
 
-  // Settings form loading and rendering.
+  // Render editable settings for the Settings tab.
   const renderSettings = (settings) => {
     const container = qs("#settings-container");
     if (!container) {
@@ -157,70 +292,107 @@
     }
 
     container.innerHTML = "";
-    Object.entries(settings || {}).forEach(([key, value]) => {
-      const isProtected = PROTECTED_KEYS.has(key);
-      const field = document.createElement("div");
-      field.innerHTML = `
-        <label class="block text-sm font-medium text-gray-700 mb-2">${key}</label>
-        <input type="text" name="${key}" value="${value}" ${isProtected ? "disabled" : ""} class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm ${
-        isProtected
-          ? "bg-gray-50 text-gray-500 cursor-not-allowed"
-          : "focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-      }">
-        ${
-          isProtected
-            ? "<p class=\"text-xs text-gray-500 mt-1\">This setting cannot be modified</p>"
-            : ""
-        }
-      `;
-      container.appendChild(field);
+    settingsState.removed.clear();
+
+    const entries = Object.entries(settings || {});
+    if (entries.length === 0) {
+      container.innerHTML = "<p class=\"text-sm text-gray-500\">No site settings yet.</p>";
+      return;
+    }
+
+    entries.forEach(([key, value]) => {
+      container.appendChild(createSettingField(key, value));
     });
   };
 
-  // Load settings data from the API.
+  // Render read-only config values.
+  const renderReadonlySettings = (settings) => {
+    const container = qs("#settings-readonly");
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = "";
+    const entries = Object.entries(settings || {});
+    if (entries.length === 0) {
+      container.innerHTML = "<p class=\"text-sm text-gray-500\">No read-only settings found.</p>";
+      return;
+    }
+
+    entries.forEach(([key, value]) => {
+      container.appendChild(createReadonlyRow(key, value));
+    });
+  };
+
+  // Fetch settings payload for the Settings tab.
   const loadSettings = async () => {
     try {
       const { data } = await fetchJson("/api/settings");
       if (data.success) {
-        renderSettings(data.settings);
+        settingsState.coreKeys = new Set((data.meta && data.meta.core_site_keys) || []);
+        renderSettings(data.editable);
+        renderReadonlySettings(data.readonly);
       }
     } catch (error) {
-      console.error("Failed to load settings:", error);
     }
   };
 
-  // Save settings data to the API.
+  // Persist settings payload for site.* keys.
   const saveSettings = async (event) => {
     event.preventDefault();
 
     const form = event.target;
     const formData = new FormData(form);
-    const settings = Object.fromEntries(formData.entries());
+    const settings = {};
+    formData.forEach((value, key) => {
+      settings[key] = value;
+    });
 
     try {
       const { data } = await fetchJson("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings })
+        body: JSON.stringify({
+          settings,
+          removed: Array.from(settingsState.removed)
+        })
       });
 
       if (data.success) {
         alert("Settings saved successfully!");
+        settingsState.removed.clear();
+        loadSettings();
         return;
       }
 
       alert("Failed to save settings: " + (data.error || "Unknown error"));
     } catch (error) {
-      console.error("Save error:", error);
       alert("Failed to save settings");
     }
   };
 
-  // Add a custom setting entry to the form.
-  const addCustomSetting = () => {
-    const key = prompt("Enter setting key (e.g., custom.my_setting):");
-    if (!key) {
+  // Add a new site.* key to the form.
+  const addSiteSetting = () => {
+    const rawKey = prompt("Enter site setting key (example: tagline):");
+    if (!rawKey) {
       return;
+    }
+
+    const normalized = normalizeSiteKey(rawKey);
+    if (!normalized || !/^[A-Za-z0-9._-]+$/.test(normalized)) {
+      alert("Setting keys can only include letters, numbers, dots, dashes, or underscores.");
+      return;
+    }
+
+    const key = `site.${normalized}`;
+    const form = qs("#settings-form");
+    if (form) {
+      const existing = Array.from(form.querySelectorAll("input[name]")).find((input) => input.name === key);
+      if (existing) {
+        alert("That setting already exists.");
+        existing.focus();
+        return;
+      }
     }
 
     const value = prompt("Enter value:");
@@ -233,15 +405,11 @@
       return;
     }
 
-    const field = document.createElement("div");
-    field.innerHTML = `
-      <label class="block text-sm font-medium text-gray-700 mb-2">${key}</label>
-      <input type="text" name="${key}" value="${value}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200">
-    `;
-    container.appendChild(field);
+    settingsState.removed.delete(key);
+    container.appendChild(createSettingField(key, value));
   };
 
-  // Initialize settings section events.
+  // Wire settings form events.
   const initSettings = () => {
     const form = qs("#settings-form");
     const addButton = qs("#add-setting-btn");
@@ -252,7 +420,211 @@
     }
 
     if (addButton) {
-      addButton.addEventListener("click", addCustomSetting);
+      addButton.addEventListener("click", addSiteSetting);
+    }
+  };
+
+  // Render the dashboard settings snapshot.
+  const renderDashboardSettings = (siteSettings, readonlySettings) => {
+    const container = qs("#dashboard-settings-list");
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = "";
+    const entries = [
+      ...Object.entries(siteSettings || {}),
+      ...Object.entries(readonlySettings || {})
+    ];
+
+    if (entries.length === 0) {
+      container.innerHTML = "<p class=\"text-sm text-gray-500\">No settings found.</p>";
+      return;
+    }
+
+    entries.forEach(([key, value]) => {
+      container.appendChild(createReadonlyRow(key, value));
+    });
+  };
+
+  // Load and render dashboard overview widgets.
+  const initDashboard = () => {
+    const pagesCount = qs("#dashboard-pages-count");
+    const blocksCount = qs("#dashboard-blocks-count");
+    const themeSelect = qs("#dashboard-theme-select");
+    const themeSave = qs("#dashboard-theme-save");
+    const status = qs("#dashboard-status");
+    const refreshButton = qs("#dashboard-refresh-btn");
+
+    const openContent = qs("#dashboard-open-content");
+    const openPages = qs("#dashboard-open-pages");
+    const openBlocks = qs("#dashboard-open-blocks");
+    const openSettingsButton = qs("#dashboard-open-settings");
+
+    const loadOverview = async () => {
+      if (pagesCount) {
+        pagesCount.textContent = "--";
+      }
+      if (blocksCount) {
+        blocksCount.textContent = "--";
+      }
+
+      try {
+        const { data } = await fetchJson("/api/admin/overview");
+        if (!data.success) {
+          throw new Error(data.error || "Failed to load overview.");
+        }
+
+        if (status) {
+          status.classList.add("hidden");
+        }
+
+        const counts = data.counts || {};
+        if (pagesCount) {
+          pagesCount.textContent = counts.pages ?? 0;
+        }
+        if (blocksCount) {
+          blocksCount.textContent = counts.blocks ?? 0;
+        }
+
+        if (themeSelect) {
+          const themes = Array.isArray(data.themes) ? data.themes : [];
+          themeSelect.innerHTML = "";
+          if (themes.length === 0) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "No themes found";
+            themeSelect.appendChild(option);
+          } else {
+            themes.forEach((theme) => {
+              const option = document.createElement("option");
+              option.value = theme.name;
+              option.textContent = theme.label;
+              themeSelect.appendChild(option);
+            });
+            themeSelect.value = data.current_theme || "";
+          }
+        }
+
+        renderDashboardSettings(data.site_settings, data.readonly_settings);
+      } catch (error) {
+        setMessage(status, { text: "Failed to load dashboard overview.", tone: "error" });
+      }
+    };
+
+    if (refreshButton) {
+      refreshButton.addEventListener("click", loadOverview);
+    }
+
+    if (openContent) {
+      openContent.addEventListener("click", () => openTab("content"));
+    }
+
+    if (openPages) {
+      openPages.addEventListener("click", () => openTab("content"));
+    }
+
+    if (openBlocks) {
+      openBlocks.addEventListener("click", () => openTab("blocks"));
+    }
+
+    if (openSettingsButton) {
+      openSettingsButton.addEventListener("click", () => openTab("settings"));
+    }
+
+    if (themeSave && themeSelect) {
+      themeSave.addEventListener("click", async () => {
+        if (!themeSelect.value) {
+          return;
+        }
+
+        const originalLabel = themeSave.textContent;
+        setButtonState(themeSave, { loading: true, label: "Saving..." });
+
+        try {
+          const { data } = await fetchJson("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ settings: { "site.theme": themeSelect.value } })
+          });
+
+          if (data.success) {
+            setMessage(status, {
+              text: "Theme updated. Refresh the site to apply changes.",
+              tone: "success"
+            });
+            return;
+          }
+
+          setMessage(status, { text: data.error || "Failed to update theme.", tone: "error" });
+        } catch (error) {
+          setMessage(status, { text: "Failed to update theme.", tone: "error" });
+        } finally {
+          setButtonState(themeSave, { loading: false, label: originalLabel });
+        }
+      });
+    }
+
+    loadOverview();
+  };
+
+  // Wire Advanced tab actions.
+  const initAdvanced = () => {
+    initExport();
+
+    const status = qs("#advanced-status");
+    const clearSessionsButton = qs("#clear-sessions-btn");
+    const clearMagicLinksButton = qs("#clear-magic-links-btn");
+
+    // Shared helper for Advanced tab actions that need confirmation + status.
+    const runAction = async (button, endpoint, confirmText, successText) => {
+      if (!button) {
+        return;
+      }
+
+      if (!confirm(confirmText)) {
+        return;
+      }
+
+      const originalLabel = button.textContent;
+      setButtonState(button, { loading: true, label: "Working..." });
+      setMessage(status, { text: "Working...", tone: "info" });
+
+      try {
+        const { data } = await fetchJson(endpoint, { method: "POST" });
+        if (data.success) {
+          setMessage(status, { text: data.message || successText, tone: "success" });
+          return;
+        }
+
+        setMessage(status, { text: data.error || "Action failed.", tone: "error" });
+      } catch (error) {
+        setMessage(status, { text: "Action failed.", tone: "error" });
+      } finally {
+        setButtonState(button, { loading: false, label: originalLabel });
+      }
+    };
+
+    if (clearSessionsButton) {
+      clearSessionsButton.addEventListener("click", () =>
+        runAction(
+          clearSessionsButton,
+          "/api/admin/clear-sessions",
+          "Clear all session files? This will log everyone out.",
+          "Sessions cleared."
+        )
+      );
+    }
+
+    if (clearMagicLinksButton) {
+      clearMagicLinksButton.addEventListener("click", () =>
+        runAction(
+          clearMagicLinksButton,
+          "/api/admin/clear-magic-links",
+          "Clear magic link tokens and cooldown markers?",
+          "Magic links cleared."
+        )
+      );
     }
   };
 
@@ -282,7 +654,6 @@
           }
           setMessage(securityMessage, { text: data.error || "Failed to send reset link.", tone: "error" });
         } catch (error) {
-          console.error("Password reset error:", error);
           setMessage(securityMessage, { text: "Failed to send reset link.", tone: "error" });
         }
       });
@@ -303,14 +674,23 @@
           }
           alert("Failed to clear blocklist.");
         } catch (error) {
-          console.error("Blocklist clear error:", error);
           alert("Failed to clear blocklist.");
         }
       });
     }
   };
 
-  // Export content handler for the settings tab.
+  const getExportFilename = (response, fallback) => {
+    const header = response.headers.get("Content-Disposition") || "";
+    const match = header.match(/filename="?([^";]+)"?/i);
+    if (match && match[1]) {
+      return match[1];
+    }
+
+    return fallback;
+  };
+
+  // Export content handler for the advanced tab.
   const initExport = () => {
     const button = qs("#export-btn");
     const status = qs("#export-status");
@@ -329,15 +709,30 @@
 
       try {
         const response = await secureFetch("/api/export", { method: "POST" });
+        const contentType = response.headers.get("Content-Type") || "";
         if (!response.ok) {
-          throw new Error("Export failed");
+          let errorMessage = "Export failed";
+          if (contentType.includes("application/json")) {
+            const data = await response.json();
+            errorMessage = data.error || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+
+        if (contentType.includes("application/json")) {
+          const data = await response.json();
+          throw new Error(data.error || "Export failed");
         }
 
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = url;
-        anchor.download = `flint-export-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.tar.gz`;
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+        const fallback = contentType.includes("zip")
+          ? `flint-export-${timestamp}.zip`
+          : `flint-export-${timestamp}.tar.gz`;
+        anchor.download = getExportFilename(response, fallback);
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);
@@ -347,7 +742,6 @@
         status.textContent = "✓ Export complete! Check your downloads.";
         setTimeout(() => status.classList.add("hidden"), 5000);
       } catch (error) {
-        console.error("Export error:", error);
         status.className = "mt-3 text-sm text-red-600 font-medium";
         status.textContent = "✗ Export failed. Please try again.";
       } finally {
@@ -356,7 +750,7 @@
     });
   };
 
-  // Render the update banner actions based on update mode.
+  // Build the update banner actions for the current auto-update mode.
   const renderUpdateActions = (data) => {
     const autoUpdateMode = data.auto_update_mode;
     const updateUrl = data.update?.download_url;
@@ -367,17 +761,17 @@
     }
 
     if (autoUpdateMode === "true") {
-      return `<button onclick="applyUpdate('${updateUrl}')" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Now</button>`;
+      return `<button type="button" data-action="apply-update" data-update-url="${updateUrl}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Now</button>`;
     }
 
     if (autoUpdateMode === "ask") {
-      return `<button onclick="applyUpdate('${updateUrl}')" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Update</button><a href="${releaseUrl}" target="_blank" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">View Release Notes</a>`;
+      return `<button type="button" data-action="apply-update" data-update-url="${updateUrl}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Update</button><a href="${releaseUrl}" target="_blank" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">View Release Notes</a>`;
     }
 
     return `<a href="${releaseUrl}" target="_blank" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">View Release</a>`;
   };
 
-  // Show update banner after a successful check.
+  // Show the update banner after a successful check.
   const showUpdateBanner = (data) => {
     const banner = qs("#update-banner");
     if (!banner) {
@@ -413,7 +807,6 @@
         }, 4000);
       }
     } catch (error) {
-      console.error("Update check failed:", error);
       banner.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-4"><p class="text-red-800 text-sm font-medium">✗ Failed to check for updates. Please try again.</p></div>`;
       banner.classList.remove("hidden");
       setTimeout(() => banner.classList.add("hidden"), 6000);
@@ -453,7 +846,32 @@
     }
   };
 
-  // Load and display form submissions.
+  // Wire update buttons and delegated banner actions.
+  const initUpdates = () => {
+    const checkButton = qs("#check-updates-btn");
+    if (checkButton) {
+      checkButton.addEventListener("click", checkForUpdates);
+    }
+
+    const banner = qs("#update-banner");
+    if (!banner) {
+      return;
+    }
+
+    banner.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-action=\"apply-update\"]");
+      if (!button) {
+        return;
+      }
+
+      const updateUrl = button.dataset.updateUrl || "";
+      if (updateUrl) {
+        applyUpdate(updateUrl);
+      }
+    });
+  };
+
+  // Fetch and render form submissions.
   const loadSubmissions = async () => {
     const container = qs("#submissions-container");
     const countEl = qs("#submissions-count");
@@ -469,13 +887,12 @@
         return;
       }
     } catch (error) {
-      console.error("Failed to load submissions:", error);
     }
 
     container.innerHTML = "<p class=\"text-red-600 text-sm\">Failed to load submissions.</p>";
   };
 
-  // Render submission cards in the admin panel.
+  // Render submission cards in the Submissions tab.
   const renderSubmissions = (submissions) => {
     const container = qs("#submissions-container");
     const countEl = qs("#submissions-count");
@@ -515,7 +932,7 @@
       .join("");
   };
 
-  // Clear submissions in the admin panel.
+  // Wire the submissions clear action.
   const initSubmissions = () => {
     const clearButton = qs("#clear-submissions-btn");
 
@@ -534,7 +951,6 @@
           }
           alert("Failed to clear submissions.");
         } catch (error) {
-          console.error("Clear error:", error);
           alert("Failed to clear submissions.");
         }
       });
@@ -563,6 +979,9 @@
         const toggleClasses = component.enabled
           ? "bg-gray-100 text-gray-700"
           : "bg-indigo-600 text-white";
+        const updateButton = component.repo
+          ? `<button type="button" data-action="update-component" data-component="${component.name}" class="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Update</button>`
+          : "";
 
         return `
           <div class="bg-white border border-gray-200 rounded-lg p-4">
@@ -575,15 +994,11 @@
             </div>
             <p class="text-sm text-gray-600 mb-3">${component.description}</p>
             <div class="flex gap-2">
-              <button onclick="toggleComponent('${component.name}', ${!component.enabled})" class="px-3 py-1 text-sm rounded ${toggleClasses} hover:opacity-80">
+              <button type="button" data-action="toggle-component" data-component="${component.name}" data-enabled="${!component.enabled}" class="px-3 py-1 text-sm rounded ${toggleClasses} hover:opacity-80">
                 ${toggleLabel}
               </button>
-              ${
-                component.repo
-                  ? `<button onclick="updateComponent('${component.name}')" class="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Update</button>`
-                  : ""
-              }
-              <button onclick="deleteComponent('${component.name}')" class="px-3 py-1 text-sm bg-red-50 text-red-700 rounded hover:bg-red-100">Delete</button>
+              ${updateButton}
+              <button type="button" data-action="delete-component" data-component="${component.name}" class="px-3 py-1 text-sm bg-red-50 text-red-700 rounded hover:bg-red-100">Delete</button>
             </div>
           </div>
         `;
@@ -591,7 +1006,7 @@
       .join("");
   };
 
-  // Render the list of available components from browse API.
+  // Render available components from the registry.
   const renderAvailableComponents = (components) => {
     const container = qs("#browse-components");
     if (!container) {
@@ -618,7 +1033,7 @@
               </div>
             </div>
             <p class="text-sm text-gray-600 mb-3">${component.description}</p>
-            <button onclick="installComponent('${component.repo}')" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+            <button type="button" data-action="install-component" data-repo="${component.repo}" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
               Install
             </button>
           </div>
@@ -627,7 +1042,7 @@
       .join("");
   };
 
-  // Load installed components from the API.
+  // Fetch installed components.
   const loadComponents = async () => {
     const container = qs("#installed-components");
     if (!container) {
@@ -641,13 +1056,12 @@
         return;
       }
     } catch (error) {
-      console.error("Failed to load components:", error);
     }
 
     container.innerHTML = "<p class=\"text-red-600 text-sm\">Failed to load components.</p>";
   };
 
-  // Browse available components from the registry API.
+  // Fetch available components from the registry API.
   const browseComponents = async () => {
     const button = qs("#browse-btn");
     const container = qs("#browse-components");
@@ -665,7 +1079,6 @@
         return;
       }
     } catch (error) {
-      console.error("Browse components failed:", error);
     } finally {
       setButtonState(button, { loading: false, label: "Refresh" });
     }
@@ -768,6 +1181,64 @@
     }
   };
 
+  // Handle component actions without inline handlers.
+  const initComponentActions = () => {
+    const refreshButton = qs("#refresh-components-btn");
+    if (refreshButton) {
+      refreshButton.addEventListener("click", loadComponents);
+    }
+
+    const browseButton = qs("#browse-btn");
+    if (browseButton) {
+      browseButton.addEventListener("click", browseComponents);
+    }
+
+    const installedContainer = qs("#installed-components");
+    if (installedContainer) {
+      installedContainer.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-action]");
+        if (!button) {
+          return;
+        }
+
+        const action = button.dataset.action || "";
+        const name = button.dataset.component || "";
+
+        if (action === "toggle-component") {
+          const enabled = button.dataset.enabled === "true";
+          if (name) {
+            toggleComponent(name, enabled);
+          }
+          return;
+        }
+
+        if (action === "update-component" && name) {
+          updateComponent(name);
+          return;
+        }
+
+        if (action === "delete-component" && name) {
+          deleteComponent(name);
+        }
+      });
+    }
+
+    const browseContainer = qs("#browse-components");
+    if (browseContainer) {
+      browseContainer.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-action=\"install-component\"]");
+        if (!button) {
+          return;
+        }
+
+        const repo = button.dataset.repo || "";
+        if (repo) {
+          installComponent(repo);
+        }
+      });
+    }
+  };
+
   // Build a nested tree list UI from API data.
   const renderTreeList = (items, container, depth, onFileClick) => {
     items.forEach((item) => {
@@ -837,12 +1308,11 @@
 
       editor.list.innerHTML = `<p class="text-xs text-red-600">${editor.errorText}</p>`;
     } catch (error) {
-      console.error(editor.errorLog, error);
       editor.list.innerHTML = `<p class="text-xs text-red-600">${editor.errorText}</p>`;
     }
   };
 
-  // Open the editor for a selected tree list file.
+  // Load a selected file into the editor.
   const openEditorItem = async (editor, path, label, button) => {
     if (!editor.editorArea || !editor.title || !editor.pathLabel) {
       return;
@@ -864,12 +1334,11 @@
       editor.state.originalBody = data.content;
       editor.editorArea.value = data.content;
     } catch (error) {
-      console.error(editor.loadErrorLog, error);
       alert(editor.loadErrorText);
     }
   };
 
-  // Save editor content back to the API.
+  // Persist editor content back to the API.
   const saveEditorContent = async (editor) => {
     if (!editor.editorArea || !editor.state.currentPath) {
       return;
@@ -890,12 +1359,11 @@
 
       alert(editor.saveErrorText);
     } catch (error) {
-      console.error(editor.saveErrorLog, error);
       alert(editor.saveErrorText);
     }
   };
 
-  // Cancel editor changes and restore the original content.
+  // Revert editor changes to the last loaded version.
   const cancelEditorContent = (editor) => {
     if (!editor.editorArea) {
       return;
@@ -904,7 +1372,7 @@
     editor.editorArea.value = editor.state.originalBody;
   };
 
-  // Wire up editor buttons for a given editor definition.
+  // Wire editor buttons for a given editor definition.
   const initEditor = (editor) => {
     if (editor.saveButton) {
       editor.saveButton.addEventListener("click", () => saveEditorContent(editor));
@@ -922,7 +1390,7 @@
     }
   };
 
-  // Initialize the content and block editors.
+  // Initialize content and block editors.
   const initEditors = () => {
     const contentEditor = {
       list: qs("#content-list"),
@@ -987,25 +1455,25 @@
     initEditor(contentEditor);
     initEditor(blockEditor);
 
-    const contentTab = qs('[data-tab="content"]');
+    const contentTab = qs("[data-tab='content']");
     if (contentTab) {
       contentTab.addEventListener("click", () => loadTreeList(contentEditor));
     }
 
-    const blocksTab = qs('[data-tab="blocks"]');
+    const blocksTab = qs("[data-tab='blocks']");
     if (blocksTab) {
       blocksTab.addEventListener("click", () => loadTreeList(blockEditor));
     }
   };
 
-  // Initialize lazy-loading for submissions and components tabs.
+  // Lazy-load heavier tabs on first click.
   const initLazyTabs = () => {
-    const submissionsTab = qs('[data-tab="submissions"]');
+    const submissionsTab = qs("[data-tab='submissions']");
     if (submissionsTab) {
       submissionsTab.addEventListener("click", loadSubmissions);
     }
 
-    const componentsTab = qs('[data-tab="components"]');
+    const componentsTab = qs("[data-tab='components']");
     if (componentsTab) {
       componentsTab.addEventListener("click", loadComponents);
     }
@@ -1014,24 +1482,19 @@
   // Initialize all admin UI behaviors once the DOM is ready.
   const init = () => {
     initTabs();
+    initDashboard();
     initSettings();
+    initAdvanced();
     initSecurity();
-    initExport();
     initSubmissions();
     initEditors();
     initLazyTabs();
+    initUpdates();
+    initComponentActions();
   };
 
   // Register DOM ready listener to guarantee elements exist.
   document.addEventListener("DOMContentLoaded", init);
 
-  // Expose update and component actions for inline button handlers.
-  window.checkForUpdates = checkForUpdates;
-  window.applyUpdate = applyUpdate;
-  window.loadComponents = loadComponents;
-  window.browseComponents = browseComponents;
-  window.installComponent = installComponent;
-  window.updateComponent = updateComponent;
-  window.toggleComponent = toggleComponent;
-  window.deleteComponent = deleteComponent;
+  // Keep globals clean: actions are wired through event listeners.
 })();

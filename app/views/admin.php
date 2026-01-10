@@ -19,7 +19,9 @@ ob_start();
 <div class="pt-16 flex min-h-screen">
     <aside class="w-64 bg-white border-r border-gray-200 fixed left-0 top-16 bottom-0">
         <nav class="p-6 space-y-2">
-            <a href="#settings" class="admin-nav-link active block px-4 py-2 rounded-lg text-sm font-medium text-gray-900 bg-gray-100" data-tab="settings">Settings</a>
+            <a href="#dashboard" class="admin-nav-link active block px-4 py-2 rounded-lg text-sm font-medium text-gray-900 bg-gray-100" data-tab="dashboard">Dashboard</a>
+            <a href="#settings" class="admin-nav-link block px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-tab="settings">Settings</a>
+            <a href="#advanced" class="admin-nav-link block px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-tab="advanced">Advanced</a>
             <a href="#security" class="admin-nav-link block px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-tab="security">Security</a>
             <a href="#content" class="admin-nav-link block px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-tab="content">Content</a>
             <a href="#blocks" class="admin-nav-link block px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-tab="blocks">Blocks</a>
@@ -33,18 +35,83 @@ ob_start();
 
     <main class="ml-64 flex-1 p-6 sm:p-12">
         <div class="max-w-4xl">
-            <div id="settings-tab" class="admin-tab">
+            <div id="dashboard-tab" class="admin-tab">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Dashboard</h2>
+                    <button type="button" id="dashboard-refresh-btn" class="px-3 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 rounded-full hover:bg-gray-50">Refresh</button>
+                </div>
+                <div id="dashboard-status" class="hidden mb-6 rounded-xl border px-4 py-3 text-sm"></div>
+                <div class="grid gap-6 lg:grid-cols-2">
+                    <div class="bg-white border border-gray-200 rounded-2xl p-6">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Content Overview</h3>
+                                <p class="text-sm text-gray-500">Quick stats for your pages and blocks.</p>
+                            </div>
+                            <button type="button" id="dashboard-open-content" class="text-xs text-indigo-600 hover:text-indigo-700 font-semibold">Open Pages</button>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2 mt-4">
+                            <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                                <p class="text-xs uppercase tracking-wide text-gray-500">Pages</p>
+                                <p id="dashboard-pages-count" class="text-3xl font-semibold text-gray-900 mt-2">--</p>
+                                <button type="button" id="dashboard-open-pages" class="mt-3 text-xs text-indigo-600 hover:text-indigo-700 font-semibold">Manage Pages</button>
+                            </div>
+                            <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                                <p class="text-xs uppercase tracking-wide text-gray-500">Blocks</p>
+                                <p id="dashboard-blocks-count" class="text-3xl font-semibold text-gray-900 mt-2">--</p>
+                                <button type="button" id="dashboard-open-blocks" class="mt-3 text-xs text-indigo-600 hover:text-indigo-700 font-semibold">Manage Blocks</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-2xl p-6">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Active Theme</h3>
+                                <p class="text-sm text-gray-500">Switch the live theme for your site.</p>
+                            </div>
+                            <button type="button" id="dashboard-theme-save" class="px-3 py-1.5 text-xs font-semibold text-indigo-600 border border-indigo-100 rounded-full hover:bg-indigo-50">Apply</button>
+                        </div>
+                        <div class="mt-4">
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Theme</label>
+                            <select id="dashboard-theme-select" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></select>
+                            <p class="text-xs text-gray-500 mt-2">Theme changes update <span class="font-semibold">site.theme</span> and require a refresh.</p>
+                        </div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-2xl p-6 lg:col-span-2">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Current Settings</h3>
+                                <p class="text-sm text-gray-500">Snapshot of active configuration values.</p>
+                            </div>
+                            <button type="button" id="dashboard-open-settings" class="text-xs text-indigo-600 hover:text-indigo-700 font-semibold">Open Settings</button>
+                        </div>
+                        <div id="dashboard-settings-list" class="mt-4 space-y-3 text-sm text-gray-700"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="settings-tab" class="admin-tab hidden">
                 <h2 class="text-2xl font-bold text-gray-900 mb-6">Settings</h2>
                 <div class="bg-white border border-gray-200 rounded-2xl p-6">
                     <form id="settings-form" class="space-y-6">
                         <div id="settings-container"></div>
                         <div class="flex gap-3 pt-4 border-t border-gray-200">
                             <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700">Save Settings</button>
-                            <button type="button" id="add-setting-btn" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200">Add Custom Setting</button>
+                            <button type="button" id="add-setting-btn" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200">Add Site Setting</button>
                         </div>
                     </form>
                 </div>
                 <div class="bg-white border border-gray-200 rounded-2xl p-6 mt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Read-Only Configuration</h3>
+                    <p class="text-sm text-gray-500 mb-4">System settings outside <span class="font-semibold">site.*</span> are managed in code.</p>
+                    <div id="settings-readonly" class="space-y-3 text-sm text-gray-700"></div>
+                </div>
+            </div>
+
+            <div id="advanced-tab" class="admin-tab hidden">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Advanced</h2>
+                <div id="advanced-status" class="hidden mb-6 rounded-xl border px-4 py-3 text-sm"></div>
+                <div class="bg-white border border-gray-200 rounded-2xl p-6">
                     <h3 class="text-lg font-semibold text-gray-900 mb-2">Export Content</h3>
                     <p class="text-sm text-gray-500 mb-4">Download a backup of your content directory and configuration as a compressed archive.</p>
                     <button type="button" id="export-btn" class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2">
@@ -54,6 +121,14 @@ ob_start();
                         Export Content
                     </button>
                     <div id="export-status" class="mt-3 hidden"></div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-2xl p-6 mt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Sessions & Magic Links</h3>
+                    <p class="text-sm text-gray-500 mb-4">Clear login sessions or reset magic link cooldowns in development.</p>
+                    <div class="flex flex-wrap gap-3">
+                        <button type="button" id="clear-sessions-btn" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200">Clear Sessions</button>
+                        <button type="button" id="clear-magic-links-btn" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200">Clear Magic Links</button>
+                    </div>
                 </div>
             </div>
 
@@ -136,7 +211,7 @@ ob_start();
                             <p class="text-2xl font-bold text-gray-900"><?= htmlspecialchars($version, ENT_QUOTES) ?></p>
                             <p class="text-sm text-gray-500 mt-1">Channel: <?= htmlspecialchars($channel, ENT_QUOTES) ?></p>
                         </div>
-                        <button onclick="checkForUpdates()" id="check-updates-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Check for Updates</button>
+                        <button id="check-updates-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Check for Updates</button>
                     </div>
                 </div>
                 <div class="bg-white border border-gray-200 rounded-2xl p-6">
@@ -178,14 +253,14 @@ ob_start();
                 <div class="mb-8">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-semibold text-gray-900">Installed Components</h3>
-                        <button onclick="loadComponents()" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">Refresh</button>
+                        <button id="refresh-components-btn" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">Refresh</button>
                     </div>
                     <div id="installed-components" class="grid gap-4"></div>
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-semibold text-gray-900">Browse Components</h3>
-                        <button onclick="browseComponents()" id="browse-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Browse Available</button>
+                        <button id="browse-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Browse Available</button>
                     </div>
                     <div id="browse-components" class="grid gap-4"></div>
                 </div>

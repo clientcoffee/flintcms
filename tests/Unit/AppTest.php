@@ -189,13 +189,94 @@ PHP;
         $testDir = $this->testRoot . '/nested';
         mkdir($testDir . '/sub1/sub2', 0755, true);
         file_put_contents($testDir . '/sub1/sub2/file.txt', 'test');
-
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('recursiveRemoveDirectory');
 
         $this->assertTrue(is_dir($testDir));
         $method->invoke($this->app, $testDir);
         $this->assertFalse(is_dir($testDir));
+    }
+
+    public function testSplitSettingsSeparatesEditableAndReadonly(): void
+    {
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('splitSettings');
+        $config = [
+            'site' => [
+                'name' => 'Test Site',
+                'theme' => 'motion',
+            ],
+            'system' => [
+                'environment' => 'development',
+            ],
+            'updates' => [
+                'auto_update' => 'ask',
+            ],
+        ];
+        [$editable, $readonly] = $method->invoke($this->app, $config);
+        $this->assertSame('Test Site', $editable['site.name']);
+        $this->assertSame('motion', $editable['site.theme']);
+        $this->assertArrayHasKey('system.environment', $readonly);
+        $this->assertArrayHasKey('updates.auto_update', $readonly);
+        $this->assertArrayNotHasKey('system.environment', $editable);
+    }
+
+    public function testCoreSiteKeysUsesDefaults(): void
+    {
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('coreSiteKeys');
+        $coreKeys = $method->invoke($this->app, [
+            'name' => 'Test Site',
+            'theme' => 'motion',
+        ]);
+        $this->assertContains('site.name', $coreKeys);
+        $this->assertContains('site.theme', $coreKeys);
+        $this->assertNotContains('site.custom_key', $coreKeys);
+    }
+
+    public function testCountTreeFilesCountsNestedItems(): void
+    {
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('countTreeFiles');
+        $tree = [
+            [
+                'type' => 'file',
+                'label' => 'home',
+                'path' => '/',
+            ],
+            [
+                'type' => 'directory',
+                'name' => 'docs',
+                'children' => [
+                    [
+                        'type' => 'file',
+                        'label' => 'about',
+                        'path' => '/about',
+                    ],
+                    [
+                        'type' => 'directory',
+                        'name' => 'nested',
+                        'children' => [
+                            [
+                                'type' => 'file',
+                                'label' => 'deep',
+                                'path' => '/docs/deep',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+        $this->assertSame(3, $method->invoke($this->app, $tree));
+    }
+
+    public function testParseSessionSavePathHandlesDepthPrefix(): void
+    {
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('parseSessionSavePath');
+        $this->assertSame('/var/lib/php/sessions', $method->invoke($this->app, '5;/var/lib/php/sessions'));
+        $this->assertSame('/tmp', $method->invoke($this->app, '/tmp'));
+        $this->assertNull($method->invoke($this->app, ''));
     }
 
     private function recursiveRemoveDirectory(string $dir): void

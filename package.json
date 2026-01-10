@@ -1,0 +1,15 @@
+{
+  "name": "flint-admin",
+  "private": true,
+  "scripts": {
+    "lint:js": "eslint app/assets/js/*.js",
+    "lint:js:fix": "eslint --fix app/assets/js/*.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-n": "^16.6.2",
+    "eslint-plugin-promise": "^6.1.1"
+  }
+}

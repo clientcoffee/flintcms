@@ -44,7 +44,7 @@ site/components/*/
 
 
 composer.lock
-package.lock
+package-lock.json
 
 
 docs/
