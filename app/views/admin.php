@@ -211,7 +211,7 @@ ob_start();
                             <p class="text-2xl font-bold text-gray-900"><?= htmlspecialchars($version, ENT_QUOTES) ?></p>
                             <p class="text-sm text-gray-500 mt-1">Channel: <?= htmlspecialchars($channel, ENT_QUOTES) ?></p>
                         </div>
-                        <button onclick="checkForUpdates()" id="check-updates-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Check for Updates</button>
+                        <button id="check-updates-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Check for Updates</button>
                     </div>
                 </div>
                 <div class="bg-white border border-gray-200 rounded-2xl p-6">
@@ -253,14 +253,14 @@ ob_start();
                 <div class="mb-8">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-semibold text-gray-900">Installed Components</h3>
-                        <button onclick="loadComponents()" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">Refresh</button>
+                        <button id="refresh-components-btn" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">Refresh</button>
                     </div>
                     <div id="installed-components" class="grid gap-4"></div>
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-semibold text-gray-900">Browse Components</h3>
-                        <button onclick="browseComponents()" id="browse-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Browse Available</button>
+                        <button id="browse-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Browse Available</button>
                     </div>
                     <div id="browse-components" class="grid gap-4"></div>
                 </div>

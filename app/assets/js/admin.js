@@ -13,18 +13,19 @@
   };
   const SENSITIVE_KEY_PATTERN = /(password|secret|token|api_key|smtp_pass|smtp_password)/i;
   const SPINNER_ICON = "<svg class=\"animate-spin h-4 w-4 mr-2\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\" fill=\"none\"></circle><path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\"></path></svg>";
+  // Track non-removable site keys and pending deletions.
   const settingsState = {
     coreKeys: new Set(),
     removed: new Set()
   };
 
-  // Helper to query a single element.
+  // DOM helpers keep selectors terse.
   const qs = (selector, scope = document) => scope.querySelector(selector);
 
-  // Helper to query multiple elements.
+  // DOM helpers keep selectors terse.
   const qsa = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
-  // Helper to include CSRF token in all POST requests.
+  // Attach CSRF header on state-changing requests.
   const secureFetch = (url, options = {}) => {
     const headers = options.headers || {};
     if (typeof CSRF_TOKEN !== "undefined") {
@@ -33,14 +34,14 @@
     return fetch(url, { ...options, headers });
   };
 
-  // Helper to fetch JSON with consistent error handling.
+  // Fetch JSON while preserving the raw Response for status checks.
   const fetchJson = async (url, options = {}) => {
     const response = await secureFetch(url, options);
     const data = await response.json();
     return { response, data };
   };
 
-  // Helper to swap button state during async actions.
+  // Swap button state and label during async work.
   const setButtonState = (button, state) => {
     if (!button) {
       return;
@@ -57,7 +58,7 @@
     }
   };
 
-  // Helper to set a tone-aware banner message.
+  // Display tone-aware status messages in-place.
   const setMessage = (element, options) => {
     if (!element) {
       return;
@@ -211,7 +212,7 @@
     return row;
   };
 
-  // Helper to toggle editor UI state.
+  // Toggle editor UI visibility and button state.
   const setEditorState = (editor, enabled) => {
     if (!editor.editorArea || !editor.placeholder || !editor.saveButton || !editor.cancelButton) {
       return;
@@ -223,7 +224,7 @@
     editor.cancelButton.disabled = !enabled;
   };
 
-  // Helper to toggle the active button styling.
+  // Toggle the active button styling in tree lists.
   const setActiveButton = (nextButton, currentButton) => {
     if (currentButton) {
       currentButton.classList.remove("bg-indigo-50", "text-indigo-700");
@@ -238,7 +239,7 @@
     return nextButton;
   };
 
-  // Open a named tab programmatically.
+  // Open a named tab programmatically for cross-tab shortcuts.
   const openTab = (tabName) => {
     const link = qs(`.admin-nav-link[data-tab="${tabName}"]`);
     if (link) {
@@ -283,7 +284,7 @@
     });
   };
 
-  // Settings form loading and rendering.
+  // Render editable settings for the Settings tab.
   const renderSettings = (settings) => {
     const container = qs("#settings-container");
     if (!container) {
@@ -304,6 +305,7 @@
     });
   };
 
+  // Render read-only config values.
   const renderReadonlySettings = (settings) => {
     const container = qs("#settings-readonly");
     if (!container) {
@@ -322,7 +324,7 @@
     });
   };
 
-  // Load settings data from the API.
+  // Fetch settings payload for the Settings tab.
   const loadSettings = async () => {
     try {
       const { data } = await fetchJson("/api/settings");
@@ -332,11 +334,10 @@
         renderReadonlySettings(data.readonly);
       }
     } catch (error) {
-      console.error("Failed to load settings:", error);
     }
   };
 
-  // Save settings data to the API.
+  // Persist settings payload for site.* keys.
   const saveSettings = async (event) => {
     event.preventDefault();
 
@@ -366,12 +367,11 @@
 
       alert("Failed to save settings: " + (data.error || "Unknown error"));
     } catch (error) {
-      console.error("Save error:", error);
       alert("Failed to save settings");
     }
   };
 
-  // Add a custom setting entry to the form.
+  // Add a new site.* key to the form.
   const addSiteSetting = () => {
     const rawKey = prompt("Enter site setting key (example: tagline):");
     if (!rawKey) {
@@ -409,7 +409,7 @@
     container.appendChild(createSettingField(key, value));
   };
 
-  // Initialize settings section events.
+  // Wire settings form events.
   const initSettings = () => {
     const form = qs("#settings-form");
     const addButton = qs("#add-setting-btn");
@@ -424,7 +424,7 @@
     }
   };
 
-  // Render dashboard settings snapshot.
+  // Render the dashboard settings snapshot.
   const renderDashboardSettings = (siteSettings, readonlySettings) => {
     const container = qs("#dashboard-settings-list");
     if (!container) {
@@ -447,7 +447,7 @@
     });
   };
 
-  // Initialize dashboard overview widgets.
+  // Load and render dashboard overview widgets.
   const initDashboard = () => {
     const pagesCount = qs("#dashboard-pages-count");
     const blocksCount = qs("#dashboard-blocks-count");
@@ -508,7 +508,6 @@
 
         renderDashboardSettings(data.site_settings, data.readonly_settings);
       } catch (error) {
-        console.error("Failed to load dashboard overview:", error);
         setMessage(status, { text: "Failed to load dashboard overview.", tone: "error" });
       }
     };
@@ -559,7 +558,6 @@
 
           setMessage(status, { text: data.error || "Failed to update theme.", tone: "error" });
         } catch (error) {
-          console.error("Theme update failed:", error);
           setMessage(status, { text: "Failed to update theme.", tone: "error" });
         } finally {
           setButtonState(themeSave, { loading: false, label: originalLabel });
@@ -570,7 +568,7 @@
     loadOverview();
   };
 
-  // Initialize advanced tools.
+  // Wire Advanced tab actions.
   const initAdvanced = () => {
     initExport();
 
@@ -578,6 +576,7 @@
     const clearSessionsButton = qs("#clear-sessions-btn");
     const clearMagicLinksButton = qs("#clear-magic-links-btn");
 
+    // Shared helper for Advanced tab actions that need confirmation + status.
     const runAction = async (button, endpoint, confirmText, successText) => {
       if (!button) {
         return;
@@ -600,7 +599,6 @@
 
         setMessage(status, { text: data.error || "Action failed.", tone: "error" });
       } catch (error) {
-        console.error("Advanced action failed:", error);
         setMessage(status, { text: "Action failed.", tone: "error" });
       } finally {
         setButtonState(button, { loading: false, label: originalLabel });
@@ -656,7 +654,6 @@
           }
           setMessage(securityMessage, { text: data.error || "Failed to send reset link.", tone: "error" });
         } catch (error) {
-          console.error("Password reset error:", error);
           setMessage(securityMessage, { text: "Failed to send reset link.", tone: "error" });
         }
       });
@@ -677,7 +674,6 @@
           }
           alert("Failed to clear blocklist.");
         } catch (error) {
-          console.error("Blocklist clear error:", error);
           alert("Failed to clear blocklist.");
         }
       });
@@ -746,7 +742,6 @@
         status.textContent = "✓ Export complete! Check your downloads.";
         setTimeout(() => status.classList.add("hidden"), 5000);
       } catch (error) {
-        console.error("Export error:", error);
         status.className = "mt-3 text-sm text-red-600 font-medium";
         status.textContent = "✗ Export failed. Please try again.";
       } finally {
@@ -755,7 +750,7 @@
     });
   };
 
-  // Render the update banner actions based on update mode.
+  // Build the update banner actions for the current auto-update mode.
   const renderUpdateActions = (data) => {
     const autoUpdateMode = data.auto_update_mode;
     const updateUrl = data.update?.download_url;
@@ -766,17 +761,17 @@
     }
 
     if (autoUpdateMode === "true") {
-      return `<button onclick="applyUpdate(&quot;${updateUrl}&quot;)" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Now</button>`;
+      return `<button type="button" data-action="apply-update" data-update-url="${updateUrl}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Now</button>`;
     }
 
     if (autoUpdateMode === "ask") {
-      return `<button onclick="applyUpdate(&quot;${updateUrl}&quot;)" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Update</button><a href="${releaseUrl}" target="_blank" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">View Release Notes</a>`;
+      return `<button type="button" data-action="apply-update" data-update-url="${updateUrl}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Update</button><a href="${releaseUrl}" target="_blank" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">View Release Notes</a>`;
     }
 
     return `<a href="${releaseUrl}" target="_blank" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">View Release</a>`;
   };
 
-  // Show update banner after a successful check.
+  // Show the update banner after a successful check.
   const showUpdateBanner = (data) => {
     const banner = qs("#update-banner");
     if (!banner) {
@@ -812,7 +807,6 @@
         }, 4000);
       }
     } catch (error) {
-      console.error("Update check failed:", error);
       banner.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-4"><p class="text-red-800 text-sm font-medium">✗ Failed to check for updates. Please try again.</p></div>`;
       banner.classList.remove("hidden");
       setTimeout(() => banner.classList.add("hidden"), 6000);
@@ -852,7 +846,32 @@
     }
   };
 
-  // Load and display form submissions.
+  // Wire update buttons and delegated banner actions.
+  const initUpdates = () => {
+    const checkButton = qs("#check-updates-btn");
+    if (checkButton) {
+      checkButton.addEventListener("click", checkForUpdates);
+    }
+
+    const banner = qs("#update-banner");
+    if (!banner) {
+      return;
+    }
+
+    banner.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-action=\"apply-update\"]");
+      if (!button) {
+        return;
+      }
+
+      const updateUrl = button.dataset.updateUrl || "";
+      if (updateUrl) {
+        applyUpdate(updateUrl);
+      }
+    });
+  };
+
+  // Fetch and render form submissions.
   const loadSubmissions = async () => {
     const container = qs("#submissions-container");
     const countEl = qs("#submissions-count");
@@ -868,13 +887,12 @@
         return;
       }
     } catch (error) {
-      console.error("Failed to load submissions:", error);
     }
 
     container.innerHTML = "<p class=\"text-red-600 text-sm\">Failed to load submissions.</p>";
   };
 
-  // Render submission cards in the admin panel.
+  // Render submission cards in the Submissions tab.
   const renderSubmissions = (submissions) => {
     const container = qs("#submissions-container");
     const countEl = qs("#submissions-count");
@@ -914,7 +932,7 @@
       .join("");
   };
 
-  // Clear submissions in the admin panel.
+  // Wire the submissions clear action.
   const initSubmissions = () => {
     const clearButton = qs("#clear-submissions-btn");
 
@@ -933,7 +951,6 @@
           }
           alert("Failed to clear submissions.");
         } catch (error) {
-          console.error("Clear error:", error);
           alert("Failed to clear submissions.");
         }
       });
@@ -963,7 +980,7 @@
           ? "bg-gray-100 text-gray-700"
           : "bg-indigo-600 text-white";
         const updateButton = component.repo
-          ? `<button onclick="updateComponent(&quot;${component.name}&quot;)" class="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Update</button>`
+          ? `<button type="button" data-action="update-component" data-component="${component.name}" class="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Update</button>`
           : "";
 
         return `
@@ -977,11 +994,11 @@
             </div>
             <p class="text-sm text-gray-600 mb-3">${component.description}</p>
             <div class="flex gap-2">
-              <button onclick="toggleComponent(&quot;${component.name}&quot;, ${!component.enabled})" class="px-3 py-1 text-sm rounded ${toggleClasses} hover:opacity-80">
+              <button type="button" data-action="toggle-component" data-component="${component.name}" data-enabled="${!component.enabled}" class="px-3 py-1 text-sm rounded ${toggleClasses} hover:opacity-80">
                 ${toggleLabel}
               </button>
               ${updateButton}
-              <button onclick="deleteComponent(&quot;${component.name}&quot;)" class="px-3 py-1 text-sm bg-red-50 text-red-700 rounded hover:bg-red-100">Delete</button>
+              <button type="button" data-action="delete-component" data-component="${component.name}" class="px-3 py-1 text-sm bg-red-50 text-red-700 rounded hover:bg-red-100">Delete</button>
             </div>
           </div>
         `;
@@ -989,7 +1006,7 @@
       .join("");
   };
 
-  // Render the list of available components from browse API.
+  // Render available components from the registry.
   const renderAvailableComponents = (components) => {
     const container = qs("#browse-components");
     if (!container) {
@@ -1016,7 +1033,7 @@
               </div>
             </div>
             <p class="text-sm text-gray-600 mb-3">${component.description}</p>
-            <button onclick="installComponent(&quot;${component.repo}&quot;)" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+            <button type="button" data-action="install-component" data-repo="${component.repo}" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
               Install
             </button>
           </div>
@@ -1025,7 +1042,7 @@
       .join("");
   };
 
-  // Load installed components from the API.
+  // Fetch installed components.
   const loadComponents = async () => {
     const container = qs("#installed-components");
     if (!container) {
@@ -1039,13 +1056,12 @@
         return;
       }
     } catch (error) {
-      console.error("Failed to load components:", error);
     }
 
     container.innerHTML = "<p class=\"text-red-600 text-sm\">Failed to load components.</p>";
   };
 
-  // Browse available components from the registry API.
+  // Fetch available components from the registry API.
   const browseComponents = async () => {
     const button = qs("#browse-btn");
     const container = qs("#browse-components");
@@ -1063,7 +1079,6 @@
         return;
       }
     } catch (error) {
-      console.error("Browse components failed:", error);
     } finally {
       setButtonState(button, { loading: false, label: "Refresh" });
     }
@@ -1166,6 +1181,64 @@
     }
   };
 
+  // Handle component actions without inline handlers.
+  const initComponentActions = () => {
+    const refreshButton = qs("#refresh-components-btn");
+    if (refreshButton) {
+      refreshButton.addEventListener("click", loadComponents);
+    }
+
+    const browseButton = qs("#browse-btn");
+    if (browseButton) {
+      browseButton.addEventListener("click", browseComponents);
+    }
+
+    const installedContainer = qs("#installed-components");
+    if (installedContainer) {
+      installedContainer.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-action]");
+        if (!button) {
+          return;
+        }
+
+        const action = button.dataset.action || "";
+        const name = button.dataset.component || "";
+
+        if (action === "toggle-component") {
+          const enabled = button.dataset.enabled === "true";
+          if (name) {
+            toggleComponent(name, enabled);
+          }
+          return;
+        }
+
+        if (action === "update-component" && name) {
+          updateComponent(name);
+          return;
+        }
+
+        if (action === "delete-component" && name) {
+          deleteComponent(name);
+        }
+      });
+    }
+
+    const browseContainer = qs("#browse-components");
+    if (browseContainer) {
+      browseContainer.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-action=\"install-component\"]");
+        if (!button) {
+          return;
+        }
+
+        const repo = button.dataset.repo || "";
+        if (repo) {
+          installComponent(repo);
+        }
+      });
+    }
+  };
+
   // Build a nested tree list UI from API data.
   const renderTreeList = (items, container, depth, onFileClick) => {
     items.forEach((item) => {
@@ -1235,12 +1308,11 @@
 
       editor.list.innerHTML = `<p class="text-xs text-red-600">${editor.errorText}</p>`;
     } catch (error) {
-      console.error(editor.errorLog, error);
       editor.list.innerHTML = `<p class="text-xs text-red-600">${editor.errorText}</p>`;
     }
   };
 
-  // Open the editor for a selected tree list file.
+  // Load a selected file into the editor.
   const openEditorItem = async (editor, path, label, button) => {
     if (!editor.editorArea || !editor.title || !editor.pathLabel) {
       return;
@@ -1262,12 +1334,11 @@
       editor.state.originalBody = data.content;
       editor.editorArea.value = data.content;
     } catch (error) {
-      console.error(editor.loadErrorLog, error);
       alert(editor.loadErrorText);
     }
   };
 
-  // Save editor content back to the API.
+  // Persist editor content back to the API.
   const saveEditorContent = async (editor) => {
     if (!editor.editorArea || !editor.state.currentPath) {
       return;
@@ -1288,12 +1359,11 @@
 
       alert(editor.saveErrorText);
     } catch (error) {
-      console.error(editor.saveErrorLog, error);
       alert(editor.saveErrorText);
     }
   };
 
-  // Cancel editor changes and restore the original content.
+  // Revert editor changes to the last loaded version.
   const cancelEditorContent = (editor) => {
     if (!editor.editorArea) {
       return;
@@ -1302,7 +1372,7 @@
     editor.editorArea.value = editor.state.originalBody;
   };
 
-  // Wire up editor buttons for a given editor definition.
+  // Wire editor buttons for a given editor definition.
   const initEditor = (editor) => {
     if (editor.saveButton) {
       editor.saveButton.addEventListener("click", () => saveEditorContent(editor));
@@ -1320,7 +1390,7 @@
     }
   };
 
-  // Initialize the content and block editors.
+  // Initialize content and block editors.
   const initEditors = () => {
     const contentEditor = {
       list: qs("#content-list"),
@@ -1396,7 +1466,7 @@
     }
   };
 
-  // Initialize lazy-loading for submissions and components tabs.
+  // Lazy-load heavier tabs on first click.
   const initLazyTabs = () => {
     const submissionsTab = qs("[data-tab='submissions']");
     if (submissionsTab) {
@@ -1419,18 +1489,12 @@
     initSubmissions();
     initEditors();
     initLazyTabs();
+    initUpdates();
+    initComponentActions();
   };
 
   // Register DOM ready listener to guarantee elements exist.
   document.addEventListener("DOMContentLoaded", init);
 
-  // Expose update and component actions for inline button handlers.
-  window.checkForUpdates = checkForUpdates;
-  window.applyUpdate = applyUpdate;
-  window.loadComponents = loadComponents;
-  window.browseComponents = browseComponents;
-  window.installComponent = installComponent;
-  window.updateComponent = updateComponent;
-  window.toggleComponent = toggleComponent;
-  window.deleteComponent = deleteComponent;
+  // Keep globals clean: actions are wired through event listeners.
 })();
