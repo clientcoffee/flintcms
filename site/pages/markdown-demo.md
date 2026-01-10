@@ -48,9 +48,10 @@ echo "Hello from Flint!";
 
 ## Media
 
-![Cat jam](https://tenor.com/view/catjam-cat-music-jam-vibing-gif-20520051)
+### Image embed
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/bWcASV2sey0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+![](/site/uploads/catjam.gif)
 
+### Video embed
 
 ![](https://youtu.be/bWcASV2sey0)
