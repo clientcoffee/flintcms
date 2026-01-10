@@ -1,7 +1,9 @@
 <!-- Banner Image -->
 <?php
+$contentType = strtolower((string)($page['meta']['type'] ?? ''));
+$allowBanner = $contentType !== 'post';
 $bannerUrl = $page['meta']['banner'] ?? ($themeConfig['settings']['default_banner'] ?? '');
-$hasBanner = !empty($bannerUrl);
+$hasBanner = $allowBanner && !empty($bannerUrl);
 ?>
 <?php if ($hasBanner) : ?>
     <?php

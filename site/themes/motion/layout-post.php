@@ -13,6 +13,10 @@
     <?php theme_styles(); ?>
     <link rel="stylesheet" href="<?= theme_asset('motion.css') ?>">
 
+    <?php
+    $primaryColor = $themeConfig['settings']['primary_color'] ?? '#4F46E5';
+    $primaryDark = $themeConfig['settings']['primary_color_dark'] ?? '#1E3A8A';
+    ?>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -21,8 +25,13 @@
         }
 
         /* Post-specific styles */
+        :root {
+            --post-gradient-start: <?= esc_html($primaryColor) ?>;
+            --post-gradient-end: <?= esc_html($primaryDark) ?>;
+        }
+
         .post-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--post-gradient-start) 0%, var(--post-gradient-end) 100%);
         }
 
         .post-meta {
@@ -36,7 +45,7 @@
             top: 0;
             left: 0;
             height: 3px;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(90deg, var(--post-gradient-start) 0%, var(--post-gradient-end) 100%);
             width: 0%;
             z-index: 9999;
         }
