@@ -18,7 +18,6 @@
  * @subpackage MotionTheme
  */
 
-<?php
 /**
  * Motion layout template.
  *
@@ -28,12 +27,14 @@
 $siteName = $site['name'] ?? '';
 // page_meta() reads from ThemeContext and returns escaped values.
 $pageTitle = page_meta('title', $siteName);
+// Optional SEO keywords are stored in frontmatter if present.
 $keywords = page_meta('keywords');
-$keywordsMeta = $keywords !== '' ? '<meta name="keywords" content="' . $keywords . '">' : '';
+$hasKeywords = $keywords !== '';
 
 // Nav content comes from a markdown block in /site/blocks/nav.md.
 $navItems = '';
 $navPath = \Components\Block::resolveMarkdownBlockPath(\Flint\Paths::$rootDir, 'nav');
+// Block resolution uses the CMS helper so it respects the current site root.
 if ($navPath !== null && is_readable($navPath)) {
     $navItems = file_get_contents($navPath);
 }
@@ -42,9 +43,8 @@ if ($navPath !== null && is_readable($navPath)) {
 $navHtml = trim($navItems) !== '' ? \Components\Nav::render(['items' => $navItems], '') : render_block('nav');
 
 // Simple auth toggle driven by the CMS session state.
-$authHtml = $isAdmin
-    ? '<button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>'
-    : '<a href="/login" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>';
+$showLogout = !empty($isAdmin);
+$loginUrl = '/login';
 
 // Collect head assets here so the template is mostly HTML below.
 // render_assets() injects component CSS; theme_styles() triggers theme hooks.
@@ -72,7 +72,9 @@ $footerAssets = ob_get_clean();
     <title><?= $pageTitle ?> | <?= esc_html($siteName) ?></title>
 
     <!-- Optional: SEO keywords meta tag (only if page has keywords defined) -->
-    <?= $keywordsMeta ?>
+    <?php if ($hasKeywords) : ?>
+        <meta name="keywords" content="<?= $keywords ?>">
+    <?php endif; ?>
 
     <!-- Theme's main stylesheet (Tailwind CSS) -->
     <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
@@ -117,7 +119,11 @@ $footerAssets = ob_get_clean();
                 Powered by <a href="https://flintcms.com" target="_blank" title="A flat file CMS built on Markdown" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
             </p>
 
-            <?= $authHtml ?>
+            <?php if ($showLogout) : ?>
+                <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
+            <?php else : ?>
+                <a href="<?= esc_html($loginUrl) ?>" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>
+            <?php endif; ?>
         </div>
     </footer>
 

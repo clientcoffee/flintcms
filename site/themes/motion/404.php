@@ -22,29 +22,19 @@ if (!empty($quotes) && is_array($quotes)) {
     $randomQuote = $quotes[array_rand($quotes)];
 }
 
-$quoteMarkup = '';
-if ($randomQuote !== '') {
-    $quoteMarkup = '<div class="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-6 mb-8">' .
-        '<div class="flex items-start gap-3">' .
-        '<svg class="w-8 h-8 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">' .
-        '<path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>' .
-        '</svg>' .
-        '<div class="flex-1">' .
-        '<p class="text-lg text-gray-800 italic leading-relaxed">"' . esc_html($randomQuote) . '"</p>' .
-        '<p class="text-sm text-gray-500 mt-3">— Wisdom for the wayward traveler</p>' .
-        '</div>' .
-        '</div>' .
-        '</div>';
-}
+// Boolean flag keeps the template logic simple.
+$hasQuote = $randomQuote !== '';
 
 // esc_html() is the CMS helper for safe output.
 $siteName = esc_html($site['name'] ?? 'Flint');
 
 // Collect theme styles via the CMS hook system.
-$headAssets = '<link rel="stylesheet" href="' . theme_asset('tailwind.min.css') . '">' . "\n";
 ob_start();
+?>
+<link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
+<?php
 theme_styles();
-$headAssets .= ob_get_clean();
+$headAssets = ob_get_clean();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -72,7 +62,23 @@ $headAssets .= ob_get_clean();
         </div>
 
         <!-- Random Quote Card -->
-        <?= $quoteMarkup ?>
+        <?php if ($hasQuote) : ?>
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-6 mb-8">
+                <div class="flex items-start gap-3">
+                    <svg class="w-8 h-8 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+                    </svg>
+                    <div class="flex-1">
+                        <p class="text-lg text-gray-800 italic leading-relaxed">
+                            "<?= esc_html($randomQuote) ?>"
+                        </p>
+                        <p class="text-sm text-gray-500 mt-3">
+                            — Wisdom for the wayward traveler
+                        </p>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <!-- Navigation Options -->
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
