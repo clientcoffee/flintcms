@@ -4,6 +4,7 @@ $contentType = strtolower((string)($page['meta']['type'] ?? ''));
 $allowBanner = $contentType !== 'post';
 $bannerUrl = $page['meta']['banner'] ?? ($themeConfig['settings']['default_banner'] ?? '');
 $hasBanner = $allowBanner && !empty($bannerUrl);
+$renderPageHeader = $contentType !== 'post';
 ?>
 <?php if ($hasBanner) : ?>
     <?php
@@ -18,7 +19,7 @@ $hasBanner = $allowBanner && !empty($bannerUrl);
 <?php endif; ?>
 
 <!-- Page Title with Edit Controls -->
-<?php if (!empty($page['meta']['title'])) : ?>
+<?php if ($renderPageHeader && !empty($page['meta']['title'])) : ?>
     <div class="mb-8 sm:mb-12">
         <?php if (!empty($page['meta']['icon'])) : ?>
             <?php $iconEmoji = getEmojiFromSlug($page['meta']['icon']); ?>
