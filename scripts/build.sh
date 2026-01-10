@@ -43,7 +43,6 @@ workspace_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 app_root="${workspace_root}/app"
 site_root="${workspace_root}/site"
 dist_root="${workspace_root}/dist"
-buildignore="${workspace_root}/.buildignore"
 
 # Ensure dist/ is wiped before anything else runs so build output is always fresh.
 if [[ -d "${dist_root}" ]]; then
@@ -90,28 +89,16 @@ fi
 echo -e "${BLUE}Preparing build directory...${NC}"
 mkdir -p "${dist_root}"
 
-# Build rsync exclude arguments from .buildignore
-rsync_excludes=()
-if [[ -f "${buildignore}" ]]; then
-  while IFS= read -r line; do
-    # Skip empty lines and comments
-    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-    rsync_excludes+=("--exclude=$line")
-  done < "${buildignore}"
-fi
-
 # Copy app directory
 echo -e "${BLUE}Copying app/ to dist/app/...${NC}"
 if [[ "${VERBOSE}" == "true" ]]; then
   rsync -av \
     --delete \
-    "${rsync_excludes[@]}" \
     "${app_root}/" \
     "${dist_root}/app/"
 else
   rsync -a \
     --delete \
-    "${rsync_excludes[@]}" \
     "${app_root}/" \
     "${dist_root}/app/" 2>&1 | grep -v "^$" || true
 fi
@@ -121,6 +108,13 @@ index_dist_src="${app_root}/index-dist.php"
 if [[ -f "${index_dist_src}" ]]; then
   echo -e "${BLUE}Copying app/index-dist.php to dist/index.php...${NC}"
   cp "${index_dist_src}" "${dist_root}/index.php"
+fi
+
+# Copy root .htaccess into the build if present
+root_htaccess_src="${workspace_root}/.htaccess"
+if [[ -f "${root_htaccess_src}" ]]; then
+  echo -e "${BLUE}Copying .htaccess to dist/...${NC}"
+  cp "${root_htaccess_src}" "${dist_root}/.htaccess"
 fi
 
 # Copy site directory
