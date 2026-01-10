@@ -21,10 +21,10 @@ class Callout extends RenderComponent
      */
     public static function render(array $props, string $content): string
     {
-        // Resolve the callout type from props using helper method
+        // Props are passed from markdown like {{Callout type="info"}}.
         $calloutType = self::prop($props, 'type', 'info');
 
-        // Define the Motion theme style map.
+        // Theme-specific visual mapping for each callout type.
         $styleMap = [
             'info' => [
                 'bg' => 'bg-blue-50',
@@ -56,7 +56,8 @@ class Callout extends RenderComponent
         $styleConfig = $styleMap[$calloutType] ?? $styleMap['info'];
         $iconGlyph = $styleConfig['icon'];
 
-        // Return single-line HTML to avoid markdown splitting the component.
+        // Components return HTML strings to the parser, so we build markup here.
+        // Keep it in one string to avoid markdown re-processing inside the component.
         return sprintf(
             '<div class="my-4 p-4 rounded-md border-l-4 %s %s %s flex gap-3 items-start"><span class="text-xl flex-shrink-0 mt-0.5">%s</span><div class="flex-1 text-sm leading-relaxed">%s</div></div>',
             $styleConfig['bg'],

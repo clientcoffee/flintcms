@@ -1,6 +1,13 @@
 <?php
+/**
+ * Motion 404 template.
+ *
+ * This file is rendered directly by App::render404() with $site + $themeConfig.
+ * We keep logic here and emit clean markup below to make maintenance easier.
+ */
 require_once __DIR__ . '/helpers.php';
 
+// Quotes live in the theme folder so they ship with the theme.
 $quotesPath = __DIR__ . '/quotes.json';
 $quotes = [];
 
@@ -9,6 +16,7 @@ if (file_exists($quotesPath)) {
     $quotes = json_decode($quotesContent, true);
 }
 
+// Pick a quote once so we can render it or omit the block entirely.
 $randomQuote = '';
 if (!empty($quotes) && is_array($quotes)) {
     $randomQuote = $quotes[array_rand($quotes)];
@@ -29,7 +37,14 @@ if ($randomQuote !== '') {
         '</div>';
 }
 
+// esc_html() is the CMS helper for safe output.
 $siteName = esc_html($site['name'] ?? 'Flint');
+
+// Collect theme styles via the CMS hook system.
+$headAssets = '<link rel="stylesheet" href="' . theme_asset('tailwind.min.css') . '">' . "\n";
+ob_start();
+theme_styles();
+$headAssets .= ob_get_clean();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -37,8 +52,7 @@ $siteName = esc_html($site['name'] ?? 'Flint');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>404 - Page Not Found | <?= $siteName ?></title>
-    <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
-    <?php theme_styles(); ?>
+    <?= $headAssets ?>
 </head>
 <body class="motion-404 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 min-h-screen flex items-center justify-center px-6">
     <div class="max-w-2xl w-full">

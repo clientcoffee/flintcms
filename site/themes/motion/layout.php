@@ -19,22 +19,45 @@
  */
 
 <?php
+/**
+ * Motion layout template.
+ *
+ * The CMS injects $site, $page, $viewContent, $componentAssets, and $isAdmin.
+ * We compute everything up front to keep the HTML clean and predictable.
+ */
 $siteName = $site['name'] ?? '';
+// page_meta() reads from ThemeContext and returns escaped values.
 $pageTitle = page_meta('title', $siteName);
 $keywords = page_meta('keywords');
 $keywordsMeta = $keywords !== '' ? '<meta name="keywords" content="' . $keywords . '">' : '';
 
+// Nav content comes from a markdown block in /site/blocks/nav.md.
 $navItems = '';
 $navPath = \Components\Block::resolveMarkdownBlockPath(\Flint\Paths::$rootDir, 'nav');
 if ($navPath !== null && is_readable($navPath)) {
     $navItems = file_get_contents($navPath);
 }
 
+// Render the Nav component if we have items, otherwise fall back to the block renderer.
 $navHtml = trim($navItems) !== '' ? \Components\Nav::render(['items' => $navItems], '') : render_block('nav');
 
+// Simple auth toggle driven by the CMS session state.
 $authHtml = $isAdmin
     ? '<button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>'
     : '<a href="/login" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>';
+
+// Collect head assets here so the template is mostly HTML below.
+// render_assets() injects component CSS; theme_styles() triggers theme hooks.
+ob_start();
+render_assets('head');
+theme_styles();
+$headAssets = ob_get_clean();
+
+// Collect footer assets (scripts) the same way for a clean footer block.
+ob_start();
+render_assets('foot');
+theme_scripts();
+$footerAssets = ob_get_clean();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -53,8 +76,7 @@ $authHtml = $isAdmin
 
     <!-- Theme's main stylesheet (Tailwind CSS) -->
     <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
-    <?php render_assets('head'); ?>
-    <?php theme_styles(); ?>
+    <?= $headAssets ?>
 </head>
 <body class="bg-[#FAFAFA] text-gray-800 antialiased">
     <!-- Fixed Top Navigation Bar -->
@@ -82,6 +104,7 @@ $authHtml = $isAdmin
     <!-- pt-16 creates top padding to account for fixed header -->
     <main class="pt-24 sm:pt-16 min-h-screen">
         <div class="max-w-3xl mx-auto px-6 sm:px-12 py-12 sm:py-16">
+            <!-- $viewContent is the fully rendered HTML from Parser + view.php. -->
             <?= $viewContent ?>
         </div>
     </main>
@@ -100,7 +123,6 @@ $authHtml = $isAdmin
 
     <!-- Component External Scripts (Footer Position) -->
     <!-- Most JavaScript goes here at the end of body for better page load performance -->
-    <?php render_assets('foot'); ?>
-    <?php theme_scripts(); ?>
+    <?= $footerAssets ?>
 </body>
 </html>

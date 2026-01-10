@@ -1,21 +1,30 @@
 <?php
+/**
+ * Motion post layout template.
+ *
+ * Posts have a dedicated banner header, so we keep the post-specific UI here.
+ * Data comes from $page (frontmatter + content) and $site (global config).
+ */
 $siteName = $site['name'] ?? '';
 $pageTitle = page_meta('title', $siteName);
 $keywords = page_meta('keywords');
 $keywordsMeta = $keywords !== '' ? '<meta name="keywords" content="' . $keywords . '">' : '';
 $postTitle = page_meta('title', 'Untitled Post');
 
+// Icons are stored in frontmatter as slugs and mapped to emoji in helpers.php.
 $iconEmoji = '';
 if (!empty($page['meta']['icon'])) {
     $iconEmoji = getEmojiFromSlug($page['meta']['icon']);
 }
 $iconMarkup = $iconEmoji !== '' ? '<span class="text-6xl mb-4 block">' . $iconEmoji . '</span>' : '';
 
+// Optional description below the title.
 $postDescription = $page['meta']['description'] ?? '';
 $descriptionMarkup = $postDescription !== ''
     ? '<p class="text-xl text-white/90 mb-6 leading-relaxed">' . esc_html($postDescription) . '</p>'
     : '';
 
+// Meta chips (author/date/readtime) come straight from frontmatter.
 $metaParts = [];
 $author = $page['meta']['author'] ?? '';
 if ($author !== '') {
@@ -33,9 +42,23 @@ $postMetaMarkup = !empty($metaParts)
     ? '<div class="post-meta flex items-center gap-4">' . implode('<span>•</span>', $metaParts) . '</div>'
     : '';
 
+// Auth button is driven by CMS session state.
 $authHtml = $isAdmin
     ? '<button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>'
     : '<a href="/login" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>';
+
+// Capture head assets from the CMS hooks before the HTML renders.
+// This is how components and themes inject CSS without hard-coding paths.
+ob_start();
+render_assets('head');
+theme_styles();
+$headAssets = ob_get_clean();
+
+// Capture footer assets (scripts registered by components/theme).
+ob_start();
+render_assets('foot');
+theme_scripts();
+$footerAssets = ob_get_clean();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -45,8 +68,7 @@ $authHtml = $isAdmin
     <title><?= $pageTitle ?> | <?= esc_html($siteName) ?></title>
     <?= $keywordsMeta ?>
     <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
-    <?php render_assets('head'); ?>
-    <?php theme_styles(); ?>
+    <?= $headAssets ?>
 </head>
 <body class="bg-[#FAFAFA] text-gray-800 antialiased">
     <!-- Reading Progress Bar -->
@@ -77,6 +99,7 @@ $authHtml = $isAdmin
     <!-- Post Content -->
     <main class="py-12 sm:py-16">
         <article class="max-w-3xl mx-auto px-6 sm:px-12">
+            <!-- $viewContent is the rendered HTML from view.php + markdown parser. -->
             <?= $viewContent ?>
         </article>
     </main>
@@ -92,9 +115,9 @@ $authHtml = $isAdmin
         </div>
     </footer>
 
-    <?php render_assets('foot'); ?>
+    <?= $footerAssets ?>
 
-    <!-- Reading progress script -->
+    <!-- Reading progress script (pure front-end, no CMS involvement). -->
     <script>
         window.addEventListener('scroll', () => {
             const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
@@ -103,6 +126,5 @@ $authHtml = $isAdmin
             document.getElementById('reading-progress').style.width = scrolled + '%';
         });
     </script>
-    <?php theme_scripts(); ?>
 </body>
 </html>
