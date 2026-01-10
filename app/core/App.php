@@ -812,6 +812,44 @@ class App
             return;
         }
 
+        // Admin overview for dashboard widgets.
+        if ($requestPath === '/api/admin/overview' && $requestMethod === 'GET') {
+            echo json_encode(['success' => true] + $this->buildAdminOverview());
+            return;
+        }
+
+        // Clear admin sessions.
+        if ($requestPath === '/api/admin/clear-sessions' && $requestMethod === 'POST') {
+            if (!$this->validateCsrfToken()) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+                return;
+            }
+
+            $result = $this->clearSessionFiles();
+            if (!$result['success']) {
+                http_response_code(500);
+            }
+            echo json_encode($result);
+            return;
+        }
+
+        // Clear stored magic links and rate limit markers.
+        if ($requestPath === '/api/admin/clear-magic-links' && $requestMethod === 'POST') {
+            if (!$this->validateCsrfToken()) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+                return;
+            }
+
+            $result = $this->clearMagicLinkArtifacts();
+            if (!$result['success']) {
+                http_response_code(500);
+            }
+            echo json_encode($result);
+            return;
+        }
+
         // Get form submissions (admin only).
         if ($requestPath === '/api/submissions' && $requestMethod === 'GET') {
             $submissions = $this->loadSubmissions();
@@ -1044,7 +1082,6 @@ class App
         // Handle settings endpoint.
         if ($requestPath === '/api/settings') {
             if ($requestMethod === 'GET') {
-                // Load config.php and return as flat key structure.
                 $configPath = $this->resolveConfigPath();
                 if (!file_exists($configPath)) {
                     http_response_code(404);
@@ -1053,16 +1090,18 @@ class App
                 }
 
                 $configData = require $configPath;
-                $flatConfig = [];
-                foreach ($configData as $section => $values) {
-                    if (is_array($values)) {
-                        foreach ($values as $key => $value) {
-                            $flatConfig[$section . '.' . $key] = $value;
-                        }
-                    }
-                }
+                [$editable, $readonly] = $this->splitSettings($configData);
 
-                echo json_encode(['success' => true, 'settings' => $flatConfig]);
+                $coreSiteKeys = $this->coreSiteKeys($configData['site'] ?? []);
+
+                echo json_encode([
+                    'success' => true,
+                    'editable' => $editable,
+                    'readonly' => $readonly,
+                    'meta' => [
+                        'core_site_keys' => $coreSiteKeys,
+                    ],
+                ]);
                 return;
             }
 
@@ -1073,57 +1112,53 @@ class App
                     return;
                 }
 
-                // Save settings to config.php.
                 $bodyData = $this->readJsonPayload();
-                if (!isset($bodyData['settings']) || !is_array($bodyData)) {
+                if (!isset($bodyData['settings']) || !is_array($bodyData['settings'])) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => 'Settings data required']);
                     return;
                 }
 
                 $settings = $bodyData['settings'];
-                $protectedKeys = ['admin.password', 'system.root'];
-
-                // Convert flat keys back to sections.
-                $configData = [];
-                foreach ($settings as $key => $value) {
-                    // Skip protected keys.
-                    if (in_array($key, $protectedKeys)) {
-                        continue;
-                    }
-
-                    $parts = explode('.', $key, 2);
-                    if (count($parts) === 2) {
-                        $section = $parts[0];
-                        $settingKey = $parts[1];
-                        if (!isset($configData[$section])) {
-                            $configData[$section] = [];
-                        }
-                        $configData[$section][$settingKey] = $value;
-                    }
+                $removed = $bodyData['removed'] ?? [];
+                if (!is_array($removed)) {
+                    $removed = [];
                 }
 
-                // Load existing config to preserve protected keys.
                 $configPath = $this->resolveConfigPath();
                 $existingConfig = require $configPath;
+                $siteSettings = $existingConfig['site'] ?? [];
+                if (!is_array($siteSettings)) {
+                    $siteSettings = [];
+                }
 
-                // Merge with protected keys.
-                foreach ($existingConfig as $section => $values) {
-                    if (is_array($values)) {
-                        foreach ($values as $key => $value) {
-                            $flatKey = $section . '.' . $key;
-                            if (in_array($flatKey, $protectedKeys)) {
-                                if (!isset($configData[$section])) {
-                                    $configData[$section] = [];
-                                }
-                                $configData[$section][$key] = $value;
-                            }
-                        }
+                foreach ($settings as $key => $value) {
+                    if (!str_starts_with($key, 'site.')) {
+                        continue;
+                    }
+                    $settingKey = substr($key, 5);
+                    if ($settingKey === '') {
+                        continue;
+                    }
+                    $siteSettings[$settingKey] = is_scalar($value) ? (string)$value : '';
+                }
+
+                $coreSiteKeys = $this->coreSiteKeys($siteSettings);
+                foreach ($removed as $key) {
+                    if (!is_string($key) || !str_starts_with($key, 'site.')) {
+                        continue;
+                    }
+                    if (in_array($key, $coreSiteKeys, true)) {
+                        continue;
+                    }
+                    $settingKey = substr($key, 5);
+                    if ($settingKey !== '') {
+                        unset($siteSettings[$settingKey]);
                     }
                 }
 
-                // Write config file using writePhpConfig method.
-                $this->writePhpConfig($configPath, $configData);
+                $existingConfig['site'] = $siteSettings;
+                $this->writePhpConfig($configPath, $existingConfig);
 
                 echo json_encode(['success' => true]);
                 return;
@@ -1288,65 +1323,185 @@ class App
     }
 
     /**
-     * Handle content export - creates tarball of site/ (including config.php).
+     * Handle content export - creates archive of site/ (including config.php).
      */
     private function handleExport(): void
     {
         $timestamp = date('Y-m-d_H-i-s');
-        $filename = "flint-export-{$timestamp}.tar.gz";
+        $baseName = "flint-export-{$timestamp}";
         $tempDir = sys_get_temp_dir() . '/flint-export-' . uniqid();
+        $archivePath = '';
 
         try {
-            // Create temporary directory
-            mkdir($tempDir, 0755, true);
-
-        // Copy site directory
-            $contentSource = $this->root . '/site';
-            $contentDest = $tempDir . '/site';
-            if (is_dir($contentSource)) {
-                $this->recursiveCopy($contentSource, $contentDest);
-            }
-
-        // Ensure config.php is included inside site/ for legacy installs.
-            $configSource = $this->resolveConfigPath();
-            $configDestination = $tempDir . '/site/config.php';
-            if (file_exists($configSource)) {
-                $configDir = dirname($configDestination);
-                if (!is_dir($configDir)) {
-                    mkdir($configDir, 0755, true);
-                }
-                copy($configSource, $configDestination);
-            }
-
-            // Create tarball
-            $tarball = sys_get_temp_dir() . '/' . $filename;
-            $phar = new \PharData($tarball);
-            $phar->buildFromDirectory($tempDir);
-            $phar->compress(\Phar::GZ);
-
-            // Clean up uncompressed tar
-            @unlink($tarball);
-            $tarball .= '.gz';
-
-            // Send file
-            header('Content-Type: application/gzip');
-            header('Content-Disposition: attachment; filename="' . $filename . '"');
-            header('Content-Length: ' . filesize($tarball));
-            readfile($tarball);
-
-            // Cleanup
-            @unlink($tarball);
-            $this->recursiveRemoveDirectory($tempDir);
-        } catch (\Exception $e) {
+            $this->prepareExportWorkspace($tempDir);
+            $archive = $this->buildExportArchive($tempDir, $baseName);
+            $archivePath = $archive['path'];
+            $this->sendExportArchive($archivePath, $archive['filename'], $archive['content_type']);
+        } catch (\Throwable $e) {
             http_response_code(500);
             header('Content-Type: application/json');
-            echo json_encode(['error' => 'Export failed: ' . $e->getMessage()]);
-
-            // Cleanup on error
+            echo json_encode([
+                'success' => false,
+                'error' => 'Export failed: ' . $e->getMessage()
+            ]);
+        } finally {
+            if ($archivePath !== '' && file_exists($archivePath)) {
+                unlink($archivePath);
+            }
             if (is_dir($tempDir)) {
                 $this->recursiveRemoveDirectory($tempDir);
             }
         }
+    }
+
+    /**
+     * Prepare a temporary workspace for export.
+     */
+    private function prepareExportWorkspace(string $tempDir): void
+    {
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+
+        $contentSource = $this->root . '/site';
+        $contentDest = $tempDir . '/site';
+        if (is_dir($contentSource)) {
+            $this->recursiveCopy($contentSource, $contentDest);
+        }
+
+        $configSource = $this->resolveConfigPath();
+        $configDestination = $tempDir . '/site/config.php';
+        if (file_exists($configSource)) {
+            $configDir = dirname($configDestination);
+            if (!is_dir($configDir)) {
+                mkdir($configDir, 0755, true);
+            }
+            copy($configSource, $configDestination);
+        }
+    }
+
+    /**
+     * Build the export archive and return metadata.
+     *
+     * @return array{path:string,filename:string,content_type:string}
+     */
+    private function buildExportArchive(string $tempDir, string $baseName): array
+    {
+        if ($this->canCreatePharArchive()) {
+            $path = $this->createTarGzArchive($tempDir, $baseName);
+            return [
+                'path' => $path,
+                'filename' => $baseName . '.tar.gz',
+                'content_type' => 'application/gzip',
+            ];
+        }
+
+        $path = $this->createZipArchive($tempDir, $baseName);
+        return [
+            'path' => $path,
+            'filename' => $baseName . '.zip',
+            'content_type' => 'application/zip',
+        ];
+    }
+
+    /**
+     * Determine whether Phar archives can be created.
+     */
+    private function canCreatePharArchive(): bool
+    {
+        if (!class_exists('PharData')) {
+            return false;
+        }
+
+        $readonly = ini_get('phar.readonly');
+        if ($readonly === false) {
+            return true;
+        }
+
+        return filter_var($readonly, FILTER_VALIDATE_BOOLEAN) === false;
+    }
+
+    /**
+     * Create a tar.gz archive using PharData.
+     */
+    private function createTarGzArchive(string $sourceDir, string $baseName): string
+    {
+        $tarPath = sys_get_temp_dir() . '/' . $baseName . '.tar';
+        $phar = new \PharData($tarPath);
+        $phar->buildFromDirectory($sourceDir);
+        $phar->compress(\Phar::GZ);
+
+        $gzPath = $tarPath . '.gz';
+        if (file_exists($tarPath)) {
+            unlink($tarPath);
+        }
+
+        return $gzPath;
+    }
+
+    /**
+     * Create a zip archive when Phar is unavailable.
+     */
+    private function createZipArchive(string $sourceDir, string $baseName): string
+    {
+        if (!class_exists('ZipArchive')) {
+            throw new \RuntimeException('ZipArchive extension unavailable.');
+        }
+
+        $zipPath = sys_get_temp_dir() . '/' . $baseName . '.zip';
+        $zip = new \ZipArchive();
+        $result = $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        if ($result !== true) {
+            throw new \RuntimeException('Unable to create zip archive.');
+        }
+
+        $this->addDirectoryToZip($zip, $sourceDir, '');
+        $zip->close();
+
+        return $zipPath;
+    }
+
+    /**
+     * Add directory contents to a zip archive.
+     */
+    private function addDirectoryToZip(\ZipArchive $zip, string $sourceDir, string $relativeDir): void
+    {
+        $entries = scandir($sourceDir);
+        if ($entries === false) {
+            return;
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $fullPath = $sourceDir . '/' . $entry;
+            $zipPath = $relativeDir === '' ? $entry : $relativeDir . '/' . $entry;
+
+            if (is_dir($fullPath)) {
+                $zip->addEmptyDir($zipPath);
+                $this->addDirectoryToZip($zip, $fullPath, $zipPath);
+                continue;
+            }
+
+            $zip->addFile($fullPath, $zipPath);
+        }
+    }
+
+    /**
+     * Stream the archive download response.
+     */
+    private function sendExportArchive(string $path, string $filename, string $contentType): void
+    {
+        if (!file_exists($path)) {
+            throw new \RuntimeException('Export archive missing.');
+        }
+
+        header('Content-Type: ' . $contentType);
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . filesize($path));
+        readfile($path);
     }
 
     /**
@@ -1546,6 +1701,231 @@ class App
         }
 
         return $baseName;
+    }
+
+    /**
+     * Build the admin dashboard overview payload.
+     */
+    private function buildAdminOverview(): array
+    {
+        $configPath = $this->resolveConfigPath();
+        $configData = file_exists($configPath) ? require $configPath : [];
+        if (!is_array($configData)) {
+            $configData = [];
+        }
+
+        [$editable, $readonly] = $this->splitSettings($configData);
+        $pageCount = $this->countTreeFiles($this->listContentTree());
+        $blockCount = $this->countTreeFiles($this->listBlockTree());
+        $currentTheme = $configData['site']['theme'] ?? 'motion';
+
+        return [
+            'counts' => [
+                'pages' => $pageCount,
+                'blocks' => $blockCount,
+            ],
+            'themes' => $this->listThemeOptions(),
+            'current_theme' => $currentTheme,
+            'site_settings' => $editable,
+            'readonly_settings' => $readonly,
+        ];
+    }
+
+    /**
+     * Count file entries in a tree list response.
+     */
+    private function countTreeFiles(array $items): int
+    {
+        $count = 0;
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            if (($item['type'] ?? '') === 'file') {
+                $count++;
+                continue;
+            }
+
+            if (($item['type'] ?? '') === 'directory' && isset($item['children'])) {
+                $children = is_array($item['children']) ? $item['children'] : [];
+                $count += $this->countTreeFiles($children);
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * List available themes for admin selection.
+     */
+    private function listThemeOptions(): array
+    {
+        $themesDir = Paths::$themesDir;
+        if (!is_dir($themesDir)) {
+            return [];
+        }
+
+        $entries = scandir($themesDir);
+        if ($entries === false) {
+            return [];
+        }
+
+        $themes = [];
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+                continue;
+            }
+
+            $themePath = $themesDir . '/' . $entry;
+            if (!is_dir($themePath)) {
+                continue;
+            }
+
+            $themeConfig = $this->loadThemeConfig($entry);
+            $label = $themeConfig['theme']['name'] ?? $themeConfig['name'] ?? $this->formatThemeLabel($entry);
+            $themes[] = [
+                'name' => $entry,
+                'label' => $label,
+            ];
+        }
+
+        usort($themes, fn($a, $b) => strcmp($a['label'], $b['label']));
+
+        return $themes;
+    }
+
+    /**
+     * Format a human-friendly theme label from a slug.
+     */
+    private function formatThemeLabel(string $themeName): string
+    {
+        $cleaned = str_replace(['-', '_'], ' ', $themeName);
+        $words = preg_split('/\s+/', trim($cleaned)) ?: [];
+        $words = array_map(fn($word) => ucfirst(strtolower($word)), $words);
+
+        return trim(implode(' ', $words));
+    }
+
+    /**
+     * Split settings into editable site keys and read-only config keys.
+     *
+     * @return array{0:array<string,string>,1:array<string,string>}
+     */
+    private function splitSettings(array $configData): array
+    {
+        $editable = [];
+        $readonly = [];
+
+        foreach ($configData as $group => $values) {
+            if (!is_array($values)) {
+                continue;
+            }
+
+            foreach ($values as $key => $value) {
+                if (!is_string($key) || $key === '') {
+                    continue;
+                }
+
+                $fullKey = $group . '.' . $key;
+                $normalized = $this->normalizeSettingValue($value);
+                if ($group === 'site') {
+                    $editable[$fullKey] = $normalized;
+                    continue;
+                }
+
+                $readonly[$fullKey] = $normalized;
+            }
+        }
+
+        ksort($editable);
+        ksort($readonly);
+
+        return [$editable, $readonly];
+    }
+
+    /**
+     * Normalize a config value for display or editing.
+     */
+    private function normalizeSettingValue(mixed $value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if (is_scalar($value)) {
+            return (string)$value;
+        }
+
+        if ($value === null) {
+            return '';
+        }
+
+        $encoded = json_encode($value, JSON_UNESCAPED_SLASHES);
+        return $encoded === false ? '' : $encoded;
+    }
+
+    /**
+     * Identify core site keys that should not be removed.
+     *
+     * @param array<string,mixed> $siteSettings
+     * @return array<int,string>
+     */
+    private function coreSiteKeys(array $siteSettings): array
+    {
+        $baseKeys = ['name', 'theme', 'website', 'tagline'];
+        $exampleKeys = $this->loadExampleSiteKeys();
+        $candidates = array_unique(array_merge($baseKeys, $exampleKeys));
+
+        $coreKeys = [];
+        foreach ($candidates as $key) {
+            if (!is_string($key) || $key === '') {
+                continue;
+            }
+
+            if (!array_key_exists($key, $siteSettings) && !in_array($key, $exampleKeys, true)) {
+                continue;
+            }
+
+            $coreKeys[] = 'site.' . $key;
+        }
+
+        sort($coreKeys);
+
+        return $coreKeys;
+    }
+
+    /**
+     * Load site keys from the example config for core defaults.
+     *
+     * @return array<int,string>
+     */
+    private function loadExampleSiteKeys(): array
+    {
+        $paths = [
+            $this->root . '/site/config.example.php',
+            $this->root . '/config.example.php',
+            $this->appDir . '/config.example.php',
+        ];
+
+        foreach ($paths as $path) {
+            if (!file_exists($path)) {
+                continue;
+            }
+
+            $configData = require $path;
+            if (!is_array($configData)) {
+                continue;
+            }
+
+            $siteSettings = $configData['site'] ?? null;
+            if (is_array($siteSettings)) {
+                return array_keys($siteSettings);
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -2933,6 +3313,151 @@ class App
         }
 
         $this->saveBlockedIps([]);
+    }
+
+    /**
+     * Clear stored session files from disk.
+     *
+     * @return array{success:bool,removed?:int,errors?:int,message?:string,error?:string}
+     */
+    private function clearSessionFiles(): array
+    {
+        $handler = (string)(ini_get('session.save_handler') ?: 'files');
+        if ($handler !== 'files') {
+            return ['success' => false, 'error' => 'Session handler is not file-based.'];
+        }
+
+        $savePath = $this->parseSessionSavePath((string)ini_get('session.save_path'));
+        if ($savePath === null || !is_dir($savePath)) {
+            return ['success' => false, 'error' => 'Session save path not available.'];
+        }
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
+        $removed = 0;
+        $errors = 0;
+        foreach ($this->findSessionFiles($savePath) as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+
+            if (unlink($file)) {
+                $removed++;
+            } else {
+                $errors++;
+            }
+        }
+
+        $message = $errors === 0
+            ? "Cleared {$removed} session file(s)."
+            : "Cleared {$removed} session file(s) with {$errors} error(s).";
+
+        return [
+            'success' => $errors === 0,
+            'removed' => $removed,
+            'errors' => $errors,
+            'message' => $message,
+        ];
+    }
+
+    /**
+     * Clear stored magic link tokens and cooldown markers.
+     *
+     * @return array{success:bool,removed?:int,errors?:int,message?:string}
+     */
+    private function clearMagicLinkArtifacts(): array
+    {
+        $removed = 0;
+        $errors = 0;
+
+        $tokenPath = $this->appDir . '/storage/.tokens/magic-link.json';
+        if (file_exists($tokenPath)) {
+            if (unlink($tokenPath)) {
+                $removed++;
+            } else {
+                $errors++;
+            }
+        }
+
+        $submissionsDir = $this->root . '/site/submissions';
+        if (is_dir($submissionsDir)) {
+            $files = glob($submissionsDir . '/.magic-link-*');
+            if ($files !== false) {
+                foreach ($files as $file) {
+                    if (!is_file($file)) {
+                        continue;
+                    }
+
+                    if (unlink($file)) {
+                        $removed++;
+                    } else {
+                        $errors++;
+                    }
+                }
+            }
+        }
+
+        $message = $errors === 0
+            ? "Cleared {$removed} magic link artifact(s)."
+            : "Cleared {$removed} magic link artifact(s) with {$errors} error(s).";
+
+        return [
+            'success' => $errors === 0,
+            'removed' => $removed,
+            'errors' => $errors,
+            'message' => $message,
+        ];
+    }
+
+    /**
+     * Parse session.save_path into a usable directory path.
+     */
+    private function parseSessionSavePath(string $rawPath): ?string
+    {
+        $rawPath = trim($rawPath);
+        if ($rawPath === '') {
+            return null;
+        }
+
+        $parts = array_values(array_filter(explode(';', $rawPath), 'strlen'));
+        $path = end($parts);
+        if (!is_string($path) || $path === '') {
+            return null;
+        }
+
+        return $path;
+    }
+
+    /**
+     * Locate session files inside the save path.
+     *
+     * @return array<int,string>
+     */
+    private function findSessionFiles(string $savePath): array
+    {
+        $files = [];
+
+        try {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($savePath, \FilesystemIterator::SKIP_DOTS)
+            );
+        } catch (\UnexpectedValueException $e) {
+            return $files;
+        }
+
+        foreach ($iterator as $fileInfo) {
+            if (!$fileInfo->isFile()) {
+                continue;
+            }
+
+            if (str_starts_with($fileInfo->getFilename(), 'sess_')) {
+                $files[] = $fileInfo->getPathname();
+            }
+        }
+
+        return $files;
     }
 
     /**

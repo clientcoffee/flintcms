@@ -1,9 +1,22 @@
 (() => {
   "use strict";
 
-  // Constants for protected settings and shared UI text.
-  const PROTECTED_KEYS = new Set(["admin.password", "system.root"]);
+  // Constants for settings display and shared UI text.
+  const LABEL_ACRONYMS = {
+    api: "API",
+    css: "CSS",
+    html: "HTML",
+    id: "ID",
+    ip: "IP",
+    smtp: "SMTP",
+    url: "URL"
+  };
+  const SENSITIVE_KEY_PATTERN = /(password|secret|token|api_key|smtp_pass|smtp_password)/i;
   const SPINNER_ICON = "<svg class=\"animate-spin h-4 w-4 mr-2\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\" fill=\"none\"></circle><path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\"></path></svg>";
+  const settingsState = {
+    coreKeys: new Set(),
+    removed: new Set()
+  };
 
   // Helper to query a single element.
   const qs = (selector, scope = document) => scope.querySelector(selector);
@@ -85,6 +98,119 @@
     }
   };
 
+  // Format config keys into friendly labels.
+  const formatSettingLabel = (key) => {
+    const segments = String(key || "").split(".");
+    return segments
+      .map((segment) => {
+        return segment
+          .split(/[_-]+/)
+          .map((word) => {
+            const lower = word.toLowerCase();
+            if (LABEL_ACRONYMS[lower]) {
+              return LABEL_ACRONYMS[lower];
+            }
+            return lower.charAt(0).toUpperCase() + lower.slice(1);
+          })
+          .join(" ");
+      })
+      .join(" ");
+  };
+
+  // Mask sensitive values for display-only settings.
+  const maskSettingValue = (key, value) => {
+    if (SENSITIVE_KEY_PATTERN.test(key)) {
+      return "******";
+    }
+
+    return value === "" ? "—" : value;
+  };
+
+  // Normalize new site setting keys.
+  const normalizeSiteKey = (raw) => {
+    const trimmed = String(raw || "").trim();
+    if (!trimmed) {
+      return "";
+    }
+    const withoutPrefix = trimmed.replace(/^site\./i, "");
+    return withoutPrefix.replace(/\s+/g, "_");
+  };
+
+  // Build an editable setting field element.
+  const createSettingField = (key, value) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "rounded-xl border border-gray-200 bg-white p-4 space-y-3";
+
+    const header = document.createElement("div");
+    header.className = "flex items-start justify-between gap-4";
+
+    const labelBlock = document.createElement("div");
+    const label = document.createElement("label");
+    label.className = "block text-sm font-medium text-gray-700";
+    label.textContent = formatSettingLabel(key);
+
+    const meta = document.createElement("p");
+    meta.className = "text-xs text-gray-400";
+    meta.textContent = key;
+
+    labelBlock.appendChild(label);
+    labelBlock.appendChild(meta);
+    header.appendChild(labelBlock);
+
+    if (!settingsState.coreKeys.has(key)) {
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "text-xs text-red-600 hover:text-red-700 font-semibold";
+      removeButton.textContent = "Remove";
+      removeButton.addEventListener("click", () => {
+        if (!confirm(`Remove ${key}?`)) {
+          return;
+        }
+        settingsState.removed.add(key);
+        wrapper.remove();
+      });
+      header.appendChild(removeButton);
+    }
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.name = key;
+    input.value = value;
+    input.className = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200";
+
+    wrapper.appendChild(header);
+    wrapper.appendChild(input);
+
+    return wrapper;
+  };
+
+  // Build a read-only settings row element.
+  const createReadonlyRow = (key, value) => {
+    const row = document.createElement("div");
+    row.className = "flex items-start justify-between gap-4 border-b border-gray-100 pb-3";
+
+    const labelBlock = document.createElement("div");
+    const label = document.createElement("p");
+    label.className = "text-sm font-medium text-gray-700";
+    label.textContent = formatSettingLabel(key);
+
+    const meta = document.createElement("p");
+    meta.className = "text-xs text-gray-400";
+    meta.textContent = key;
+
+    labelBlock.appendChild(label);
+    labelBlock.appendChild(meta);
+
+    const valueEl = document.createElement("p");
+    valueEl.className = "text-sm text-gray-600 text-right break-all";
+    valueEl.textContent = maskSettingValue(key, value);
+
+    row.appendChild(labelBlock);
+    row.appendChild(valueEl);
+
+    return row;
+  };
+
   // Helper to toggle editor UI state.
   const setEditorState = (editor, enabled) => {
     if (!editor.editorArea || !editor.placeholder || !editor.saveButton || !editor.cancelButton) {
@@ -110,6 +236,14 @@
     }
 
     return nextButton;
+  };
+
+  // Open a named tab programmatically.
+  const openTab = (tabName) => {
+    const link = qs(`.admin-nav-link[data-tab="${tabName}"]`);
+    if (link) {
+      link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    }
   };
 
   // Tab switching logic for the admin sidebar.
@@ -157,23 +291,34 @@
     }
 
     container.innerHTML = "";
-    Object.entries(settings || {}).forEach(([key, value]) => {
-      const isProtected = PROTECTED_KEYS.has(key);
-      const field = document.createElement("div");
-      field.innerHTML = `
-        <label class="block text-sm font-medium text-gray-700 mb-2">${key}</label>
-        <input type="text" name="${key}" value="${value}" ${isProtected ? "disabled" : ""} class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm ${
-        isProtected
-          ? "bg-gray-50 text-gray-500 cursor-not-allowed"
-          : "focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-      }">
-        ${
-          isProtected
-            ? "<p class=\"text-xs text-gray-500 mt-1\">This setting cannot be modified</p>"
-            : ""
-        }
-      `;
-      container.appendChild(field);
+    settingsState.removed.clear();
+
+    const entries = Object.entries(settings || {});
+    if (entries.length === 0) {
+      container.innerHTML = "<p class=\"text-sm text-gray-500\">No site settings yet.</p>";
+      return;
+    }
+
+    entries.forEach(([key, value]) => {
+      container.appendChild(createSettingField(key, value));
+    });
+  };
+
+  const renderReadonlySettings = (settings) => {
+    const container = qs("#settings-readonly");
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = "";
+    const entries = Object.entries(settings || {});
+    if (entries.length === 0) {
+      container.innerHTML = "<p class=\"text-sm text-gray-500\">No read-only settings found.</p>";
+      return;
+    }
+
+    entries.forEach(([key, value]) => {
+      container.appendChild(createReadonlyRow(key, value));
     });
   };
 
@@ -182,7 +327,9 @@
     try {
       const { data } = await fetchJson("/api/settings");
       if (data.success) {
-        renderSettings(data.settings);
+        settingsState.coreKeys = new Set((data.meta && data.meta.core_site_keys) || []);
+        renderSettings(data.editable);
+        renderReadonlySettings(data.readonly);
       }
     } catch (error) {
       console.error("Failed to load settings:", error);
@@ -195,17 +342,25 @@
 
     const form = event.target;
     const formData = new FormData(form);
-    const settings = Object.fromEntries(formData.entries());
+    const settings = {};
+    formData.forEach((value, key) => {
+      settings[key] = value;
+    });
 
     try {
       const { data } = await fetchJson("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings })
+        body: JSON.stringify({
+          settings,
+          removed: Array.from(settingsState.removed)
+        })
       });
 
       if (data.success) {
         alert("Settings saved successfully!");
+        settingsState.removed.clear();
+        loadSettings();
         return;
       }
 
@@ -217,10 +372,27 @@
   };
 
   // Add a custom setting entry to the form.
-  const addCustomSetting = () => {
-    const key = prompt("Enter setting key (e.g., custom.my_setting):");
-    if (!key) {
+  const addSiteSetting = () => {
+    const rawKey = prompt("Enter site setting key (example: tagline):");
+    if (!rawKey) {
       return;
+    }
+
+    const normalized = normalizeSiteKey(rawKey);
+    if (!normalized || !/^[A-Za-z0-9._-]+$/.test(normalized)) {
+      alert("Setting keys can only include letters, numbers, dots, dashes, or underscores.");
+      return;
+    }
+
+    const key = `site.${normalized}`;
+    const form = qs("#settings-form");
+    if (form) {
+      const existing = Array.from(form.querySelectorAll("input[name]")).find((input) => input.name === key);
+      if (existing) {
+        alert("That setting already exists.");
+        existing.focus();
+        return;
+      }
     }
 
     const value = prompt("Enter value:");
@@ -233,12 +405,8 @@
       return;
     }
 
-    const field = document.createElement("div");
-    field.innerHTML = `
-      <label class="block text-sm font-medium text-gray-700 mb-2">${key}</label>
-      <input type="text" name="${key}" value="${value}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200">
-    `;
-    container.appendChild(field);
+    settingsState.removed.delete(key);
+    container.appendChild(createSettingField(key, value));
   };
 
   // Initialize settings section events.
@@ -252,7 +420,213 @@
     }
 
     if (addButton) {
-      addButton.addEventListener("click", addCustomSetting);
+      addButton.addEventListener("click", addSiteSetting);
+    }
+  };
+
+  // Render dashboard settings snapshot.
+  const renderDashboardSettings = (siteSettings, readonlySettings) => {
+    const container = qs("#dashboard-settings-list");
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = "";
+    const entries = [
+      ...Object.entries(siteSettings || {}),
+      ...Object.entries(readonlySettings || {})
+    ];
+
+    if (entries.length === 0) {
+      container.innerHTML = "<p class=\"text-sm text-gray-500\">No settings found.</p>";
+      return;
+    }
+
+    entries.forEach(([key, value]) => {
+      container.appendChild(createReadonlyRow(key, value));
+    });
+  };
+
+  // Initialize dashboard overview widgets.
+  const initDashboard = () => {
+    const pagesCount = qs("#dashboard-pages-count");
+    const blocksCount = qs("#dashboard-blocks-count");
+    const themeSelect = qs("#dashboard-theme-select");
+    const themeSave = qs("#dashboard-theme-save");
+    const status = qs("#dashboard-status");
+    const refreshButton = qs("#dashboard-refresh-btn");
+
+    const openContent = qs("#dashboard-open-content");
+    const openPages = qs("#dashboard-open-pages");
+    const openBlocks = qs("#dashboard-open-blocks");
+    const openSettingsButton = qs("#dashboard-open-settings");
+
+    const loadOverview = async () => {
+      if (pagesCount) {
+        pagesCount.textContent = "--";
+      }
+      if (blocksCount) {
+        blocksCount.textContent = "--";
+      }
+
+      try {
+        const { data } = await fetchJson("/api/admin/overview");
+        if (!data.success) {
+          throw new Error(data.error || "Failed to load overview.");
+        }
+
+        if (status) {
+          status.classList.add("hidden");
+        }
+
+        const counts = data.counts || {};
+        if (pagesCount) {
+          pagesCount.textContent = counts.pages ?? 0;
+        }
+        if (blocksCount) {
+          blocksCount.textContent = counts.blocks ?? 0;
+        }
+
+        if (themeSelect) {
+          const themes = Array.isArray(data.themes) ? data.themes : [];
+          themeSelect.innerHTML = "";
+          if (themes.length === 0) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "No themes found";
+            themeSelect.appendChild(option);
+          } else {
+            themes.forEach((theme) => {
+              const option = document.createElement("option");
+              option.value = theme.name;
+              option.textContent = theme.label;
+              themeSelect.appendChild(option);
+            });
+            themeSelect.value = data.current_theme || "";
+          }
+        }
+
+        renderDashboardSettings(data.site_settings, data.readonly_settings);
+      } catch (error) {
+        console.error("Failed to load dashboard overview:", error);
+        setMessage(status, { text: "Failed to load dashboard overview.", tone: "error" });
+      }
+    };
+
+    if (refreshButton) {
+      refreshButton.addEventListener("click", loadOverview);
+    }
+
+    if (openContent) {
+      openContent.addEventListener("click", () => openTab("content"));
+    }
+
+    if (openPages) {
+      openPages.addEventListener("click", () => openTab("content"));
+    }
+
+    if (openBlocks) {
+      openBlocks.addEventListener("click", () => openTab("blocks"));
+    }
+
+    if (openSettingsButton) {
+      openSettingsButton.addEventListener("click", () => openTab("settings"));
+    }
+
+    if (themeSave && themeSelect) {
+      themeSave.addEventListener("click", async () => {
+        if (!themeSelect.value) {
+          return;
+        }
+
+        const originalLabel = themeSave.textContent;
+        setButtonState(themeSave, { loading: true, label: "Saving..." });
+
+        try {
+          const { data } = await fetchJson("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ settings: { "site.theme": themeSelect.value } })
+          });
+
+          if (data.success) {
+            setMessage(status, {
+              text: "Theme updated. Refresh the site to apply changes.",
+              tone: "success"
+            });
+            return;
+          }
+
+          setMessage(status, { text: data.error || "Failed to update theme.", tone: "error" });
+        } catch (error) {
+          console.error("Theme update failed:", error);
+          setMessage(status, { text: "Failed to update theme.", tone: "error" });
+        } finally {
+          setButtonState(themeSave, { loading: false, label: originalLabel });
+        }
+      });
+    }
+
+    loadOverview();
+  };
+
+  // Initialize advanced tools.
+  const initAdvanced = () => {
+    initExport();
+
+    const status = qs("#advanced-status");
+    const clearSessionsButton = qs("#clear-sessions-btn");
+    const clearMagicLinksButton = qs("#clear-magic-links-btn");
+
+    const runAction = async (button, endpoint, confirmText, successText) => {
+      if (!button) {
+        return;
+      }
+
+      if (!confirm(confirmText)) {
+        return;
+      }
+
+      const originalLabel = button.textContent;
+      setButtonState(button, { loading: true, label: "Working..." });
+      setMessage(status, { text: "Working...", tone: "info" });
+
+      try {
+        const { data } = await fetchJson(endpoint, { method: "POST" });
+        if (data.success) {
+          setMessage(status, { text: data.message || successText, tone: "success" });
+          return;
+        }
+
+        setMessage(status, { text: data.error || "Action failed.", tone: "error" });
+      } catch (error) {
+        console.error("Advanced action failed:", error);
+        setMessage(status, { text: "Action failed.", tone: "error" });
+      } finally {
+        setButtonState(button, { loading: false, label: originalLabel });
+      }
+    };
+
+    if (clearSessionsButton) {
+      clearSessionsButton.addEventListener("click", () =>
+        runAction(
+          clearSessionsButton,
+          "/api/admin/clear-sessions",
+          "Clear all session files? This will log everyone out.",
+          "Sessions cleared."
+        )
+      );
+    }
+
+    if (clearMagicLinksButton) {
+      clearMagicLinksButton.addEventListener("click", () =>
+        runAction(
+          clearMagicLinksButton,
+          "/api/admin/clear-magic-links",
+          "Clear magic link tokens and cooldown markers?",
+          "Magic links cleared."
+        )
+      );
     }
   };
 
@@ -310,7 +684,17 @@
     }
   };
 
-  // Export content handler for the settings tab.
+  const getExportFilename = (response, fallback) => {
+    const header = response.headers.get("Content-Disposition") || "";
+    const match = header.match(/filename="?([^";]+)"?/i);
+    if (match && match[1]) {
+      return match[1];
+    }
+
+    return fallback;
+  };
+
+  // Export content handler for the advanced tab.
   const initExport = () => {
     const button = qs("#export-btn");
     const status = qs("#export-status");
@@ -329,15 +713,30 @@
 
       try {
         const response = await secureFetch("/api/export", { method: "POST" });
+        const contentType = response.headers.get("Content-Type") || "";
         if (!response.ok) {
-          throw new Error("Export failed");
+          let errorMessage = "Export failed";
+          if (contentType.includes("application/json")) {
+            const data = await response.json();
+            errorMessage = data.error || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+
+        if (contentType.includes("application/json")) {
+          const data = await response.json();
+          throw new Error(data.error || "Export failed");
         }
 
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = url;
-        anchor.download = `flint-export-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.tar.gz`;
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+        const fallback = contentType.includes("zip")
+          ? `flint-export-${timestamp}.zip`
+          : `flint-export-${timestamp}.tar.gz`;
+        anchor.download = getExportFilename(response, fallback);
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);
@@ -1014,9 +1413,10 @@
   // Initialize all admin UI behaviors once the DOM is ready.
   const init = () => {
     initTabs();
+    initDashboard();
     initSettings();
+    initAdvanced();
     initSecurity();
-    initExport();
     initSubmissions();
     initEditors();
     initLazyTabs();

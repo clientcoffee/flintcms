@@ -29,6 +29,8 @@
         "test:integration": "phpunit --testsuite Integration",
         "test:coverage": "phpunit --coverage-html coverage",
         "analyse": "phpstan analyse app/core app/core/components --level=5",
+        "lint:php": "phpcs",
+        "lint:php:fix": "phpcbf",
         "check": [
             "@test",
             "@analyse"
