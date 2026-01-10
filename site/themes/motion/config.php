@@ -31,7 +31,7 @@ return [
 
         // Layout
         // Relative to /site (example: /uploads/default-banner.jpg)
-        'default_banner' => '/uploads/default-banner-1544x500.png',
+        'default_banner' => '/uploads/motion-banner.jpg',
         'max_content_width' => '1200px',
         'sidebar_width' => '300px',
     ],
