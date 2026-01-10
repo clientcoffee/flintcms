@@ -761,9 +761,9 @@ class Parser
 
             // UNORDERED LISTS (including nested)
             // Pattern: - List item
-            //          - Another item
+            //          * Another item
             //            - Nested item (2 spaces = 1 level of nesting)
-            if (preg_match('/^(\s*)- (.*)$/', $currentLineText, $listMatch)) {
+            if (preg_match('/^(\s*)([-*])\s+(.*)$/', $currentLineText, $listMatch)) {
                 // Close blockquote if open
                 if ($isInBlockquote) {
                     $htmlOutputFragments[] = "</blockquote>";
@@ -774,10 +774,11 @@ class Parser
                 // 2 spaces = 1 level of nesting
                 $indentationSpaces = strlen($listMatch[1]);
                 $targetDepth = (int)($indentationSpaces / 2);
+                $listClass = ' class="list-disc pl-6"';
 
                 // Open list if not already open
                 if (!$isInList) {
-                    $htmlOutputFragments[] = "<ul>";
+                    $htmlOutputFragments[] = "<ul{$listClass}>";
                     $isInList = true;
                     $currentListDepth = 0;
                 }
@@ -786,7 +787,7 @@ class Parser
                 if ($targetDepth > $currentListDepth) {
                     // Going deeper - open new nested <ul> tags
                     for ($depth = $currentListDepth; $depth < $targetDepth; $depth++) {
-                        $htmlOutputFragments[] = "<ul>";
+                        $htmlOutputFragments[] = "<ul{$listClass}>";
                     }
                 }
 
@@ -801,7 +802,7 @@ class Parser
                 $currentListDepth = $targetDepth;
 
                 // Process inline markdown in list item text
-                $listItemText = $listMatch[2];
+                $listItemText = $listMatch[3];
                 $listItemContent = $this->processInlineMarkdown($listItemText);
 
                 $htmlOutputFragments[] = "<li>{$listItemContent}</li>";
@@ -969,11 +970,17 @@ class Parser
             return $placeholderKey;
         }, $inlineText);
 
-        // STEP 2: Process inline code (must be before bold/links to take precedence)
+        // STEP 2: Process inline code (must be before other markdown to take precedence)
         // Pattern: `code text`
         // SECURITY: Code content is escaped to prevent XSS
-        $inlineText = preg_replace_callback('/`([^`]+)`/', function ($codeMatch) {
-            return '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">' . htmlspecialchars($codeMatch[1]) . '</code>';
+        $codeSpanMap = [];
+        $codePlaceholderPrefix = '___CODE_SPAN_';
+        $codeCounter = 0;
+        $inlineText = preg_replace_callback('/`([^`]+)`/', function ($codeMatch) use (&$codeSpanMap, $codePlaceholderPrefix, &$codeCounter) {
+            $placeholderKey = $codePlaceholderPrefix . $codeCounter . '___';
+            $codeSpanMap[$placeholderKey] = '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">' . htmlspecialchars($codeMatch[1], ENT_QUOTES, 'UTF-8') . '</code>';
+            $codeCounter++;
+            return $placeholderKey;
         }, $inlineText);
 
         // STEP 3: Process images and video embeds (inline)
@@ -991,7 +998,16 @@ class Parser
             return '<strong>' . htmlspecialchars($boldMatch[1], ENT_QUOTES, 'UTF-8') . '</strong>';
         }, $inlineText);
 
-        // STEP 5: Process links
+        // STEP 5: Process italics
+        // Pattern: *italic text* or _italic text_
+        $inlineText = preg_replace_callback('/(?<!\*)\*(?!\s)([^*]+?)(?<!\s)\*(?!\*)/', function ($italicMatch) {
+            return '<em>' . htmlspecialchars($italicMatch[1], ENT_QUOTES, 'UTF-8') . '</em>';
+        }, $inlineText);
+        $inlineText = preg_replace_callback('/(?<!\w)_(?!\s)([^_]+?)(?<!\s)_(?!\w)/', function ($italicMatch) {
+            return '<em>' . htmlspecialchars($italicMatch[1], ENT_QUOTES, 'UTF-8') . '</em>';
+        }, $inlineText);
+
+        // STEP 6: Process links
         // Pattern: [link text](url)
         // SECURITY: Both link text and URL are escaped to prevent XSS
         // Fixed in code review - was vulnerable to XSS before using callback
@@ -1001,10 +1017,15 @@ class Parser
             return '<a href="' . $linkUrl . '">' . $linkText . '</a>';
         }, $inlineText);
 
-        // STEP 6: Restore HTML tags from components
+        // STEP 7: Restore HTML tags from components
         // Now that markdown processing is done, put back the component HTML
         foreach ($htmlTagMap as $placeholderKey => $originalTagHtml) {
             $inlineText = str_replace($placeholderKey, $originalTagHtml, $inlineText);
+        }
+
+        // STEP 8: Restore inline code spans
+        foreach ($codeSpanMap as $placeholderKey => $codeHtml) {
+            $inlineText = str_replace($placeholderKey, $codeHtml, $inlineText);
         }
 
         return $inlineText;
