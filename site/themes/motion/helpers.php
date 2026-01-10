@@ -162,3 +162,23 @@ function motion_theme_is_safe_inline_script(string $content): bool
     return stripos($content, '</script') === false &&
            stripos($content, '<script') === false;
 }
+
+if (!function_exists('motion_theme_register_hooks')) {
+    /**
+     * Register Motion theme hooks (styles, scripts).
+     */
+    function motion_theme_register_hooks(): void
+    {
+        static $registered = false;
+        if ($registered) {
+            return;
+        }
+        $registered = true;
+
+        \Flint\HookManager::on('theme_styles', function (): void {
+            echo '<link rel="stylesheet" href="' . theme_asset('theme.css') . '">' . "\n";
+        }, 20);
+    }
+}
+
+motion_theme_register_hooks();

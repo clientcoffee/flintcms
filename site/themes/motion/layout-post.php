@@ -1,55 +1,52 @@
+<?php
+$siteName = $site['name'] ?? '';
+$pageTitle = page_meta('title', $siteName);
+$keywords = page_meta('keywords');
+$keywordsMeta = $keywords !== '' ? '<meta name="keywords" content="' . $keywords . '">' : '';
+$postTitle = page_meta('title', 'Untitled Post');
+
+$iconEmoji = '';
+if (!empty($page['meta']['icon'])) {
+    $iconEmoji = getEmojiFromSlug($page['meta']['icon']);
+}
+$iconMarkup = $iconEmoji !== '' ? '<span class="text-6xl mb-4 block">' . $iconEmoji . '</span>' : '';
+
+$postDescription = $page['meta']['description'] ?? '';
+$descriptionMarkup = $postDescription !== ''
+    ? '<p class="text-xl text-white/90 mb-6 leading-relaxed">' . esc_html($postDescription) . '</p>'
+    : '';
+
+$metaParts = [];
+$author = $page['meta']['author'] ?? '';
+if ($author !== '') {
+    $metaParts[] = '<span>By ' . esc_html($author) . '</span>';
+}
+$date = $page['meta']['date'] ?? '';
+if ($date !== '') {
+    $metaParts[] = '<time>' . esc_html($date) . '</time>';
+}
+$readtime = $page['meta']['readtime'] ?? '';
+if ($readtime !== '') {
+    $metaParts[] = '<span>' . esc_html($readtime) . ' min read</span>';
+}
+$postMetaMarkup = !empty($metaParts)
+    ? '<div class="post-meta flex items-center gap-4">' . implode('<span>•</span>', $metaParts) . '</div>'
+    : '';
+
+$authHtml = $isAdmin
+    ? '<button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>'
+    : '<a href="/login" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= page_meta('title', $site['name']) ?> | <?= esc_html($site['name']) ?></title>
-    <?php $keywords = page_meta('keywords'); ?>
-    <?php if ($keywords !== '') : ?>
-    <meta name="keywords" content="<?= $keywords ?>">
-    <?php endif; ?>
+    <title><?= $pageTitle ?> | <?= esc_html($siteName) ?></title>
+    <?= $keywordsMeta ?>
     <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
     <?php render_assets('head'); ?>
     <?php theme_styles(); ?>
-    <link rel="stylesheet" href="<?= theme_asset('motion.css') ?>">
-
-    <?php
-    $primaryColor = $themeConfig['settings']['primary_color'] ?? '#4F46E5';
-    $primaryDark = $themeConfig['settings']['primary_color_dark'] ?? '#1E3A8A';
-    ?>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-        }
-
-        /* Post-specific styles */
-        :root {
-            --post-gradient-start: <?= esc_html($primaryColor) ?>;
-            --post-gradient-end: <?= esc_html($primaryDark) ?>;
-        }
-
-        .post-header {
-            background: linear-gradient(135deg, var(--post-gradient-start) 0%, var(--post-gradient-end) 100%);
-        }
-
-        .post-meta {
-            font-size: 0.875rem;
-            color: rgba(255, 255, 255, 0.9);
-        }
-
-        /* Reading progress bar */
-        #reading-progress {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--post-gradient-start) 0%, var(--post-gradient-end) 100%);
-            width: 0%;
-            z-index: 9999;
-        }
-    </style>
 </head>
 <body class="bg-[#FAFAFA] text-gray-800 antialiased">
     <!-- Reading Progress Bar -->
@@ -65,36 +62,15 @@
                 Back to Home
             </a>
 
-            <?php if (!empty($page['meta']['icon'])) : ?>
-                <?php $iconEmoji = getEmojiFromSlug($page['meta']['icon']); ?>
-                <?php if ($iconEmoji) : ?>
-                    <span class="text-6xl mb-4 block"><?= $iconEmoji ?></span>
-                <?php endif; ?>
-            <?php endif; ?>
+            <?= $iconMarkup ?>
 
             <h1 class="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
-                <?= page_meta('title', 'Untitled Post') ?>
+                <?= $postTitle ?>
             </h1>
 
-            <?php if (!empty($page['meta']['description'])) : ?>
-                <p class="text-xl text-white/90 mb-6 leading-relaxed">
-                    <?= esc_html($page['meta']['description']) ?>
-                </p>
-            <?php endif; ?>
+            <?= $descriptionMarkup ?>
 
-            <div class="post-meta flex items-center gap-4">
-                <?php if (!empty($page['meta']['author'])) : ?>
-                    <span>By <?= esc_html($page['meta']['author']) ?></span>
-                <?php endif; ?>
-                <?php if (!empty($page['meta']['date'])) : ?>
-                    <span>•</span>
-                    <time><?= esc_html($page['meta']['date']) ?></time>
-                <?php endif; ?>
-                <?php if (!empty($page['meta']['readtime'])) : ?>
-                    <span>•</span>
-                    <span><?= esc_html($page['meta']['readtime']) ?> min read</span>
-                <?php endif; ?>
-            </div>
+            <?= $postMetaMarkup ?>
         </div>
     </header>
 
@@ -112,11 +88,7 @@
             <p class="text-sm text-gray-500">
                 Powered by <a href="https://flintcms.com" target="_blank" title="A flat file CMS built on Markdown" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
             </p>
-            <?php if (!empty($isAdmin)) : ?>
-                <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
-            <?php else : ?>
-                <a href="/login" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>
-            <?php endif; ?>
+            <?= $authHtml ?>
         </div>
     </footer>
 

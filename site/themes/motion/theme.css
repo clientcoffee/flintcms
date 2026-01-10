@@ -1,0 +1,201 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+
+:root {
+  --motion-transition-short: 100ms;
+  --motion-transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-transition-props: background-color, border-color, color, fill, stroke;
+  --post-gradient-start: #4f46e5;
+  --post-gradient-end: #1e3a8a;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+h1 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h3,
+h4 {
+  font-weight: 600;
+}
+
+.nav-menu ul {
+  flex-wrap: wrap;
+}
+
+a,
+button,
+[role="button"],
+.nav-link,
+.transition-short {
+  transition-property: var(--motion-transition-props);
+  transition-duration: var(--motion-transition-short);
+  transition-timing-function: var(--motion-transition-ease);
+}
+
+.transition,
+.transition-all,
+.transition-colors,
+.transition-opacity,
+.transition-shadow,
+.transition-transform {
+  transition-duration: var(--motion-transition-short);
+  transition-timing-function: var(--motion-transition-ease);
+}
+
+#reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--post-gradient-start) 0%, var(--post-gradient-end) 100%);
+  width: 0%;
+  z-index: 9999;
+  transition: width var(--motion-transition-short) ease;
+}
+
+.post-header {
+  background: linear-gradient(135deg, var(--post-gradient-start) 0%, var(--post-gradient-end) 100%);
+}
+
+.post-meta {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.motion-page-banner {
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+
+.motion-page-banner__image {
+  height: clamp(12rem, 32vw, 20rem);
+}
+
+.motion-page-title {
+  font-size: clamp(1.9rem, 3vw, 2.55rem);
+}
+
+.motion-page-icon-wrap--offset {
+  transform: translateY(-60%);
+}
+
+.motion-content {
+  color: rgb(55, 53, 47);
+  line-height: 1.6;
+}
+
+.motion-content h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.2;
+  color: rgb(55, 53, 47);
+}
+
+.motion-content h2 {
+  font-size: 1.875rem;
+  font-weight: 600;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+  color: rgb(55, 53, 47);
+}
+
+.motion-content h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+  color: rgb(55, 53, 47);
+}
+
+.motion-content p {
+  font-size: 1rem;
+  line-height: 1.7;
+  margin-bottom: 0.75rem;
+  color: rgb(55, 53, 47);
+}
+
+.motion-content strong {
+  font-weight: 600;
+  color: rgb(55, 53, 47);
+}
+
+.motion-content a {
+  color: rgb(55, 53, 47);
+  text-decoration: underline;
+  text-decoration-color: rgba(55, 53, 47, 0.4);
+  text-underline-offset: 2px;
+}
+
+.motion-content a:hover {
+  text-decoration-color: rgb(55, 53, 47);
+  background-color: rgba(55, 53, 47, 0.08);
+}
+
+.motion-content li {
+  font-size: 1rem;
+  line-height: 1.7;
+  padding: 0.25rem 0;
+  color: rgb(55, 53, 47);
+  list-style-position: outside;
+  margin-left: 1.5rem;
+}
+
+.motion-content ul {
+  margin: 0.5rem 0 1rem 0;
+}
+
+.motion-content li::marker {
+  color: rgba(55, 53, 47, 0.4);
+}
+
+.motion-embed {
+  position: relative;
+  padding-top: 56.25%;
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.motion-embed iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.motion-lightbox::backdrop {
+  background: rgba(15, 23, 42, 0.65);
+}
+
+@keyframes motion-float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.motion-404 .float-animation {
+  animation: motion-float 3s ease-in-out infinite;
+}

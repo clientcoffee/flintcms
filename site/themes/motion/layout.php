@@ -18,6 +18,23 @@
  * @subpackage MotionTheme
  */
 
+<?php
+$siteName = $site['name'] ?? '';
+$pageTitle = page_meta('title', $siteName);
+$keywords = page_meta('keywords');
+$keywordsMeta = $keywords !== '' ? '<meta name="keywords" content="' . $keywords . '">' : '';
+
+$navItems = '';
+$navPath = \Components\Block::resolveMarkdownBlockPath(\Flint\Paths::$rootDir, 'nav');
+if ($navPath !== null && is_readable($navPath)) {
+    $navItems = file_get_contents($navPath);
+}
+
+$navHtml = trim($navItems) !== '' ? \Components\Nav::render(['items' => $navItems], '') : render_block('nav');
+
+$authHtml = $isAdmin
+    ? '<button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>'
+    : '<a href="/login" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -29,44 +46,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Page title: Use page-specific title if available, otherwise site name -->
-    <title><?= page_meta('title', $site['name']) ?> | <?= esc_html($site['name']) ?></title>
+    <title><?= $pageTitle ?> | <?= esc_html($siteName) ?></title>
 
     <!-- Optional: SEO keywords meta tag (only if page has keywords defined) -->
-    <?php $keywords = page_meta('keywords'); ?>
-    <?php if ($keywords !== '') : ?>
-    <meta name="keywords" content="<?= $keywords ?>">
-    <?php endif; ?>
+    <?= $keywordsMeta ?>
 
     <!-- Theme's main stylesheet (Tailwind CSS) -->
     <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
     <?php render_assets('head'); ?>
     <?php theme_styles(); ?>
-    <link rel="stylesheet" href="<?= theme_asset('motion.css') ?>">
-
-    <!-- Theme Global Styles -->
-    <style>
-        /* Import Inter font from Google Fonts for modern typography */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-        /* Set Inter as primary font with system font fallbacks */
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-        }
-
-        /* Enable smooth scrolling for anchor links */
-        html {
-            scroll-behavior: smooth;
-        }
-
-        /* Heading typography: Bold weights and tight letter spacing */
-        h1 { font-weight: 700; letter-spacing: -0.02em; }
-        h2 { font-weight: 600; letter-spacing: -0.01em; }
-        h3, h4 { font-weight: 600; }
-
-        .nav-menu ul {
-            flex-wrap: wrap;
-        }
-    </style>
 </head>
 <body class="bg-[#FAFAFA] text-gray-800 antialiased">
     <!-- Fixed Top Navigation Bar -->
@@ -80,24 +68,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
                 </svg>
                 <!-- Site name from configuration -->
-                <?= esc_html($site['name']) ?>
+                <?= esc_html($siteName) ?>
             </a>
 
             <!-- Navigation Menu -->
             <div class="nav-menu flex items-center gap-3">
-                <?php
-                $navItems = '';
-                $navPath = \Components\Block::resolveMarkdownBlockPath(\Flint\Paths::$rootDir, 'nav');
-                if ($navPath !== null && is_readable($navPath)) {
-                    $navItems = file_get_contents($navPath);
-                }
-
-                if (trim($navItems) !== '') {
-                    echo \Components\Nav::render(['items' => $navItems], '');
-                } else {
-                    echo render_block('nav');
-                }
-                ?>
+                <?= $navHtml ?>
             </div>
         </div>
     </div>
@@ -106,11 +82,7 @@
     <!-- pt-16 creates top padding to account for fixed header -->
     <main class="pt-24 sm:pt-16 min-h-screen">
         <div class="max-w-3xl mx-auto px-6 sm:px-12 py-12 sm:py-16">
-            <?php
-            // This is where the actual page content is rendered
-            // $viewContent contains the parsed markdown as HTML
-            echo $viewContent;
-            ?>
+            <?= $viewContent ?>
         </div>
     </main>
 
@@ -122,11 +94,7 @@
                 Powered by <a href="https://flintcms.com" target="_blank" title="A flat file CMS built on Markdown" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
             </p>
 
-            <?php if (!empty($isAdmin)) : ?>
-                <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
-            <?php else : ?>
-                <a href="/login" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>
-            <?php endif; ?>
+            <?= $authHtml ?>
         </div>
     </footer>
 
