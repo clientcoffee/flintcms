@@ -139,6 +139,13 @@ else
     "${dist_root}/site/" 2>&1 | grep -v "^$" || true
 fi
 
+# Seed default pages/blocks into dist/site when empty.
+seed_script="${workspace_root}/scripts/seed-content.sh"
+if [[ -x "${seed_script}" ]]; then
+  echo -e "${BLUE}Seeding default content into dist/site (if needed)...${NC}"
+  "${seed_script}" --root "${dist_root}"
+fi
+
 # Create empty uploads directory
 mkdir -p "${dist_root}/site/uploads"
 

@@ -27,6 +27,11 @@ done
 echo "Running Flint build..."
 ./scripts/build.sh "${BUILD_ARGS[@]}"
 
+if [[ -x "./scripts/seed-content.sh" ]]; then
+  echo "Seeding default content into dist/site (if needed)..."
+  ./scripts/seed-content.sh --root "${workspace_root}/dist"
+fi
+
 echo "Serving dist/app on http://localhost:${PORT} (Ctrl+C to stop)"
 cd dist/app
 
