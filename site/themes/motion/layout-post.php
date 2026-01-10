@@ -41,6 +41,7 @@ $hasMeta = $hasAuthor || $hasDate || $hasReadtime;
 // Auth button is driven by CMS session state.
 $showLogout = !empty($isAdmin);
 $loginUrl = '/login';
+$adminUrl = '/admin';
 
 // Capture head assets from the CMS hooks before the HTML renders.
 // This is how components and themes inject CSS without hard-coding paths.
@@ -135,7 +136,10 @@ $footerAssets = ob_get_clean();
                 Powered by <a href="https://flintcms.com" target="_blank" title="A flat file CMS built on Markdown" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
             </p>
             <?php if ($showLogout) : ?>
-                <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
+                <div class="flex items-center gap-4">
+                    <a href="<?= esc_html($adminUrl) ?>" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Admin</a>
+                    <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
+                </div>
             <?php else : ?>
                 <a href="<?= esc_html($loginUrl) ?>" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>
             <?php endif; ?>

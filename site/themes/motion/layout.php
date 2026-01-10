@@ -45,6 +45,7 @@ $navHtml = trim($navItems) !== '' ? \Components\Nav::render(['items' => $navItem
 // Simple auth toggle driven by the CMS session state.
 $showLogout = !empty($isAdmin);
 $loginUrl = '/login';
+$adminUrl = '/admin';
 
 // Collect head assets here so the template is mostly HTML below.
 // render_assets() injects component CSS; theme_styles() triggers theme hooks.
@@ -120,7 +121,10 @@ $footerAssets = ob_get_clean();
             </p>
 
             <?php if ($showLogout) : ?>
-                <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
+                <div class="flex items-center gap-4">
+                    <a href="<?= esc_html($adminUrl) ?>" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Admin</a>
+                    <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
+                </div>
             <?php else : ?>
                 <a href="<?= esc_html($loginUrl) ?>" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>
             <?php endif; ?>
