@@ -766,11 +766,11 @@
     }
 
     if (autoUpdateMode === "true") {
-      return `<button onclick="applyUpdate('${updateUrl}')" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Now</button>`;
+      return `<button onclick="applyUpdate(&quot;${updateUrl}&quot;)" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Now</button>`;
     }
 
     if (autoUpdateMode === "ask") {
-      return `<button onclick="applyUpdate('${updateUrl}')" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Update</button><a href="${releaseUrl}" target="_blank" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">View Release Notes</a>`;
+      return `<button onclick="applyUpdate(&quot;${updateUrl}&quot;)" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">Install Update</button><a href="${releaseUrl}" target="_blank" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">View Release Notes</a>`;
     }
 
     return `<a href="${releaseUrl}" target="_blank" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">View Release</a>`;
@@ -962,6 +962,9 @@
         const toggleClasses = component.enabled
           ? "bg-gray-100 text-gray-700"
           : "bg-indigo-600 text-white";
+        const updateButton = component.repo
+          ? `<button onclick="updateComponent(&quot;${component.name}&quot;)" class="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Update</button>`
+          : "";
 
         return `
           <div class="bg-white border border-gray-200 rounded-lg p-4">
@@ -974,15 +977,11 @@
             </div>
             <p class="text-sm text-gray-600 mb-3">${component.description}</p>
             <div class="flex gap-2">
-              <button onclick="toggleComponent('${component.name}', ${!component.enabled})" class="px-3 py-1 text-sm rounded ${toggleClasses} hover:opacity-80">
+              <button onclick="toggleComponent(&quot;${component.name}&quot;, ${!component.enabled})" class="px-3 py-1 text-sm rounded ${toggleClasses} hover:opacity-80">
                 ${toggleLabel}
               </button>
-              ${
-                component.repo
-                  ? `<button onclick="updateComponent('${component.name}')" class="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Update</button>`
-                  : ""
-              }
-              <button onclick="deleteComponent('${component.name}')" class="px-3 py-1 text-sm bg-red-50 text-red-700 rounded hover:bg-red-100">Delete</button>
+              ${updateButton}
+              <button onclick="deleteComponent(&quot;${component.name}&quot;)" class="px-3 py-1 text-sm bg-red-50 text-red-700 rounded hover:bg-red-100">Delete</button>
             </div>
           </div>
         `;
@@ -1017,7 +1016,7 @@
               </div>
             </div>
             <p class="text-sm text-gray-600 mb-3">${component.description}</p>
-            <button onclick="installComponent('${component.repo}')" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+            <button onclick="installComponent(&quot;${component.repo}&quot;)" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
               Install
             </button>
           </div>
@@ -1386,12 +1385,12 @@
     initEditor(contentEditor);
     initEditor(blockEditor);
 
-    const contentTab = qs('[data-tab="content"]');
+    const contentTab = qs("[data-tab='content']");
     if (contentTab) {
       contentTab.addEventListener("click", () => loadTreeList(contentEditor));
     }
 
-    const blocksTab = qs('[data-tab="blocks"]');
+    const blocksTab = qs("[data-tab='blocks']");
     if (blocksTab) {
       blocksTab.addEventListener("click", () => loadTreeList(blockEditor));
     }
@@ -1399,12 +1398,12 @@
 
   // Initialize lazy-loading for submissions and components tabs.
   const initLazyTabs = () => {
-    const submissionsTab = qs('[data-tab="submissions"]');
+    const submissionsTab = qs("[data-tab='submissions']");
     if (submissionsTab) {
       submissionsTab.addEventListener("click", loadSubmissions);
     }
 
-    const componentsTab = qs('[data-tab="components"]');
+    const componentsTab = qs("[data-tab='components']");
     if (componentsTab) {
       componentsTab.addEventListener("click", loadComponents);
     }

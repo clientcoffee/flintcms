@@ -2,6 +2,12 @@
 <ruleset name="Flint">
   <description>PHPCS configuration for Flint.</description>
   <rule ref="PSR12"/>
+  <rule ref="Generic.Files.LineLength">
+    <properties>
+      <property name="lineLimit" value="9999"/>
+      <property name="absoluteLineLimit" value="9999"/>
+    </properties>
+  </rule>
   <file>app</file>
   <file>site</file>
   <file>tests</file>
@@ -9,4 +15,5 @@
   <exclude-pattern>dist/*</exclude-pattern>
   <exclude-pattern>documentation/*</exclude-pattern>
   <exclude-pattern>docs/*</exclude-pattern>
+  <exclude-pattern>app/views/404-fallback.php</exclude-pattern>
 </ruleset>

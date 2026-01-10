@@ -189,7 +189,6 @@ PHP;
         $testDir = $this->testRoot . '/nested';
         mkdir($testDir . '/sub1/sub2', 0755, true);
         file_put_contents($testDir . '/sub1/sub2/file.txt', 'test');
-
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('recursiveRemoveDirectory');
 
@@ -202,8 +201,6 @@ PHP;
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('splitSettings');
-        $method->setAccessible(true);
-
         $config = [
             'site' => [
                 'name' => 'Test Site',
@@ -216,9 +213,7 @@ PHP;
                 'auto_update' => 'ask',
             ],
         ];
-
         [$editable, $readonly] = $method->invoke($this->app, $config);
-
         $this->assertSame('Test Site', $editable['site.name']);
         $this->assertSame('motion', $editable['site.theme']);
         $this->assertArrayHasKey('system.environment', $readonly);
@@ -230,13 +225,10 @@ PHP;
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('coreSiteKeys');
-        $method->setAccessible(true);
-
         $coreKeys = $method->invoke($this->app, [
             'name' => 'Test Site',
             'theme' => 'motion',
         ]);
-
         $this->assertContains('site.name', $coreKeys);
         $this->assertContains('site.theme', $coreKeys);
         $this->assertNotContains('site.custom_key', $coreKeys);
@@ -246,8 +238,6 @@ PHP;
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('countTreeFiles');
-        $method->setAccessible(true);
-
         $tree = [
             [
                 'type' => 'file',
@@ -277,7 +267,6 @@ PHP;
                 ],
             ],
         ];
-
         $this->assertSame(3, $method->invoke($this->app, $tree));
     }
 
@@ -285,8 +274,6 @@ PHP;
     {
         $reflection = new \ReflectionClass($this->app);
         $method = $reflection->getMethod('parseSessionSavePath');
-        $method->setAccessible(true);
-
         $this->assertSame('/var/lib/php/sessions', $method->invoke($this->app, '5;/var/lib/php/sessions'));
         $this->assertSame('/tmp', $method->invoke($this->app, '/tmp'));
         $this->assertNull($method->invoke($this->app, ''));
