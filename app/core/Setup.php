@@ -96,48 +96,6 @@ class Setup
 
         self::seedDefaultContent($rootDir);
 
-        // Create welcome page if it doesn't exist.
-        $welcomePage = $rootDir . '/site/pages/index.md';
-        if (!file_exists($welcomePage)) {
-            $welcomeContent = <<<'MD'
----
-title: Welcome to Flint
-description: Your new flat-file CMS is ready to go!
-icon: home
-order: 1
----
-
-# 👋 Hello from Flint!
-
-Welcome to your new content management system. Everything is set up and ready for you to start creating.
-
-## What's Flint?
-
-A beautifully simple, flat-file CMS that just works:
-
-- **Zero Dependencies** - Drop it on any PHP 8.2+ server
-- **No Database** - All content lives in simple markdown files
-- **Built-in Editor** - Edit content right in your browser
-- **Lightning Fast** - No database queries, just files
-- **Theme System** - Beautiful, responsive themes included
-
-## Get Started in 3 Steps
-
-1. **Login** - Click the login link in the footer to access the admin panel
-2. **Edit** - Modify this page or create new content
-3. **Customize** - Change your theme and site settings
-
-## What's Next?
-
-- Explore the admin panel to customize your site
-- Create new pages by adding markdown files
-- Customize your theme and settings
-
-**Ready to build something amazing?** Your content awaits! ✨
-MD;
-            file_put_contents($welcomePage, $welcomeContent);
-        }
-
         $adminPassword = MagicLink::generatePassword(64);
         $hashedPassword = password_hash($adminPassword, PASSWORD_DEFAULT);
 
@@ -304,7 +262,13 @@ MD;
     private static function seedDefaultContent(string $rootDir): void
     {
         $coreContentDir = $rootDir . '/app/core/content';
-        self::copyMissingFiles($coreContentDir . '/pages', $rootDir . '/site/pages');
+        $pagesSource = $coreContentDir . '/pages';
+        $pagesDestination = $rootDir . '/site/pages';
+
+        if (!self::hasMarkdownContent($pagesDestination)) {
+            self::copyMissingFiles($pagesSource, $pagesDestination);
+        }
+
         self::copyMissingFiles($coreContentDir . '/blocks', $rootDir . '/site/blocks');
         self::copyMissingFiles($coreContentDir . '/uploads', $rootDir . '/site/uploads');
     }
@@ -345,5 +309,31 @@ MD;
                 copy($item->getPathname(), $targetPath);
             }
         }
+    }
+
+    /**
+     * Check for existing markdown content before seeding.
+     */
+    private static function hasMarkdownContent(string $directory): bool
+    {
+        if (!is_dir($directory)) {
+            return false;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $item) {
+            if (!$item->isFile()) {
+                continue;
+            }
+
+            if (preg_match('/\.(md|mdx)$/i', $item->getFilename())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
