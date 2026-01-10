@@ -21,10 +21,10 @@ class Callout extends RenderComponent
      */
     public static function render(array $props, string $content): string
     {
-        // Resolve the callout type from props using helper method
+        // Props are passed from markdown like {{Callout type="info"}}.
         $calloutType = self::prop($props, 'type', 'info');
 
-        // Define the Motion theme style map.
+        // Theme-specific visual mapping for each callout type.
         $styleMap = [
             'info' => [
                 'bg' => 'bg-blue-50',
@@ -56,14 +56,20 @@ class Callout extends RenderComponent
         $styleConfig = $styleMap[$calloutType] ?? $styleMap['info'];
         $iconGlyph = $styleConfig['icon'];
 
-        // Return single-line HTML to avoid markdown splitting the component.
-        return sprintf(
-            '<div class="my-4 p-4 rounded-md border-l-4 %s %s %s flex gap-3 items-start"><span class="text-xl flex-shrink-0 mt-0.5">%s</span><div class="flex-1 text-sm leading-relaxed">%s</div></div>',
-            $styleConfig['bg'],
-            $styleConfig['border'],
-            $styleConfig['text'],
-            $iconGlyph,
-            htmlspecialchars($content)
-        );
+        // Callout content should be treated as plain text here.
+        $safeContent = htmlspecialchars($content);
+
+        // Components return HTML strings, so we buffer markup output.
+        ob_start();
+        ?>
+        <div class="my-4 p-4 rounded-md border-l-4 <?= esc_html($styleConfig['bg']) ?> <?= esc_html($styleConfig['border']) ?> <?= esc_html($styleConfig['text']) ?> flex gap-3 items-start">
+            <!-- Emoji gives a quick visual cue for the callout type. -->
+            <span class="text-xl flex-shrink-0 mt-0.5"><?= esc_html($iconGlyph) ?></span>
+            <!-- Content is plain text to keep callouts simple and safe. -->
+            <div class="flex-1 text-sm leading-relaxed"><?= $safeContent ?></div>
+        </div>
+        <?php
+
+        return trim(ob_get_clean());
     }
 }

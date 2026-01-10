@@ -21,8 +21,9 @@ class Alert extends RenderComponent
      */
     public static function render(array $props, string $content): string
     {
-        // Use helper methods from RenderComponent
+        // RenderComponent::prop() reads props passed from markdown like {{Alert type="info"}}.
         $type = self::prop($props, 'type', 'info');
+        // Optional title renders a bold heading inside the alert.
         $title = self::prop($props, 'title');
 
         $styles = [
@@ -39,27 +40,36 @@ class Alert extends RenderComponent
             'error' => '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>',
         ];
 
+        // Fall back to "info" if the type is unknown.
         $style = $styles[$type] ?? $styles['info'];
         $icon = $icons[$type] ?? $icons['info'];
 
-        $html = '<div class="motion-alert rounded-xl border p-4 my-4 ' . $style . '">';
-        $html .= '<div class="flex gap-3">';
-        $html .= '<div class="flex-shrink-0">' . $icon . '</div>';
-        $html .= '<div class="flex-1">';
+        // The CMS parser already sanitized $content.
+        $hasTitle = $title !== '';
+        $hasContent = $content !== '';
 
-        if ($title) {
-            $html .= '<h4 class="font-semibold mb-1">' . self::escape($title) . '</h4>';
-        }
+        // Components return HTML strings, so we buffer a template-style output.
+        ob_start();
+        ?>
+        <div class="motion-alert rounded-xl border p-4 my-4 <?= esc_html($style) ?>">
+            <div class="flex gap-3">
+                <!-- Icon is chosen by alert type. -->
+                <div class="flex-shrink-0"><?= $icon ?></div>
+                <div class="flex-1">
+                    <!-- Title is optional to keep alerts compact. -->
+                    <?php if ($hasTitle) : ?>
+                        <h4 class="font-semibold mb-1"><?= self::escape($title) ?></h4>
+                    <?php endif; ?>
 
-        if ($content) {
-            // Content is pre-sanitized by Parser
-            $html .= '<div class="text-sm">' . $content . '</div>';
-        }
+                    <!-- Content is already parsed HTML from the CMS. -->
+                    <?php if ($hasContent) : ?>
+                        <div class="text-sm"><?= $content ?></div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php
 
-        $html .= '</div>';
-        $html .= '</div>';
-        $html .= '</div>';
-
-        return $html;
+        return trim(ob_get_clean());
     }
 }

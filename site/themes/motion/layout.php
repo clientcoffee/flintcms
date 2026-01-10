@@ -18,6 +18,46 @@
  * @subpackage MotionTheme
  */
 
+/**
+ * Motion layout template.
+ *
+ * The CMS injects $site, $page, $viewContent, $componentAssets, and $isAdmin.
+ * We compute everything up front to keep the HTML clean and predictable.
+ */
+$siteName = $site['name'] ?? '';
+// page_meta() reads from ThemeContext and returns escaped values.
+$pageTitle = page_meta('title', $siteName);
+// Optional SEO keywords are stored in frontmatter if present.
+$keywords = page_meta('keywords');
+$hasKeywords = $keywords !== '';
+
+// Nav content comes from a markdown block in /site/blocks/nav.md.
+$navItems = '';
+$navPath = \Components\Block::resolveMarkdownBlockPath(\Flint\Paths::$rootDir, 'nav');
+// Block resolution uses the CMS helper so it respects the current site root.
+if ($navPath !== null && is_readable($navPath)) {
+    $navItems = file_get_contents($navPath);
+}
+
+// Render the Nav component if we have items, otherwise fall back to the block renderer.
+$navHtml = trim($navItems) !== '' ? \Components\Nav::render(['items' => $navItems], '') : render_block('nav');
+
+// Simple auth toggle driven by the CMS session state.
+$showLogout = !empty($isAdmin);
+$loginUrl = '/login';
+
+// Collect head assets here so the template is mostly HTML below.
+// render_assets() injects component CSS; theme_styles() triggers theme hooks.
+ob_start();
+render_assets('head');
+theme_styles();
+$headAssets = ob_get_clean();
+
+// Collect footer assets (scripts) the same way for a clean footer block.
+ob_start();
+render_assets('foot');
+theme_scripts();
+$footerAssets = ob_get_clean();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -29,44 +69,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Page title: Use page-specific title if available, otherwise site name -->
-    <title><?= page_meta('title', $site['name']) ?> | <?= esc_html($site['name']) ?></title>
+    <title><?= $pageTitle ?> | <?= esc_html($siteName) ?></title>
 
     <!-- Optional: SEO keywords meta tag (only if page has keywords defined) -->
-    <?php $keywords = page_meta('keywords'); ?>
-    <?php if ($keywords !== '') : ?>
-    <meta name="keywords" content="<?= $keywords ?>">
+    <?php if ($hasKeywords) : ?>
+        <meta name="keywords" content="<?= $keywords ?>">
     <?php endif; ?>
 
     <!-- Theme's main stylesheet (Tailwind CSS) -->
     <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
-    <?php render_assets('head'); ?>
-    <?php theme_styles(); ?>
-    <link rel="stylesheet" href="<?= theme_asset('motion.css') ?>">
-
-    <!-- Theme Global Styles -->
-    <style>
-        /* Import Inter font from Google Fonts for modern typography */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-        /* Set Inter as primary font with system font fallbacks */
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-        }
-
-        /* Enable smooth scrolling for anchor links */
-        html {
-            scroll-behavior: smooth;
-        }
-
-        /* Heading typography: Bold weights and tight letter spacing */
-        h1 { font-weight: 700; letter-spacing: -0.02em; }
-        h2 { font-weight: 600; letter-spacing: -0.01em; }
-        h3, h4 { font-weight: 600; }
-
-        .nav-menu ul {
-            flex-wrap: wrap;
-        }
-    </style>
+    <?= $headAssets ?>
 </head>
 <body class="bg-[#FAFAFA] text-gray-800 antialiased">
     <!-- Fixed Top Navigation Bar -->
@@ -80,24 +92,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
                 </svg>
                 <!-- Site name from configuration -->
-                <?= esc_html($site['name']) ?>
+                <?= esc_html($siteName) ?>
             </a>
 
             <!-- Navigation Menu -->
             <div class="nav-menu flex items-center gap-3">
-                <?php
-                $navItems = '';
-                $navPath = \Components\Block::resolveMarkdownBlockPath(\Flint\Paths::$rootDir, 'nav');
-                if ($navPath !== null && is_readable($navPath)) {
-                    $navItems = file_get_contents($navPath);
-                }
-
-                if (trim($navItems) !== '') {
-                    echo \Components\Nav::render(['items' => $navItems], '');
-                } else {
-                    echo render_block('nav');
-                }
-                ?>
+                <?= $navHtml ?>
             </div>
         </div>
     </div>
@@ -106,11 +106,8 @@
     <!-- pt-16 creates top padding to account for fixed header -->
     <main class="pt-24 sm:pt-16 min-h-screen">
         <div class="max-w-3xl mx-auto px-6 sm:px-12 py-12 sm:py-16">
-            <?php
-            // This is where the actual page content is rendered
-            // $viewContent contains the parsed markdown as HTML
-            echo $viewContent;
-            ?>
+            <!-- $viewContent is the fully rendered HTML from Parser + view.php. -->
+            <?= $viewContent ?>
         </div>
     </main>
 
@@ -122,17 +119,16 @@
                 Powered by <a href="https://flintcms.com" target="_blank" title="A flat file CMS built on Markdown" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
             </p>
 
-            <?php if (!empty($isAdmin)) : ?>
+            <?php if ($showLogout) : ?>
                 <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
             <?php else : ?>
-                <a href="/login" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>
+                <a href="<?= esc_html($loginUrl) ?>" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>
             <?php endif; ?>
         </div>
     </footer>
 
     <!-- Component External Scripts (Footer Position) -->
     <!-- Most JavaScript goes here at the end of body for better page load performance -->
-    <?php render_assets('foot'); ?>
-    <?php theme_scripts(); ?>
+    <?= $footerAssets ?>
 </body>
 </html>

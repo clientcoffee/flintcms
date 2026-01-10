@@ -1,5 +1,13 @@
 <?php
-// Load quotes from JSON file
+/**
+ * Motion 404 template.
+ *
+ * This file is rendered directly by App::render404() with $site + $themeConfig.
+ * We keep logic here and emit clean markup below to make maintenance easier.
+ */
+require_once __DIR__ . '/helpers.php';
+
+// Quotes live in the theme folder so they ship with the theme.
 $quotesPath = __DIR__ . '/quotes.json';
 $quotes = [];
 
@@ -8,13 +16,25 @@ if (file_exists($quotesPath)) {
     $quotes = json_decode($quotesContent, true);
 }
 
-// Select random quote
+// Pick a quote once so we can render it or omit the block entirely.
 $randomQuote = '';
 if (!empty($quotes) && is_array($quotes)) {
     $randomQuote = $quotes[array_rand($quotes)];
 }
 
-$siteName = htmlspecialchars($site['name'] ?? 'Flint', ENT_QUOTES);
+// Boolean flag keeps the template logic simple.
+$hasQuote = $randomQuote !== '';
+
+// esc_html() is the CMS helper for safe output.
+$siteName = esc_html($site['name'] ?? 'Flint');
+
+// Collect theme styles via the CMS hook system.
+ob_start();
+?>
+<link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
+<?php
+theme_styles();
+$headAssets = ob_get_clean();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -22,23 +42,9 @@ $siteName = htmlspecialchars($site['name'] ?? 'Flint', ENT_QUOTES);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>404 - Page Not Found | <?= $siteName ?></title>
-    <link rel="stylesheet" href="/themes/motion/tailwind.min.css">
-    <link rel="stylesheet" href="<?= theme_asset('motion.css') ?>">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        }
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-        }
-        .float-animation {
-            animation: float 3s ease-in-out infinite;
-        }
-    </style>
+    <?= $headAssets ?>
 </head>
-<body class="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 min-h-screen flex items-center justify-center px-6">
+<body class="motion-404 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 min-h-screen flex items-center justify-center px-6">
     <div class="max-w-2xl w-full">
         <!-- 404 Header -->
         <div class="text-center mb-8">
@@ -56,22 +62,22 @@ $siteName = htmlspecialchars($site['name'] ?? 'Flint', ENT_QUOTES);
         </div>
 
         <!-- Random Quote Card -->
-        <?php if ($randomQuote) : ?>
-        <div class="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-6 mb-8">
-            <div class="flex items-start gap-3">
-                <svg class="w-8 h-8 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
-                </svg>
-                <div class="flex-1">
-                    <p class="text-lg text-gray-800 italic leading-relaxed">
-                        "<?= htmlspecialchars($randomQuote, ENT_QUOTES) ?>"
-                    </p>
-                    <p class="text-sm text-gray-500 mt-3">
-                        — Wisdom for the wayward traveler
-                    </p>
+        <?php if ($hasQuote) : ?>
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-6 mb-8">
+                <div class="flex items-start gap-3">
+                    <svg class="w-8 h-8 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+                    </svg>
+                    <div class="flex-1">
+                        <p class="text-lg text-gray-800 italic leading-relaxed">
+                            "<?= esc_html($randomQuote) ?>"
+                        </p>
+                        <p class="text-sm text-gray-500 mt-3">
+                            — Wisdom for the wayward traveler
+                        </p>
+                    </div>
                 </div>
             </div>
-        </div>
         <?php endif; ?>
 
         <!-- Navigation Options -->

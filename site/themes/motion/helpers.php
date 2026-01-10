@@ -9,7 +9,7 @@
  */
 function getEmojiFromSlug(string $slug): string
 {
-    // Define the supported emoji tokens in one place.
+    // Define the supported emoji tokens in one place to keep templates simple.
     $emojiMap = [
         'rocket' => '🚀',
         'sparkles' => '✨',
@@ -35,7 +35,7 @@ function getEmojiFromSlug(string $slug): string
         'eye' => '👁️',
     ];
 
-    // Return the mapped emoji or a safe empty string.
+    // Return the mapped emoji or a safe empty string (no fallback icons).
     return $emojiMap[$slug] ?? '';
 }
 
@@ -44,6 +44,7 @@ function getEmojiFromSlug(string $slug): string
  */
 function motion_theme_render_component_styles(array $componentAssets): void
 {
+    // Component assets are collected by the parser and passed via ThemeContext.
     foreach ($componentAssets['styles'] ?? [] as $style) {
         $href = trim($style['href'] ?? '');
         if ($href === '') {
@@ -58,6 +59,7 @@ function motion_theme_render_component_styles(array $componentAssets): void
  */
 function motion_theme_render_component_inline_styles(array $componentAssets): void
 {
+    // Inline styles are opt-in and must pass a safety check.
     $inlineStyles = $componentAssets['inline_styles'] ?? [];
     $safeSnippets = [];
 
@@ -91,6 +93,7 @@ function motion_theme_render_component_inline_styles(array $componentAssets): vo
  */
 function motion_theme_render_component_scripts(array $componentAssets, string $position = 'footer'): void
 {
+    // Scripts are split into head/footer for performance.
     foreach ($componentAssets['scripts'] ?? [] as $script) {
         $scriptPosition = $script['position'] ?? 'footer';
         if ($scriptPosition !== $position) {
@@ -116,6 +119,7 @@ function motion_theme_render_component_scripts(array $componentAssets, string $p
  */
 function motion_theme_render_component_inline_scripts(array $componentAssets, string $position = 'footer'): void
 {
+    // Inline scripts are sanitized to avoid accidental injection.
     foreach ($componentAssets['inline_scripts'] ?? [] as $inlineScript) {
         $scriptPosition = $inlineScript['position'] ?? 'footer';
         if ($scriptPosition !== $position) {
@@ -148,6 +152,7 @@ function motion_theme_render_component_inline_scripts(array $componentAssets, st
  */
 function motion_theme_is_safe_inline_style(string $content): bool
 {
+    // Minimal static allowlist to prevent obvious script injection.
     return stripos($content, '</style') === false &&
            stripos($content, '<script') === false &&
            stripos($content, 'javascript:') === false &&
@@ -159,6 +164,30 @@ function motion_theme_is_safe_inline_style(string $content): bool
  */
 function motion_theme_is_safe_inline_script(string $content): bool
 {
+    // Block any attempt to close the script tag.
     return stripos($content, '</script') === false &&
            stripos($content, '<script') === false;
 }
+
+if (!function_exists('motion_theme_register_hooks')) {
+    /**
+     * Register Motion theme hooks (styles, scripts).
+     */
+    function motion_theme_register_hooks(): void
+    {
+        // Prevent duplicate registration if helpers are included multiple times.
+        static $registered = false;
+        if ($registered) {
+            return;
+        }
+        $registered = true;
+
+        \Flint\HookManager::on('theme_styles', function (): void {
+            // The CMS calls theme_styles() inside layouts; we attach theme.css here.
+            echo '<link rel="stylesheet" href="' . theme_asset('theme.css') . '">' . "\n";
+        }, 20);
+    }
+}
+
+// Ensure hooks are registered as soon as the theme helpers load.
+motion_theme_register_hooks();
