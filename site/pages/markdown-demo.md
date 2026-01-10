@@ -1,7 +1,7 @@
 ---
 title: Markdown Demo
 description: A quick tour of common Markdown elements.
-icon: pen
+icon: construction
 ---
 
 This page demonstrates how Markdown renders in Flint.
@@ -15,15 +15,19 @@ Use **bold**, _italic_, and `inline code` to emphasize content.
 - Dash bullet item (uses `-`)
 * Asterisk bullet item (uses `*`)
   * Nested lists (uses `*`)
-+ Plus bullet item (uses `+`)
 
 1. Ordered item one
 2. Ordered item two
-3. Ordered item three
    1. Nested ordered item
    2. Another nested ordered item
+3. Ordered item three
 4. Ordered item four
 5. Ordered item five
+   1. Nested ordered item
+      1. Deep nested ordered item
+      2. Another deep nested ordered item
+   2. Second nested ordered item
+6. Ordered item six
    - Nested unordered item
    - Another nested unordered item
 

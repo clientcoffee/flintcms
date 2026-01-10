@@ -20,6 +20,7 @@ function getEmojiFromSlug(string $slug): string
         'heart' => '❤️',
         'check' => '✅',
         'warning' => '⚠️',
+        'construction' => '🚧',
         'info' => 'ℹ️',
         'question' => '❓',
         'lightbulb' => '💡',
