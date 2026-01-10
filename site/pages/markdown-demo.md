@@ -50,8 +50,14 @@ echo "Hello from Flint!";
 
 ### Image embed
 
+Easily embed an image with: `![](/site/uploads/catjam.gif)`. Example:
+
 ![](/site/uploads/catjam.gif)
 
 ### Video embed
+
+Easily embed youtube links with the same markdown you would use for an image. The bang `!` tells the CMS to embed it.
+
+Here's an example: `![](https://youtu.be/dQw4w9WgXcQ)`. And here it is in action!
 
 ![](https://youtu.be/bWcASV2sey0)
