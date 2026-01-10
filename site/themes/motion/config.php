@@ -23,6 +23,7 @@ return [
 
         // Custom color scheme (overrides default)
         'primary_color' => '#4F46E5',
+        'primary_color_dark' => '#1E3A8A',
         'secondary_color' => '#7C3AED',
 
         // Typography
