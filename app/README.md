@@ -1,25 +1,30 @@
 # Flint
 
-A deadly simple, drop-in flat-file CMS for PHP.
+A flat-file CMS that ships as a folder. No database, no framework, no build chain required to run.
 
-## Getting Started
+Flint keeps your content as Markdown and configuration files, so you can version it, back it up, and move it anywhere. It is designed to stay small, readable, and easy to deploy.
 
-1.  **Upload:** Upload all files to your web server (FTP/SFTP).
-2.  **Visit:** Go to your website URL.
-3.  **Setup:** Fill out the one-time setup form.
+Website: https://flintcms.com
 
-That's it.
+## Quick Start
+
+1. **Upload** the project files to your web server.
+2. **Visit** your site in the browser.
+3. **Complete** the one-time setup wizard.
+4. **Log in** at `/admin` to start editing.
 
 ## Writing Content
 
-Create Markdown files in the `/site` directory.
+Pages live in `site/pages/` as Markdown:
 
-*   `/site/pages/index.md` -> Your Homepage
-*   `/site/pages/about.md` -> /about
+- `site/pages/index.md` -> Home page
+- `site/pages/about.md` -> /about
+
+Blocks live in `site/blocks/` and can be reused across pages.
 
 ### Using Components
 
-You can use components inside your Markdown (stored in `/site/components`):
+You can embed components directly in Markdown:
 
 ```markdown
 # My Page
@@ -29,36 +34,18 @@ You can use components inside your Markdown (stored in `/site/components`):
 
 ## Configuration
 
-Edit `site/config.php` to change your theme or site name.
-
-## Developer Scripts
-
-### Merge All Open PRs
-
-Use `scripts/merge-open-prs.sh` to merge open PRs targeting `main`. It merges
-the first PR (by number), then merges `main` into the remaining PR branches
-and merges those PRs.
-
-Requirements:
-- `gh auth login` completed for this repo
-- Clean working tree
-
-Optional overrides:
-- `BASE_BRANCH=main` (default)
-- `REMOTE=origin` (default)
-- `LIMIT=200` (max PRs to fetch)
-- `MERGE_METHOD=--merge` (or `--squash`, `--rebase`)
-
-Example:
-
-```bash
-scripts/merge-open-prs.sh
-```
+Your site config lives in `site/config.php`. The setup wizard creates this file for you.
 
 ## Themes
 
-Themes are located in `/site/themes`. The default theme is **Motion**, which features a clean, modern design. Themes use Tailwind CSS by default via CDN.
+Themes live in `site/themes/`. The default theme is **Motion**, which ships with its own CSS and layout templates. You can drop in a new theme by adding a folder and updating `site/config.php`.
 
 ## Requirements
 
-*   PHP 8.2 or higher.
+- PHP 8.2 or higher
+- Apache with mod_rewrite (or Nginx with equivalent rewrite rules)
+- Write permissions on `site/` and `app/`
+
+## License
+
+MIT. See `LICENSE` in the project root.
