@@ -1,0 +1,211 @@
+/* ---
+id: default
+name: Flint Default
+description: Calm blue-gray base theme
+family: blue
+accent: blue
+framework: tailwind
+--- */
+
+:root {
+  --bg: #f7f5f2;
+  --bg-muted: #f0ede9;
+  --text: #1a1a18;
+  --text-secondary: #44433f;
+  --rule: #d8d4ce;
+  --accent: #3a4c8b;
+  --accent-visited: #2f3f73;
+  --radius: 6px;
+  --max-width: 760px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.site-header {
+  background: rgba(247, 245, 242, 0.95);
+  border-bottom: 1px solid var(--rule);
+  box-shadow: none;
+}
+
+.logo {
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tagline {
+  color: var(--text-secondary);
+}
+
+.hello,
+.section-meta,
+.byline {
+  background: var(--bg-muted);
+  border: 1px solid var(--rule);
+  box-shadow: none;
+}
+
+.section-content {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.byline {
+  background: var(--bg-muted);
+}
+
+.user-pill {
+  background: var(--bg-muted);
+  border-color: var(--rule);
+  color: var(--text-secondary);
+}
+
+.user-role {
+  background: rgba(58, 76, 139, 0.12);
+}
+
+.content h1,
+.content h2,
+.content h3,
+.content h4,
+.content h5,
+.content h6 {
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.content h1 {
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 0.75rem;
+}
+
+.content h2 {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.2;
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.content h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+}
+
+.content h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.content p {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  margin-bottom: 1.25rem;
+}
+
+.content code {
+  background: var(--bg-muted);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}
+
+.content pre {
+  background: var(--bg-muted);
+  color: var(--text);
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  padding: 1.25rem;
+  font-size: 0.95rem;
+}
+
+.content blockquote {
+  background: var(--bg-muted);
+  border-left: 2px solid var(--rule);
+  border-radius: 0;
+  color: var(--text-secondary);
+  padding: 1rem 1.5rem;
+  margin: 1.25rem 0;
+}
+
+.content table {
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  box-shadow: none;
+}
+
+.content th,
+.content td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.75rem;
+}
+
+.content th {
+  background: var(--bg-muted);
+  color: var(--text);
+}
+
+.content hr {
+  border-top: 1px solid var(--rule);
+  margin: 3rem 0;
+}
+
+/* Link + focus states mimic Tailwind defaults */
+.content a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+.content a:visited {
+  color: var(--accent-visited);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Header nav spacing */
+.header-nav {
+  display: inline-flex;
+  gap: 0.75rem;
+  font-size: 0.98rem;
+}
+
+.header-nav a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.header-nav a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* Cards & shells mimic Tailwind spacing scales */
+.section-shell {
+  gap: 1.5rem;
+}
+
+.section-meta {
+  border-radius: var(--radius);
+}
+
+.byline {
+  border-radius: var(--radius);
+}
+
+.nav-items {
+  gap: 0.75rem;
+}
