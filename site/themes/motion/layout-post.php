@@ -1,18 +1,20 @@
 <?php
+
 /**
  * Motion post layout template.
  *
  * Posts have a dedicated banner header, so we keep the post-specific UI here.
  * Data comes from $page (frontmatter + content) and $site (global config).
  */
+
 $siteName = $site['name'] ?? '';
-// page_meta() reads frontmatter from ThemeContext and escapes it.
-$pageTitle = page_meta('title', $siteName);
+$postTitleRaw = (string)($page['meta']['title'] ?? 'Untitled Post');
+$postTitle = $postTitleRaw !== '' ? render_inline_markdown($postTitleRaw) : '';
+$postTitlePlain = trim(strip_tags($postTitle));
+$pageTitle = $postTitlePlain !== '' ? $postTitlePlain : $siteName;
 // Keywords are optional metadata from the markdown frontmatter.
 $keywords = page_meta('keywords');
 $hasKeywords = $keywords !== '';
-// Post title falls back to a safe default if frontmatter is missing.
-$postTitle = page_meta('title', 'Untitled Post');
 // This title is shown in the post banner header.
 
 // Icons are stored in frontmatter as slugs and mapped to emoji in helpers.php.
@@ -43,6 +45,26 @@ $showLogout = !empty($isAdmin);
 $loginUrl = '/login';
 $adminUrl = '/admin';
 
+// Footer column content: nav, recent posts, and quick links.
+$footerNavHtml = '';
+$navPath = \Components\Block::resolveMarkdownBlockPath(\Flint\Paths::$rootDir, 'nav');
+if ($navPath !== null && is_readable($navPath)) {
+    $footerNavHtml = render_block('nav');
+}
+
+$recentPosts = function_exists('motion_theme_get_recent_blog_posts')
+    ? motion_theme_get_recent_blog_posts(5, $showLogout)
+    : [];
+
+$footerLinks = [
+    ['label' => 'Sitemap', 'href' => '/sitemap'],
+];
+if ($showLogout) {
+    $footerLinks[] = ['label' => 'Admin', 'href' => $adminUrl];
+} else {
+    $footerLinks[] = ['label' => 'Login', 'href' => $loginUrl];
+}
+
 // Capture head assets from the CMS hooks before the HTML renders.
 // This is how components and themes inject CSS without hard-coding paths.
 ob_start();
@@ -55,6 +77,20 @@ ob_start();
 render_assets('foot');
 theme_scripts();
 $footerAssets = ob_get_clean();
+
+// Optional post navigation (previous/next siblings).
+$neighborNavHtml = '';
+$componentsDir = isset(\Flint\Paths::$siteComponentsDir) ? \Flint\Paths::$siteComponentsDir : '';
+if ($componentsDir !== '' && is_dir($componentsDir)) {
+    $neighborComponentPath = $componentsDir . '/NeighborNav.php';
+    if (is_file($neighborComponentPath)) {
+        require_once $neighborComponentPath;
+        if (class_exists(\Components\NeighborNav::class)) {
+            $neighborNavHtml = \Components\NeighborNav::render([], '');
+        }
+    }
+}
+$hasNeighborNav = $neighborNavHtml !== '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -126,23 +162,66 @@ $footerAssets = ob_get_clean();
             <!-- $viewContent is the rendered HTML from view.php + markdown parser. -->
             <?= $viewContent ?>
         </article>
+        <?php if ($hasNeighborNav) : ?>
+            <div class="max-w-3xl mx-auto px-6 sm:px-12 motion-post-neighbors">
+                <?= $neighborNavHtml ?>
+            </div>
+        <?php endif; ?>
     </main>
 
     <!-- Footer -->
     <footer class="border-t border-gray-200 bg-white">
-        <div class="max-w-3xl mx-auto px-6 sm:px-12 py-8 flex items-center justify-between">
-            <!-- Copyright/Branding. I'd appreciate it if you left this in your themes. -->
-            <p class="text-sm text-gray-500">
-                Powered by <a href="https://flintcms.com" target="_blank" title="A flat file CMS built on Markdown" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
-            </p>
-            <?php if ($showLogout) : ?>
-                <div class="flex items-center gap-4">
-                    <a href="<?= esc_html($adminUrl) ?>" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Admin</a>
-                    <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
+        <div class="max-w-5xl mx-auto px-6 sm:px-12 py-10 motion-footer">
+            <div class="motion-footer__grid">
+                <div class="motion-footer__col">
+                    <h3 class="motion-footer__title">Navigate</h3>
+                    <div class="motion-footer__nav">
+                        <?= $footerNavHtml ?>
+                    </div>
                 </div>
-            <?php else : ?>
-                <a href="<?= esc_html($loginUrl) ?>" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>
-            <?php endif; ?>
+
+                <div class="motion-footer__col">
+                    <h3 class="motion-footer__title">Recent posts</h3>
+                    <?php if (!empty($recentPosts)) : ?>
+                        <ul class="motion-footer__list">
+                            <?php foreach ($recentPosts as $post) : ?>
+                                <li>
+                                    <a class="motion-footer__link" href="<?= esc_html($post['path']) ?>">
+                                        <?= esc_html($post['label']) ?>
+                                    </a>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else : ?>
+                        <p class="motion-footer__empty">No posts yet.</p>
+                    <?php endif; ?>
+                </div>
+
+                <div class="motion-footer__col">
+                    <h3 class="motion-footer__title">Account</h3>
+                    <ul class="motion-footer__list">
+                        <?php foreach ($footerLinks as $link) : ?>
+                            <li>
+                                <a class="motion-footer__link" href="<?= esc_html($link['href']) ?>">
+                                    <?= esc_html($link['label']) ?>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                        <?php if ($showLogout) : ?>
+                            <li>
+                                <button id="admin-logout-btn" class="motion-footer__button">Logout</button>
+                            </li>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="motion-footer__meta">
+                <!-- Copyright/Branding. I'd appreciate it if you left this in your themes. -->
+                <p class="text-sm text-gray-500">
+                    Powered by <a href="https://flintcms.com" target="_blank" title="A flat file CMS built on Markdown" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
+                </p>
+            </div>
         </div>
     </footer>
 

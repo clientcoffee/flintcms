@@ -121,14 +121,6 @@ class Paths
      */
     public static string $coreDir;
 
-    /**
-     * Core components directory (built-in components)
-     * Example: /var/www/flint/app/core/components
-     *
-     * @var string
-     */
-    public static string $coreComponentsDir;
-
     // ==========================================
     // STORAGE DIRECTORIES
     // ==========================================
@@ -222,7 +214,6 @@ class Paths
 
         // Compute core directories
         self::$coreDir = $appDirectory . '/core';
-        self::$coreComponentsDir = $appDirectory . '/core/components';
 
         // Compute storage directories
         self::$storageDir = $appDirectory . '/storage';

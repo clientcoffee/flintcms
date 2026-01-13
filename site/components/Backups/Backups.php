@@ -6,33 +6,33 @@ use Flint\BaseComponent;
 use Flint\HookManager;
 
 /**
- * Backups Component
+ * Backups Component.
  *
- * Creates site backups (config + content) as tarballs,
- * emails admin with secure 24-hour download link,
- * automatically cleans up expired backups.
+ * Creates site backups (config + content) as tarballs.
+ * Emails admin with a secure 24-hour download link.
+ * Automatically cleans up expired backups.
  */
 class Backups extends BaseComponent
 {
     private static string $metadataDir = '';
 
     /**
-     * Component initialization
+     * Component initialization.
      */
     protected static function onInit(): void
     {
         self::$metadataDir = self::$app->root . '/site/submissions/backups';
 
-        // Ensure metadata directory exists
+        // Ensure metadata directory exists.
         self::ensureStorageDir(self::$metadataDir);
 
-        // Ensure base uploads directory has .htaccess protection
+        // Ensure base uploads directory has .htaccess protection.
         $uploadsDir = self::$app->root . '/site/uploads';
         self::ensureStorageDir($uploadsDir);
 
         $htaccess = $uploadsDir . '/.htaccess';
         if (!file_exists($htaccess)) {
-            // Prevent PHP execution in uploads directory
+            // Prevent PHP execution in uploads directory.
             $htaccessContent = <<<HTACCESS
 # Prevent PHP execution in uploads directory
 <FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi)$">
@@ -49,12 +49,12 @@ HTACCESS;
             file_put_contents($htaccess, $htaccessContent, LOCK_EX);
         }
 
-        // Cleanup expired backups on init
+        // Cleanup expired backups on init.
         self::cleanupExpired();
     }
 
     /**
-     * Get backup directory for current month (yyyymm format)
+     * Get backup directory for current month (yyyymm format).
      */
     private static function getBackupDir(?int $timestamp = null): string
     {
@@ -64,9 +64,9 @@ HTACCESS;
     }
 
     /**
-     * Generate unique backup ID (backup-yyyymmdd-hhiiss-random)
+     * Generate unique backup ID (backup-yyyymmdd-hhiiss-random).
      *
-     * @return string Backup ID like 'backup-20250104-030000-abc123de'
+     * @return string Backup ID like 'backup-20250104-030000-abc123de'.
      */
     private static function generateBackupId(): string
     {
@@ -76,25 +76,25 @@ HTACCESS;
     }
 
     /**
-     * Register component hooks
+     * Register component hooks.
      */
     protected static function registerHooks(): void
     {
-        // Hook for manual backup trigger
+        // Hook for manual backup trigger.
         self::registerHook('admin_panel_load', [self::class, 'onAdminLoad']);
 
-        // Register custom routes for backup downloads
+        // Register custom routes for backup downloads.
         self::registerHook('custom_routes', [self::class, 'handleCustomRoutes']);
 
-        // Register custom API endpoints for backup management
+        // Register custom API endpoints for backup management.
         self::registerHook('custom_api_endpoints', [self::class, 'handleApiEndpoints']);
 
-        // Register scheduled backup task
+        // Register scheduled backup task.
         self::registerHook('register_scheduled_tasks', [self::class, 'registerScheduledTasks']);
     }
 
     /**
-     * Register scheduled backup task with scheduler
+     * Register scheduled backup task with scheduler.
      */
     public static function registerScheduledTasks(array $context): void
     {
@@ -103,63 +103,63 @@ HTACCESS;
             return;
         }
 
-        // Get backup schedule configuration
+        // Get backup schedule configuration.
         $scheduleType = self::getConfig('backups.schedule', 'manual');
 
-        // Don't register if schedule is manual (admin-triggered only)
+        // Don't register if schedule is manual (admin-triggered only).
         if ($scheduleType === 'manual') {
             return;
         }
 
-        // Build schedule configuration
+        // Build schedule configuration.
         $schedule = ['type' => $scheduleType];
 
-        // Add schedule-specific options
+        // Add schedule-specific options.
         if ($scheduleType === 'daily') {
             $schedule['time'] = self::getConfig('backups.schedule_time', '03:00');
         } elseif ($scheduleType === 'weekly') {
             $schedule['time'] = self::getConfig('backups.schedule_time', '03:00');
-            $schedule['day'] = (int)self::getConfig('backups.schedule_day', 0); // 0 = Sunday
+            $schedule['day'] = (int)self::getConfig('backups.schedule_day', 0); // 0 = Sunday.
         } elseif ($scheduleType === 'monthly') {
             $schedule['time'] = self::getConfig('backups.schedule_time', '03:00');
-            $schedule['day'] = (int)self::getConfig('backups.schedule_day', 1); // 1st of month
+            $schedule['day'] = (int)self::getConfig('backups.schedule_day', 1); // 1st of month.
         } elseif ($scheduleType === 'interval') {
-            $schedule['seconds'] = (int)self::getConfig('backups.schedule_interval', 86400); // Default: 24 hours
+            $schedule['seconds'] = (int)self::getConfig('backups.schedule_interval', 86400); // Default: 24 hours.
         }
 
-        // Register task with scheduler
+        // Register task with scheduler.
         $scheduler->registerTask('backups_automatic', $schedule, function () {
             self::createBackup();
         });
     }
 
     /**
-     * Admin panel load hook - adds backup button functionality
+     * Admin panel load hook - adds backup button functionality.
      */
     public static function onAdminLoad(array $context): void
     {
-        // Hook is registered, actual UI handled by admin panel
+        // Hook is registered, actual UI handled by admin panel.
     }
 
     /**
-     * Handle custom routes (backup download)
+     * Handle custom routes (backup download).
      */
     public static function handleCustomRoutes(array $context): bool
     {
         $path = $context['path'] ?? '';
 
-        // Handle backup download route: /backup/download/{token}
+        // Handle backup download route: /backup/download/{token}.
         if (preg_match('#^/backup/download/([a-f0-9]{64})$#', $path, $matches)) {
             $token = $matches[1];
             self::serveBackup($token);
-            return true; // Route handled
+            return true; // Route handled.
         }
 
-        return false; // Route not handled
+        return false; // Route not handled.
     }
 
     /**
-     * Handle custom API endpoints (create, list, delete backups)
+     * Handle custom API endpoints (create, list, delete backups).
      */
     public static function handleApiEndpoints(array $context): bool
     {
@@ -167,7 +167,7 @@ HTACCESS;
         $method = $context['method'] ?? 'GET';
         $auth = $context['auth'] ?? null;
 
-        // Create backup (admin only)
+        // Create backup (admin only).
         if ($path === '/api/backup/create' && $method === 'POST') {
             if ($auth && !$auth->isAdmin()) {
                 http_response_code(401);
@@ -177,10 +177,10 @@ HTACCESS;
 
             $result = self::createBackup();
             echo json_encode($result);
-            return true; // Request handled
+            return true; // Request handled.
         }
 
-        // List backups (admin only)
+        // List backups (admin only).
         if ($path === '/api/backup/list' && $method === 'GET') {
             if ($auth && !$auth->isAdmin()) {
                 http_response_code(401);
@@ -190,16 +190,16 @@ HTACCESS;
 
             $backups = self::listBackups();
             echo json_encode(['success' => true, 'backups' => $backups]);
-            return true; // Request handled
+            return true; // Request handled.
         }
 
-        return false; // Request not handled
+        return false; // Request not handled.
     }
 
     /**
-     * Create a backup of the site
+     * Create a backup of the site.
      *
-     * @return array Result with success status and backup info
+     * @return array Result with success status and backup info.
      */
     public static function createBackup(): array
     {
@@ -208,21 +208,21 @@ HTACCESS;
             $backupId = self::generateBackupId();
             $filename = "{$backupId}.tar.gz";
 
-            // Get backup directory for current month (yyyymm)
+            // Get backup directory for current month (yyyymm).
             $backupDir = self::getBackupDir($timestamp);
             $filepath = $backupDir . '/' . $filename;
 
-            // Create temporary directory for staging
+            // Create temporary directory for staging.
             $tempDir = $backupDir . '/temp-' . $backupId;
             self::ensureStorageDir($tempDir);
 
-            // Copy files to temp directory
+            // Copy files to temp directory.
             self::stageBackupFiles($tempDir);
 
-            // Create tarball
+            // Create tarball.
             $success = self::createTarball($tempDir, $filepath);
 
-            // Remove temp directory
+            // Remove temp directory.
             self::removeDirectory($tempDir);
 
             if (!$success) {
@@ -232,11 +232,11 @@ HTACCESS;
                 ];
             }
 
-            // Generate download token
+            // Generate download token.
             $token = bin2hex(random_bytes(32));
             $expiry = $timestamp + self::getConfig('backups.link_expiration', 86400);
 
-            // Store metadata
+            // Store metadata.
             $metadata = [
                 'backup_id' => $backupId,
                 'filename' => $filename,
@@ -253,10 +253,10 @@ HTACCESS;
                 $metadata
             );
 
-            // Send email to admin
+            // Send email to admin.
             $emailSent = self::sendBackupEmail($metadata);
 
-            // Cleanup old backups
+            // Cleanup old backups.
             self::cleanupOldBackups();
 
             return [
@@ -277,13 +277,13 @@ HTACCESS;
     }
 
     /**
-     * Stage files for backup
+     * Stage files for backup.
      */
     private static function stageBackupFiles(string $tempDir): void
     {
         $root = self::$app->root;
 
-        // Copy site/config.php if enabled
+        // Copy site/config.php if enabled.
         if (self::getConfig('backups.include_config', true)) {
             $configCandidates = [
                 $root . '/site/config.php',
@@ -308,7 +308,7 @@ HTACCESS;
             }
         }
 
-        // Copy content directory
+        // Copy content directory.
         if (self::getConfig('backups.include_content', true)) {
             $contentSrc = $root . '/site';
             $contentDest = $tempDir . '/site';
@@ -316,7 +316,7 @@ HTACCESS;
             if (is_dir($contentSrc)) {
                 self::copyDirectory($contentSrc, $contentDest);
 
-                // Exclude uploads if configured
+                // Exclude uploads if configured.
                 if (!self::getConfig('backups.include_uploads', true)) {
                     $uploadsDir = $contentDest . '/uploads';
                     if (is_dir($uploadsDir)) {
@@ -326,7 +326,7 @@ HTACCESS;
             }
         }
 
-        // Copy themes if enabled
+        // Copy themes if enabled.
         if (self::getConfig('backups.include_themes', false)) {
             $themesSrc = $root . '/site/themes';
             $themesDest = $tempDir . '/themes';
@@ -337,14 +337,14 @@ HTACCESS;
     }
 
     /**
-     * Create tarball from directory
+     * Create tarball from directory.
      */
     private static function createTarball(string $sourceDir, string $outputFile): bool
     {
         $cwd = getcwd();
         chdir($sourceDir);
 
-        // Create tarball using tar command
+        // Create tarball using tar command.
         $command = sprintf(
             'tar -czf %s . 2>&1',
             escapeshellarg($outputFile)
@@ -363,7 +363,7 @@ HTACCESS;
     }
 
     /**
-     * Copy directory recursively
+     * Copy directory recursively.
      */
     private static function copyDirectory(string $source, string $dest): void
     {
@@ -390,7 +390,7 @@ HTACCESS;
     }
 
     /**
-     * Remove directory recursively
+     * Remove directory recursively.
      */
     private static function removeDirectory(string $dir): void
     {
@@ -415,7 +415,7 @@ HTACCESS;
     }
 
     /**
-     * Send backup email to admin
+     * Send backup email to admin.
      */
     private static function sendBackupEmail(array $metadata): bool
     {
@@ -485,11 +485,11 @@ EMAIL;
     }
 
     /**
-     * Serve backup file for download
+     * Serve backup file for download.
      */
     public static function serveBackup(string $token): bool
     {
-        // Find backup by token
+        // Find backup by token.
         $metadata = self::findBackupByToken($token);
 
         if (!$metadata) {
@@ -498,7 +498,7 @@ EMAIL;
             return false;
         }
 
-        // Check expiration
+        // Check expiration.
         if (time() > $metadata['expires']) {
             http_response_code(410);
             echo "Download link has expired";
@@ -506,14 +506,14 @@ EMAIL;
             return false;
         }
 
-        // Check if file exists
+        // Check if file exists.
         if (!file_exists($metadata['filepath'])) {
             http_response_code(404);
             echo "Backup file not found";
             return false;
         }
 
-        // Mark as downloaded
+        // Mark as downloaded.
         $metadata['downloaded'] = true;
         $metadata['downloaded_at'] = time();
         self::writeJsonFile(
@@ -521,7 +521,7 @@ EMAIL;
             $metadata
         );
 
-        // Serve file
+        // Serve file.
         header('Content-Type: application/x-gzip');
         header('Content-Disposition: attachment; filename="' . $metadata['filename'] . '"');
         header('Content-Length: ' . filesize($metadata['filepath']));
@@ -536,7 +536,7 @@ EMAIL;
     }
 
     /**
-     * Find backup metadata by token
+     * Find backup metadata by token.
      */
     private static function findBackupByToken(string $token): ?array
     {
@@ -553,7 +553,7 @@ EMAIL;
     }
 
     /**
-     * Cleanup expired backups
+     * Cleanup expired backups.
      */
     private static function cleanupExpired(): void
     {
@@ -571,19 +571,19 @@ EMAIL;
     }
 
     /**
-     * Cleanup old backups (keep only max_backups)
+     * Cleanup old backups (keep only max_backups).
      */
     private static function cleanupOldBackups(): void
     {
         $maxBackups = self::getConfig('backups.max_backups', 10);
         $files = glob(self::$metadataDir . '/backup-*.json');
 
-        // Sort by creation time (newest first)
+        // Sort by creation time (newest first).
         usort($files, function ($a, $b) {
             return filemtime($b) - filemtime($a);
         });
 
-        // Delete old backups
+        // Delete old backups.
         $count = 0;
         foreach ($files as $file) {
             $count++;
@@ -598,11 +598,11 @@ EMAIL;
     }
 
     /**
-     * Delete a backup and its metadata
+     * Delete a backup and its metadata.
      */
     private static function deleteBackup(string $backupId): void
     {
-        // Read metadata to get filepath
+        // Read metadata to get filepath.
         $metadataFile = self::$metadataDir . "/backup-{$backupId}.json";
         $metadata = null;
 
@@ -611,11 +611,11 @@ EMAIL;
             unlink($metadataFile);
         }
 
-        // Delete tarball using filepath from metadata
+        // Delete tarball using filepath from metadata.
         if ($metadata && isset($metadata['filepath']) && file_exists($metadata['filepath'])) {
             unlink($metadata['filepath']);
         } else {
-            // Fallback: search uploads directory structure
+            // Fallback: search uploads directory structure.
             $uploadsDir = self::$app->root . '/site/uploads';
             $pattern = $uploadsDir . '/*/backup-' . $backupId . '.*';
             $files = glob($pattern);
@@ -628,7 +628,7 @@ EMAIL;
     }
 
     /**
-     * Format bytes to human readable
+     * Format bytes to human readable.
      */
     private static function formatBytes(int $bytes): string
     {
@@ -644,7 +644,7 @@ EMAIL;
     }
 
     /**
-     * Get all backups info
+     * Get all backups info.
      */
     public static function listBackups(): array
     {
@@ -660,7 +660,7 @@ EMAIL;
             }
         }
 
-        // Sort by creation time (newest first)
+        // Sort by creation time (newest first).
         usort($backups, function ($a, $b) {
             return $b['created'] - $a['created'];
         });

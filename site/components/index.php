@@ -1,3 +1,3 @@
 <?php
 
-// Shhh.
+// Component directory marker for autoloading.

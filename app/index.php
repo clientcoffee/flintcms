@@ -27,7 +27,7 @@ spl_autoload_register(function (string $class) {
 
     $map = [
         'Flint\\' => $appDir . '/core/',
-        'Components\\' => $appDir . '/core/components/',  // System components
+        'Components\\' => $rootDir . '/site/components/',  // Site components
         'Modules\\' => $rootDir . '/site/themes/',  // User themes
     ];
 
@@ -40,7 +40,7 @@ spl_autoload_register(function (string $class) {
                 return;
             }
 
-            // Support component directories like core/components/Block/Block.php
+            // Support component directories like site/components/Block/Block.php
             if ($prefix === 'Components\\') {
                 $relativePath = str_replace('\\', '/', $relative);
                 $basename = basename($relativePath);

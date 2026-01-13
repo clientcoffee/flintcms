@@ -5,24 +5,31 @@ namespace Components;
 use Flint\Auth;
 use Flint\RenderComponent;
 
+/**
+ * Render a sitemap of all pages, including hidden/drafts for admins.
+ */
 class Sitemap extends RenderComponent
 {
     public static function render(array $props, string $content): string
     {
+        // Resolve the app instance for filesystem access.
         $app = self::getApp();
         if (!$app) {
             return '';
         }
 
+        // Determine admin state for hidden/draft visibility.
         $auth = new Auth($app);
         $isAdmin = $auth->isAdmin();
         $pagesDir = $app->root . '/site/pages';
 
+        // Build a recursive tree of pages.
         $items = self::buildTree($pagesDir, '', $isAdmin);
         if (empty($items)) {
             return '';
         }
 
+        // Collect list attributes for the wrapper.
         $attrs = [
             'class' => trim((string)self::prop($props, 'class', 'sitemap'))
         ];
@@ -31,15 +38,20 @@ class Sitemap extends RenderComponent
             $attrs['id'] = $id;
         }
 
-        $html = '<ul ' . self::buildAttributes($attrs) . '>';
-        $html .= self::renderItems($items, $isAdmin);
-        $html .= '</ul>';
+        ob_start();
+        ?>
+        <ul <?= self::buildAttributes($attrs) ?>>
+            <?= self::renderItems($items, $isAdmin) ?>
+        </ul>
+        <?php
 
-        return $html;
+        // Return the final sitemap markup.
+        return trim((string)ob_get_clean());
     }
 
     private static function buildTree(string $baseDir, string $relativeDir, bool $includePrivate): array
     {
+        // Walk the pages directory and build a mixed tree.
         if (!is_dir($baseDir)) {
             return [];
         }
@@ -54,12 +66,14 @@ class Sitemap extends RenderComponent
         $files = [];
 
         foreach ($entries as $entry) {
+            // Skip dot entries and hidden files.
             if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
                 continue;
             }
 
             $fullPath = $directory . '/' . $entry;
             if (is_dir($fullPath)) {
+                // Recurse into subdirectories and keep non-empty branches.
                 $childRelative = ltrim($relativeDir . '/' . $entry, '/');
                 $children = self::buildTree($baseDir, $childRelative, $includePrivate);
                 if (!empty($children)) {
@@ -72,6 +86,7 @@ class Sitemap extends RenderComponent
                 continue;
             }
 
+            // Only include markdown files.
             if (!preg_match('/\.(md|mdx)$/i', $entry)) {
                 continue;
             }
@@ -85,6 +100,7 @@ class Sitemap extends RenderComponent
                 continue;
             }
 
+            // Use frontmatter title when available.
             $label = trim((string)($meta['title'] ?? ''));
             if ($label === '') {
                 $label = self::labelFromRelative($relativeFile, $slug);
@@ -98,6 +114,7 @@ class Sitemap extends RenderComponent
             ];
         }
 
+        // Sort directories and files alphabetically by label.
         usort($directories, fn($a, $b) => strcmp($a['label'], $b['label']));
         usort($files, fn($a, $b) => strcmp($a['label'], $b['label']));
 
@@ -106,53 +123,74 @@ class Sitemap extends RenderComponent
 
     private static function renderItems(array $items, bool $isAdmin): string
     {
-        $html = '';
-
+        // Render the tree recursively as nested lists.
+        ob_start();
         foreach ($items as $item) {
             if ($item['type'] === 'directory') {
-                $html .= '<li>';
-                $html .= '<span>' . self::escape($item['label']) . '</span>';
-                $html .= '<ul>' . self::renderItems($item['children'], $isAdmin) . '</ul>';
-                $html .= '</li>';
+                ?>
+                <li class="sitemap__group">
+                    <span class="sitemap__group-label"><?= self::escape($item['label']) ?></span>
+                    <ul class="sitemap__group-list">
+                        <?= self::renderItems($item['children'], $isAdmin) ?>
+                    </ul>
+                </li>
+                <?php
                 continue;
             }
 
-            $html .= '<li>';
-            $html .= '<a href="' . self::escape($item['path']) . '">' . self::escape($item['label']) . '</a>';
+            $status = $item['status'] ?? 'published';
+            $isHidden = $status === 'hidden';
+            $isDraft = $status === 'draft';
+            $statusClass = '';
 
-            if ($isAdmin) {
-                if ($item['status'] === 'hidden') {
-                    $html .= self::statusIcon('eye', 'Hidden');
-                } elseif ($item['status'] === 'draft') {
-                    $html .= self::statusIcon('pencil', 'Draft');
-                }
+            if ($isAdmin && ($isHidden || $isDraft)) {
+                $statusClass = $isHidden ? ' sitemap__item--hidden' : ' sitemap__item--draft';
             }
-
-            $html .= '</li>';
+            ?>
+            <li class="sitemap__item<?= $statusClass ?>">
+                <a class="sitemap__link" href="<?= self::escape($item['path']) ?>">
+                    <?= self::escape($item['label']) ?>
+                </a>
+                <?php if ($isAdmin && $isHidden) : ?>
+                    <?= self::statusIcon('hidden', 'Hidden') ?>
+                <?php elseif ($isAdmin && $isDraft) : ?>
+                    <?= self::statusIcon('draft', 'Draft') ?>
+                <?php endif; ?>
+            </li>
+            <?php
         }
 
-        return $html;
+        return trim((string)ob_get_clean());
     }
 
     private static function statusIcon(string $type, string $label): string
     {
+        // Provide a minimal inline SVG for status states.
         $path = '';
-        if ($type === 'eye') {
-            $path = '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"></path>'
-                . '<circle cx="12" cy="12" r="3"></circle>';
+        if ($type === 'hidden') {
+            $path = '<path d="M17.94 17.94A10.94 10.94 0 0112 20c-5 0-9.27-3.11-11-8 1.04-2.79 2.8-5 5-6.28"></path>'
+                . '<path d="M9.9 4.24A10.94 10.94 0 0112 4c5 0 9.27 3.11 11 8-0.55 1.47-1.32 2.78-2.25 3.88"></path>'
+                . '<path d="M14.12 14.12a3 3 0 01-4.24-4.24"></path>'
+                . '<path d="M1 1l22 22"></path>';
         } else {
             $path = '<path d="M12 20h9"></path>'
                 . '<path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"></path>';
         }
 
-        return '<svg role="img" aria-label="' . self::escape($label) . '" viewBox="0 0 24 24" width="14" height="14"'
-            . ' style="display:inline-block;vertical-align:text-bottom;margin-left:0.35rem;color:#9ca3af;"'
-            . ' fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
-            . $path . '</svg>';
+        ob_start();
+        ?>
+        <svg class="sitemap__icon" role="img" aria-label="<?= self::escape($label) ?>" viewBox="0 0 24 24" width="14" height="14"
+            fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <?= $path ?>
+        </svg>
+        <?php
+
+        return trim((string)ob_get_clean());
     }
 
     private static function extractFrontmatter(string $filePath): array
     {
+        // Read frontmatter only when present at the top of the file.
         $contents = file_get_contents($filePath);
         if ($contents === false || !str_starts_with($contents, "---")) {
             return [];
@@ -168,6 +206,7 @@ class Sitemap extends RenderComponent
 
     private static function parseYamlLite(string $yamlText): array
     {
+        // Parse simple key:value YAML without nesting.
         $metadata = [];
         $lines = explode("\n", $yamlText);
 
@@ -191,6 +230,7 @@ class Sitemap extends RenderComponent
 
     private static function resolveStatus(array $meta): string
     {
+        // Resolve status with draft override semantics.
         $status = strtolower(trim((string)($meta['status'] ?? 'published')));
 
         if ($status === '') {
@@ -207,6 +247,7 @@ class Sitemap extends RenderComponent
 
     private static function slugFromRelative(string $relativeFile): string
     {
+        // Convert a relative path to a route slug.
         $relativeFile = str_replace('\\', '/', $relativeFile);
         $trimmed = preg_replace('/\.(md|mdx)$/i', '', $relativeFile);
         $trimmed = ltrim($trimmed, '/');
@@ -225,6 +266,7 @@ class Sitemap extends RenderComponent
 
     private static function labelFromRelative(string $relativeFile, string $slug): string
     {
+        // Build a fallback label from the filename.
         if ($slug === '/') {
             return 'home';
         }

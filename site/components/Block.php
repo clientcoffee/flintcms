@@ -4,40 +4,43 @@ namespace Components;
 
 use Flint\RenderComponent;
 
+/**
+ * Render markdown blocks from /site/blocks/.
+ */
 class Block extends RenderComponent
 {
     /**
-     * Render a reusable content block from /site/blocks/
+     * Render a reusable content block from /site/blocks/.
      */
     public static function render(array $props, string $content): string
     {
-        // Get block name from props or content
+        // Read the block name from props or component body.
         $blockName = self::contentOrProp($content, $props, 'name');
 
         if ($blockName === '') {
-            return '<!-- Block component: no name specified -->';
+            return '<!-- Block component: no name specified. -->';
         }
 
-        // Get the current application instance
+        // Fetch the active app so we can resolve filesystem paths.
         $app = self::getApp();
         if ($app === null) {
-            return '<!-- Block component: application context not available -->';
+            return '<!-- Block component: application context not available. -->';
         }
 
         $blockPath = self::resolveMarkdownBlockPath($app->root, $blockName);
 
         if ($blockPath === null) {
-            return '<!-- Block "' . self::escape($blockName) . '" not found -->';
+            return sprintf('<!-- Block "%s" not found. -->', self::escape($blockName));
         }
 
-        // Read and parse the block content
+        // Read and parse the block content through the CMS parser.
         $blockContent = file_get_contents($blockPath);
 
-        // Create a new Parser instance to process the block
+        // Create a fresh parser instance for isolated block rendering.
         $parser = new \Flint\Parser($app);
         $parsedBlock = $parser->parse($blockContent);
 
-        // Return the rendered HTML
+        // Return the rendered HTML.
         return $parsedBlock['content_html'];
     }
 

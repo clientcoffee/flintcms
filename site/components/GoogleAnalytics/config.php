@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Google Analytics Component Configuration
+ * Google Analytics Component Configuration.
  *
  * Google Analytics 4 tracking integration.
  */

@@ -6,7 +6,7 @@ keywords: about, flint, cms
 order: 2
 ---
 
-<img src="/site/uploads/flint-at-work.gif" align="right" width="250px"/>
+<img src="/uploads/flint-at-work.gif" align="right" width="250px"/>
 
 My job's to keep things organized and orderly.
 
