@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Motion view template.
  *
  * The CMS passes $page, $content, $themeConfig, and $site into the theme.
  * We normalize those values here so the markup below is clean and predictable.
  */
+
 $contentType = strtolower((string)($page['meta']['type'] ?? ''));
 // Frontmatter drives layout decisions like "post" vs "page".
 // Posts use layout-post.php, so we suppress the shared banner/header here.
@@ -13,16 +15,20 @@ $allowBanner = $contentType !== 'post';
 $bannerUrl = $page['meta']['banner'] ?? ($themeConfig['settings']['default_banner'] ?? '');
 // Theme config is loaded from site/themes/motion/config.php by the CMS.
 $hasBanner = $allowBanner && $bannerUrl !== '';
-// page_meta() pulls from ThemeContext and escapes for safe output.
-$pageTitle = page_meta('title');
-// page_meta() reads from ThemeContext and escapes output.
-$hasTitle = $pageTitle !== '';
+// Title can contain inline markdown, so render it here for display.
+$pageTitleRaw = (string)($page['meta']['title'] ?? '');
+$pageTitle = $pageTitleRaw !== '' ? render_inline_markdown($pageTitleRaw) : '';
+$pageTitlePlain = trim(strip_tags($pageTitle));
+$hasTitle = $pageTitlePlain !== '';
 $renderPageHeader = $contentType !== 'post' && $hasTitle;
 
-// Theme assets expect /site prefix for relative uploads.
+// Normalize banner URLs to avoid the /site prefix in public URLs.
 if ($hasBanner && !preg_match('/^https?:\/\//', $bannerUrl)) {
-    // Relative URLs from frontmatter should point to /site/uploads.
-    $bannerUrl = '/site' . $bannerUrl;
+    if (str_starts_with($bannerUrl, '/site/')) {
+        $bannerUrl = substr($bannerUrl, 5);
+    } elseif (!str_starts_with($bannerUrl, '/')) {
+        $bannerUrl = '/uploads/' . ltrim($bannerUrl, '/');
+    }
 }
 
 // Icons are stored as slugs in frontmatter and mapped to emoji.
@@ -47,7 +53,7 @@ $hasDescription = $pageDescription !== '';
 <!-- Banner output (optional). -->
 <?php if ($hasBanner) : ?>
     <div class="page-banner mb-8 motion-page-banner">
-        <img src="<?= esc_html($bannerUrl) ?>" alt="<?= $pageTitle ?>" class="w-full object-cover motion-page-banner__image" />
+        <img src="<?= esc_html($bannerUrl) ?>" alt="<?= esc_html($pageTitlePlain) ?>" class="w-full object-cover motion-page-banner__image" />
     </div>
 <?php endif; ?>
 

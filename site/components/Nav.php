@@ -4,11 +4,14 @@ namespace Components;
 
 use Flint\RenderComponent;
 
+/**
+ * Render navigation menus from markdown lists or presets.
+ */
 class Nav extends RenderComponent
 {
     public static function render(array $props, string $content): string
     {
-        // Group top-level configuration inputs
+        // Normalize configuration inputs from props and inline content.
         $navigationMode = strtolower(self::prop($props, 'mode', 'auto'));
         $autoPreset = strtolower(self::prop($props, 'auto', 'default'));
         $customHtml = self::prop($props, 'html');
@@ -131,72 +134,97 @@ class Nav extends RenderComponent
 
     private static function renderItems(array $items): string
     {
-        // Render the top-level nav container.
-        $navHtml = '<ul class="flex items-center gap-1">';
-        foreach ($items as $itemData) {
-            $navHtml .= self::renderItem($itemData);
-        }
-        $navHtml .= '</ul>';
+        ob_start();
+        ?>
+        <ul class="flex items-center gap-1">
+            <?php foreach ($items as $itemData) : ?>
+                <?= self::renderItem($itemData) ?>
+            <?php endforeach; ?>
+        </ul>
+        <?php
 
-        // Return the nav markup.
-        return $navHtml;
+        return trim((string)ob_get_clean());
     }
 
     private static function renderItem(array $item): string
     {
-        // Normalize the incoming item payload
+        // Normalize the incoming item payload.
         $itemLabel = self::escape($item['label']);
         $itemUrl = trim($item['url'] ?? '');
         $childItems = $item['children'] ?? [];
 
-        // Render dropdown items for parents with children
+        // Render dropdown items for parents with children.
         if (!empty($childItems)) {
-            $dropdownHtml = '<li class="relative group">';
-            $dropdownHtml .= '<button type="button" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md nav-link flex items-center gap-1">';
-            $dropdownHtml .= '<span>' . $itemLabel . '</span><span class="text-xs text-gray-400">v</span>';
-            $dropdownHtml .= '</button>';
-            $dropdownHtml .= '<div class="absolute left-0 top-full hidden min-w-[200px] pt-2 group-hover:block group-focus-within:block">';
-            $dropdownHtml .= '<div class="rounded-xl border border-gray-200 bg-white/95 shadow-lg backdrop-blur-sm">';
-            $dropdownHtml .= '<ul class="py-2">';
-            foreach ($childItems as $childItem) {
-                $dropdownHtml .= self::renderChild($childItem);
-            }
-            $dropdownHtml .= '</ul>';
-            $dropdownHtml .= '</div>';
-            $dropdownHtml .= '</div>';
-            $dropdownHtml .= '</li>';
+            $triggerClasses = 'px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md nav-link flex items-center gap-1';
 
-            return $dropdownHtml;
+            ob_start();
+            ?>
+            <li class="relative group">
+                <?php if ($itemUrl !== '') : ?>
+                    <a href="<?= self::escape($itemUrl) ?>" class="<?= self::escape($triggerClasses) ?>" aria-haspopup="menu">
+                        <span><?= $itemLabel ?></span>
+                        <span class="text-xs text-gray-400" aria-hidden="true">v</span>
+                    </a>
+                <?php else : ?>
+                    <button type="button" class="<?= self::escape($triggerClasses) ?>" aria-haspopup="menu">
+                        <span><?= $itemLabel ?></span>
+                        <span class="text-xs text-gray-400" aria-hidden="true">v</span>
+                    </button>
+                <?php endif; ?>
+                <div class="absolute left-0 top-full hidden min-w-[200px] pt-2 group-hover:block group-focus-within:block">
+                    <div class="rounded-xl border border-gray-200 bg-white/95 shadow-lg backdrop-blur-sm">
+                        <ul class="py-2" role="menu">
+                            <?php foreach ($childItems as $childItem) : ?>
+                                <?= self::renderChild($childItem) ?>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                </div>
+            </li>
+            <?php
+
+            return trim((string)ob_get_clean());
         }
 
-        // Render a simple leaf item
+        // Render a simple leaf item.
         $href = $itemUrl !== '' ? self::escape($itemUrl) : '#';
-        return '<li><a href="' . $href . '" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md nav-link">' . $itemLabel . '</a></li>';
+        ob_start();
+        ?>
+        <li>
+            <a href="<?= $href ?>" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md nav-link">
+                <?= $itemLabel ?>
+            </a>
+        </li>
+        <?php
+
+        return trim((string)ob_get_clean());
     }
 
     private static function renderChild(array $item): string
     {
-        // Normalize child item data
+        // Normalize child item data.
         $childLabel = self::escape($item['label']);
         $childUrl = trim($item['url'] ?? '');
         $childItems = $item['children'] ?? [];
         $childHref = $childUrl !== '' ? self::escape($childUrl) : '#';
 
-        // Render the child item and any nested children
-        $childHtml = '<li class="px-2">';
-        $childHtml .= '<a href="' . $childHref . '" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">';
-        $childHtml .= $childLabel;
-        $childHtml .= '</a>';
-        if (!empty($childItems)) {
-            $childHtml .= '<ul class="mt-1 space-y-1 pl-2">';
-            foreach ($childItems as $nestedChild) {
-                $childHtml .= self::renderChild($nestedChild);
-            }
-            $childHtml .= '</ul>';
-        }
-        $childHtml .= '</li>';
+        // Render the child item and any nested children.
+        ob_start();
+        ?>
+        <li class="px-2">
+            <a href="<?= $childHref ?>" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                <?= $childLabel ?>
+            </a>
+            <?php if (!empty($childItems)) : ?>
+                <ul class="mt-1 space-y-1 pl-2">
+                    <?php foreach ($childItems as $nestedChild) : ?>
+                        <?= self::renderChild($nestedChild) ?>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </li>
+        <?php
 
-        // Return the child markup
-        return $childHtml;
+        return trim((string)ob_get_clean());
     }
 }

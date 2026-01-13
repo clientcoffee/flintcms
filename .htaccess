@@ -1,7 +1,8 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Normalize /site/* to /
+  # Normalize /site/* to / (only for direct requests).
+  RewriteCond %{THE_REQUEST} \s/+site/ [NC]
   RewriteRule ^site/(.+)$ /$1 [R=301,L]
 
   # Block path traversal attempts

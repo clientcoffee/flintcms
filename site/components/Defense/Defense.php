@@ -5,57 +5,55 @@ namespace Components\Defense;
 use Flint\BaseComponent;
 
 /**
- * Defense Component - Asymmetric Active Defense System
+ * Defense Component - Asymmetric Active Defense System.
  *
- * Makes attackers regret their life choices through tarpitting,
- * resource exhaustion, and proof-of-work challenges.
- *
- * This is a drop-in component that hooks into the application lifecycle
- * without tight coupling to core application code.
+ * Makes attackers regret their life choices through tarpitting.
+ * Uses resource exhaustion and proof-of-work challenges.
+ * Hooks into the application lifecycle without tight coupling.
  */
 class Defense extends BaseComponent
 {
     private static string $clientIp = '';
     private static string $storageDir = '';
 
-    // Defense levels from config
+    // Defense levels from config.
     private const MODE_PASSIVE = 'passive';
     private const MODE_ACTIVE = 'active';
 
     /**
-     * Component-specific initialization
+     * Component-specific initialization.
      */
     protected static function onInit(): void
     {
         self::$clientIp = self::getClientIp();
-        // Store defense events in site/submissions/defense (event log)
+        // Store defense events in site/submissions/defense (event log).
         self::$storageDir = self::$app->root . '/site/submissions/defense';
         self::ensureStorageDir(self::$storageDir);
 
-        // Ensure component config exists (self-setup)
+        // Ensure component config exists (self-setup).
         self::ensureConfig();
     }
 
     /**
-     * Ensure component configuration file exists with defaults
+     * Ensure component configuration file exists with defaults.
      */
     private static function ensureConfig(): void
     {
         $configPath = self::$app->root . '/site/components/Defense/config.php';
 
-        // If config already exists, nothing to do
+        // If config already exists, nothing to do.
         if (file_exists($configPath)) {
             return;
         }
 
-        // Create default config as PHP array
+        // Create default config as PHP array.
         $defaultConfig = <<<'PHP'
 <?php
 /**
- * Defense Component Configuration
+ * Defense Component Configuration.
  *
- * Asymmetric active defense system with tarpitting, proof-of-work challenges,
- * and novel form defenses.
+ * Asymmetric active defense system with tarpitting and proof-of-work challenges.
+ * Includes novel form defenses.
  */
 
 return [
@@ -69,14 +67,14 @@ return [
         'priority' => 10,
     ],
     'defense' => [
-        // Defense mode: "passive" = tarpit + large fake responses, "active" = adds proof of work
+        // Defense mode: "passive" = tarpit + large fake responses, "active" = adds proof of work.
         'mode' => 'passive',
 
-        // Cryptocurrency wallet address for proof-of-work earnings (Monero address format)
-        // When mode=active, attackers must solve crypto puzzles that earn this wallet
+        // Cryptocurrency wallet address for proof-of-work earnings (Monero address format).
+        // When mode=active, attackers must solve crypto puzzles that earn this wallet.
         'wallet' => '4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge',
 
-        // Suspicious behavior thresholds
+        // Suspicious behavior thresholds.
         'rapid_request_threshold' => 10,
         'scanner_404_threshold' => 5,
         'failed_login_threshold' => 3,
@@ -88,7 +86,7 @@ PHP;
     }
 
     /**
-     * Register component hooks
+     * Register component hooks.
      */
     protected static function registerHooks(): void
     {
@@ -98,7 +96,7 @@ PHP;
     }
 
     /**
-     * Hook callback: Request start
+     * Hook callback: Request start.
      */
     public static function onRequestStart(array $context): mixed
     {
@@ -109,11 +107,11 @@ PHP;
             self::engage($path, 'suspicious_activity');
         }
 
-        return null; // Continue normal execution
+        return null; // Continue normal execution.
     }
 
     /**
-     * Hook callback: Generate form token
+     * Hook callback: Generate form token.
      */
     public static function onFormTokenGenerate(array $context): string
     {
@@ -127,7 +125,7 @@ PHP;
     }
 
     /**
-     * Hook callback: Validate form submission
+     * Hook callback: Validate form submission.
      */
     public static function onFormValidate(array $context): array
     {
@@ -142,7 +140,7 @@ PHP;
      */
     private static function shouldEngage(string $requestPath, string $requestMethod): bool
     {
-        // Check for suspicious patterns
+        // Check for suspicious patterns.
         if (self::isHoneypotPath($requestPath)) {
             return true;
         }
@@ -169,30 +167,30 @@ PHP;
     {
         $mode = self::getConfig('defense.mode', self::MODE_PASSIVE);
 
-        // Log the engagement
+        // Log the engagement.
         self::logEngagement($requestPath, $context, $mode);
 
-        // Increment offense counter
+        // Increment offense counter.
         self::recordOffense($context);
 
-        // Get offense level for this IP
+        // Get offense level for this IP.
         $offenseLevel = self::getOffenseLevel();
 
-        // Apply tarpit delays (exponential backoff)
+        // Apply tarpit delays (exponential backoff).
         self::tarpit($offenseLevel);
 
-        // Randomly serve fake error messages during sustained attacks
-        // This confuses attackers by making them think they found vulnerabilities
+        // Randomly serve fake error messages during sustained attacks.
+        // This confuses attackers by making them think they found vulnerabilities.
         if ($offenseLevel >= 3 && rand(1, 100) <= 30) {
             self::serveFakeError($requestPath, $offenseLevel);
-            return; // Exit after serving fake error
+            return; // Exit after serving fake error.
         }
 
         if ($mode === self::MODE_ACTIVE) {
-            // Active mode: Demand proof of work
+            // Active mode: Demand proof of work.
             self::demandProofOfWork($offenseLevel);
         } else {
-            // Passive mode: Send large fake response
+            // Passive mode: Send large fake response.
             self::serveFakeResponse($requestPath, $offenseLevel);
         }
     }
@@ -202,22 +200,22 @@ PHP;
      */
     private static function tarpit(int $offenseLevel): void
     {
-        // Exponential delay: 1s, 2s, 4s, 8s, 16s, 32s, 60s (max)
+        // Exponential delay: 1s, 2s, 4s, 8s, 16s, 32s, 60s (max).
         $delay = min(pow(2, $offenseLevel - 1), 60);
 
-        // Add randomness so they can't pattern-detect
-        $jitter = rand(0, $delay * 500) / 1000; // up to 50% jitter
+        // Add randomness so they can't pattern-detect.
+        $jitter = rand(0, $delay * 500) / 1000; // up to 50% jitter.
 
         $totalDelay = $delay + $jitter;
 
-        // Sleep in small increments to avoid locking PHP process
+        // Sleep in small increments to avoid locking PHP process.
         $slept = 0;
         while ($slept < $totalDelay) {
-            $chunk = min(0.5, $totalDelay - $slept); // 500ms chunks
+            $chunk = min(0.5, $totalDelay - $slept); // 500ms chunks.
             usleep((int)($chunk * 1000000));
             $slept += $chunk;
 
-            // Check if connection is still alive
+            // Check if connection is still alive.
             if (connection_aborted()) {
                 return;
             }
@@ -229,20 +227,20 @@ PHP;
      */
     private static function demandProofOfWork(int $offenseLevel): void
     {
-        // Difficulty increases with offense level
-        $difficulty = 4 + $offenseLevel; // Leading zeros required
+        // Difficulty increases with offense level.
+        $difficulty = 4 + $offenseLevel; // Leading zeros required.
 
-        // Generate challenge
+        // Generate challenge.
         $challenge = bin2hex(random_bytes(32));
         $nonce = bin2hex(random_bytes(16));
 
-        // Wallet address from config (Monero address format)
+        // Wallet address from config (Monero address format).
         $walletAddress = self::getConfig(
             'defense.wallet',
             '4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge'
         );
 
-        http_response_code(429); // Too Many Requests
+        http_response_code(429); // Too Many Requests.
         header('Content-Type: application/json');
         header('Retry-After: 60');
 
@@ -266,7 +264,7 @@ PHP;
      */
     private static function serveFakeResponse(string $requestPath, int $offenseLevel): void
     {
-        // Choose response type based on path
+        // Choose response type based on path.
         if (strpos($requestPath, 'admin') !== false || strpos($requestPath, 'wp-') !== false) {
             self::serveFakeAdminPanel($offenseLevel);
         } elseif (strpos($requestPath, 'api') !== false) {
@@ -284,61 +282,78 @@ PHP;
         http_response_code(200);
         header('Content-Type: text/html; charset=utf-8');
 
-        // Start output buffering for chunked transfer
+        // Start output buffering for chunked transfer.
         if (!ob_get_level()) {
             ob_start();
         }
 
-        echo '<!DOCTYPE html><html><head><title>Admin Login</title>';
-        echo '<style>body{font-family:Arial;margin:40px;background:#f5f5f5}';
-        echo '.login{max-width:400px;margin:0 auto;background:white;padding:30px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}';
-        echo 'input{width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:4px}';
-        echo 'button{width:100%;padding:12px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer}';
-        echo '</style></head><body><div class="login">';
-        echo '<h2>Administrator Login</h2>';
-        echo '<form method="POST"><input name="user" placeholder="Username" required>';
-        echo '<input type="password" name="pass" placeholder="Password" required>';
+        $debugHash = hash('sha256', 'fake_password_' . time());
+        $csrfToken = bin2hex(random_bytes(32));
+        $analyticsId = bin2hex(random_bytes(8));
 
-        // Flush and delay
+        ?>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Admin Login</title>
+            <style>
+                body{font-family:Arial;margin:40px;background:#f5f5f5}
+                .login{max-width:400px;margin:0 auto;background:white;padding:30px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}
+                input{width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:4px}
+                button{width:100%;padding:12px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer}
+            </style>
+        </head>
+        <body>
+            <div class="login">
+                <h2>Administrator Login</h2>
+                <form method="POST">
+                    <input name="user" placeholder="Username" required>
+                    <input type="password" name="pass" placeholder="Password" required>
+        <?php
+
+        // Flush and delay.
         ob_flush();
         flush();
         sleep(2);
 
-        echo '<button type="submit">Login</button></form>';
+        ?>
+                    <button type="submit">Login</button>
+                </form>
 
-        // Add fake vulnerability hints in comments to waste security researcher time
-        echo '<!-- TODO: Fix SQL injection in user parameter -->';
-        echo '<!-- FIXME: XSS vulnerability in admin dashboard -->';
-        echo '<!-- NOTE: Session token stored in cookie "admin_session" -->';
-        echo '<!-- DEBUG: Admin password hash: ' . hash('sha256', 'fake_password_' . time()) . ' -->';
+                <!-- TODO: Fix SQL injection in user parameter. -->
+                <!-- FIXME: XSS vulnerability in admin dashboard. -->
+                <!-- NOTE: Session token stored in cookie "admin_session". -->
+                <!-- DEBUG: Admin password hash: <?= $debugHash ?>. -->
+        <?php
 
         ob_flush();
         flush();
         sleep(1);
 
-        // Generate massive amount of fake JavaScript
-        echo '<script>';
-        echo '// Anti-CSRF token validation';
-        echo 'const csrfToken = "' . bin2hex(random_bytes(32)) . '";';
+        // Generate massive amount of fake JavaScript.
+        ?>
+                <script>
+                // Anti-CSRF token validation.
+                const csrfToken = "<?= $csrfToken ?>";
+                <?php for ($i = 0; $i < 50; $i++) : ?>
+                // Validation function <?= $i ?>.
+                function validate<?= $i ?>(input) { return input.length > 0 && input.length < 100 && /^[a-zA-Z0-9]+$/.test(input); }
+                    <?php if ($i % 5 == 0) : ?>
+                        <?php
+                        ob_flush();
+                        flush();
+                        usleep(500000);
+                        ?>
+                    <?php endif; ?>
+                <?php endfor; ?>
+                </script>
 
-        // Generate kilobytes of fake validation code
-        for ($i = 0; $i < 50; $i++) {
-            echo "\n// Validation function " . $i . "\n";
-            echo 'function validate' . $i . '(input) { ';
-            echo 'return input.length > 0 && input.length < 100 && /^[a-zA-Z0-9]+$/.test(input); }';
-
-            if ($i % 5 == 0) {
-                ob_flush();
-                flush();
-                usleep(500000); // 500ms delay
-            }
-        }
-
-        echo '</script>';
-
-        // Fake analytics tracking that goes nowhere
-        echo '<script async src="/analytics.js?id=' . bin2hex(random_bytes(8)) . '"></script>';
-        echo '</div></body></html>';
+                <!-- Fake analytics tracking that goes nowhere. -->
+                <script async src="/analytics.js?id=<?= $analyticsId ?>"></script>
+            </div>
+        </body>
+        </html>
+        <?php
 
         ob_end_flush();
         exit;
@@ -352,7 +367,7 @@ PHP;
         http_response_code(200);
         header('Content-Type: application/json');
 
-        // Generate massive fake data payload
+        // Generate massive fake data payload.
         $fakeData = [
             'success' => true,
             'message' => 'Data retrieved successfully',
@@ -360,7 +375,7 @@ PHP;
             'records' => []
         ];
 
-        // Generate thousands of fake records
+        // Generate thousands of fake records.
         $recordCount = 1000 * $offenseLevel;
         for ($i = 0; $i < $recordCount; $i++) {
             $fakeData['records'][] = [
@@ -369,16 +384,16 @@ PHP;
                 'name' => 'User_' . $i,
                 'email' => 'user' . $i . '@example.com',
                 'created' => date('Y-m-d H:i:s', time() - rand(0, 31536000)),
-                'data' => str_repeat('x', 100), // Padding
+                'data' => str_repeat('x', 100), // Padding.
                 'token' => bin2hex(random_bytes(32)),
             ];
 
-            // Drip feed the response
+            // Drip feed the response.
             if ($i % 100 == 0 && $i > 0) {
-                echo json_encode(['batch' => $i, 'data' => array_slice($fakeData['records'], $i - 100, 100)]) . "\n";
+                echo json_encode(['batch' => $i, 'data' => array_slice($fakeData['records'], $i - 100, 100)]), "\n";
                 ob_flush();
                 flush();
-                usleep(100000); // 100ms delay
+                usleep(100000); // 100ms delay.
             }
         }
 
@@ -396,37 +411,38 @@ PHP;
 
         echo '<!DOCTYPE html><html><head><title>Loading...</title></head><body>';
 
-        // Generate HTML comments with fake vulnerability information
+        // Generate HTML comments with fake vulnerability information.
+        $fakeApiKey = bin2hex(random_bytes(16));
         $vulnComments = [
-            '<!-- Vulnerable to: SQL Injection in /api/users?id= -->',
-            '<!-- TODO: Patch XSS in search parameter -->',
-            '<!-- SECURITY: Remove debug endpoint /internal/debug -->',
-            '<!-- WARNING: Backup file at /backup/database.sql -->',
-            '<!-- FIXME: Hardcoded API key: sk_live_' . bin2hex(random_bytes(16)) . ' -->',
-            '<!-- NOTE: Admin panel accessible at /secret/admin -->',
+            '<!-- Vulnerable to: SQL Injection in /api/users?id=. -->',
+            '<!-- TODO: Patch XSS in search parameter. -->',
+            '<!-- SECURITY: Remove debug endpoint /internal/debug. -->',
+            '<!-- WARNING: Backup file at /backup/database.sql. -->',
+            '<!-- FIXME: Hardcoded API key: sk_live_' . $fakeApiKey . '. -->',
+            '<!-- NOTE: Admin panel accessible at /secret/admin. -->',
         ];
 
         foreach ($vulnComments as $comment) {
-            echo $comment . "\n";
+            echo $comment, "\n";
             ob_flush();
             flush();
             usleep(200000);
         }
 
-        // Generate massive amounts of fake content
+        // Generate massive amounts of fake content.
         $paragraphs = 500 * $offenseLevel;
         for ($i = 0; $i < $paragraphs; $i++) {
             $words = rand(50, 200);
             echo '<p>';
             for ($j = 0; $j < $words; $j++) {
-                echo self::randomWord() . ' ';
+                echo self::randomWord(), ' ';
             }
-            echo '</p>' . "\n";
+            echo '</p>', "\n";
 
             if ($i % 10 == 0) {
                 ob_flush();
                 flush();
-                usleep(50000); // 50ms delay
+                usleep(50000); // 50ms delay.
             }
         }
 
@@ -437,16 +453,16 @@ PHP;
     /**
      * Serve context-aware fake error messages to confuse attackers.
      *
-     * Analyzes the request path to determine what the attacker is probing for,
-     * then serves a semi-dynamic, realistic-looking error message that suggests
-     * they've found a vulnerability (when they haven't).
+     * Analyzes the request path to determine what the attacker is probing for.
+     * Serves a semi-dynamic error message that looks believable.
+     * Suggests a vulnerability even when there is none.
      */
     private static function serveFakeError(string $requestPath, int $offenseLevel): void
     {
-        // Detect what technology the attacker is probing for
+        // Detect what technology the attacker is probing for.
         $errorType = self::detectProbeType($requestPath);
 
-        // Generate semi-dynamic error details
+        // Generate semi-dynamic error details.
         $timestamp = date('Y-m-d H:i:s');
         $pid = rand(1000, 9999);
         $tid = rand(100, 999);
@@ -454,7 +470,7 @@ PHP;
         $sessionId = bin2hex(random_bytes(16));
         $requestId = strtoupper(bin2hex(random_bytes(8)));
 
-        // Set appropriate content type and status code
+        // Set appropriate content type and status code.
         http_response_code(500);
 
         switch ($errorType) {
@@ -765,13 +781,13 @@ HTML;
         $errors = [];
         $suspicionScore = 0;
 
-        // 1. Honeypot field check (should be empty)
+        // 1. Honeypot field check (should be empty).
         if (!empty($formData['website']) || !empty($formData['url']) || !empty($formData['company'])) {
             $suspicionScore += 10;
             self::recordOffense('honeypot_filled');
         }
 
-        // 2. Timing check (form should take at least 3 seconds to fill)
+        // 2. Timing check (form should take at least 3 seconds to fill).
         if (isset($formData['form_token'])) {
             $tokenData = self::decodeFormToken($formData['form_token']);
             if ($tokenData) {
@@ -787,15 +803,15 @@ HTML;
             }
         }
 
-        // 3. Entropy analysis (detect copy-pasted spam)
+        // 3. Entropy analysis (detect copy-pasted spam).
         if (isset($formData['message'])) {
             $entropy = self::calculateEntropy($formData['message']);
-            if ($entropy < 3.5) { // Very low entropy = repetitive/spam
+            if ($entropy < 3.5) { // Very low entropy = repetitive/spam.
                 $suspicionScore += 5;
             }
         }
 
-        // 4. Field order validation (randomized per session)
+        // 4. Field order validation (randomized per session).
         if (isset($formData['field_order'])) {
             $expectedOrder = self::getExpectedFieldOrder();
             if ($formData['field_order'] !== $expectedOrder) {
@@ -803,24 +819,24 @@ HTML;
             }
         }
 
-        // 5. Mouse movement check (JavaScript should track this)
+        // 5. Mouse movement check (JavaScript should track this).
         if (!isset($formData['mouse_entropy']) || $formData['mouse_entropy'] < 0.1) {
             $suspicionScore += 4;
         }
 
-        // 6. Duplicate detection (same message recently)
+        // 6. Duplicate detection (same message recently).
         if (self::isDuplicateSubmission($formData)) {
             $suspicionScore += 8;
             $errors[] = 'Duplicate submission detected';
         }
 
-        // 7. Known spam patterns
+        // 7. Known spam patterns.
         $spamPatterns = [
             '/\b(viagra|cialis|casino|lottery|prize|winner)\b/i',
             '/\b(click here|buy now|limited time|act now)\b/i',
-            '/http.*http.*http/i', // Multiple URLs
-            '/<a\s+href/i', // HTML links
-            '/\[url=/i', // BBCode links
+            '/http.*http.*http/i', // Multiple URLs.
+            '/<a\s+href/i', // HTML links.
+            '/\[url=/i', // BBCode links.
         ];
 
         foreach ($spamPatterns as $pattern) {
@@ -889,7 +905,7 @@ HTML;
             $recent = json_decode(file_get_contents($cacheFile), true) ?? [];
         }
 
-        // Check if hash exists in last hour
+        // Check if hash exists in last hour.
         $cutoff = time() - 3600;
         $recent = array_filter($recent, fn($item) => $item['time'] > $cutoff);
 
@@ -897,7 +913,7 @@ HTML;
             return true;
         }
 
-        // Store this hash
+        // Store this hash.
         $recent[$hash] = ['time' => time()];
         file_put_contents($cacheFile, json_encode($recent), LOCK_EX);
 
@@ -949,11 +965,11 @@ HTML;
     private static function isScanningPattern(string $path): bool
     {
         $patterns = [
-            '/[\x00-\x1F]/', // Control characters
-            '/\.\.[\/\\\\]/', // Path traversal
-            '/(union|select|insert|update|delete|drop)/i', // SQL keywords
-            '/<script|javascript:|onerror=/i', // XSS attempts
-            '/\${|<%|<\?php/i', // Template injection
+            '/[\x00-\x1F]/', // Control characters.
+            '/\.\.[\/\\\\]/', // Path traversal.
+            '/(union|select|insert|update|delete|drop)/i', // SQL keywords.
+            '/<script|javascript:|onerror=/i', // XSS attempts.
+            '/\${|<%|<\?php/i', // Template injection.
         ];
 
         foreach ($patterns as $pattern) {
@@ -980,17 +996,17 @@ HTML;
         $now = time();
         $key = self::$clientIp;
 
-        // Clean old entries
+        // Clean old entries.
         if (isset($requests[$key])) {
             $requests[$key] = array_filter($requests[$key], fn($t) => $t > $now - 60);
         } else {
             $requests[$key] = [];
         }
 
-        // Add current request
+        // Add current request.
         $requests[$key][] = $now;
 
-        // Save
+        // Save.
         file_put_contents($requestFile, json_encode($requests), LOCK_EX);
 
         $threshold = self::getConfig('defense.rapid_request_threshold', 10);
@@ -1027,7 +1043,7 @@ HTML;
         $offenses[$key]['types'][$type] = ($offenses[$key]['types'][$type] ?? 0) + 1;
         $offenses[$key]['last'] = time();
 
-        // Clean old offenses (older than 24 hours)
+        // Clean old offenses (older than 24 hours).
         $cutoff = time() - 86400;
         foreach ($offenses as $ip => $data) {
             if ($data['last'] < $cutoff) {

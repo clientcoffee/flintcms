@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Google Tag Manager Component Configuration
+ * Google Tag Manager Component Configuration.
  *
  * Google Tag Manager container integration.
  */

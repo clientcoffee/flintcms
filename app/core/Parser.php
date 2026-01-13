@@ -17,9 +17,8 @@ namespace Flint;
  *
  * COMPONENT CASCADE SYSTEM:
  * Components are resolved in this priority order:
-* - Theme components (site/themes/{theme}/*.php) → \Modules\ namespace
-* - Site components (site/components/*.php) → \Components\ namespace
- * - Core components (app/core/components/*.php) → \Components\ namespace
+ * - Theme components (site/themes/{theme}/*.php) → \Modules\ namespace
+ * - Site components (site/components/*.php) → \Components\ namespace
  *
  * This allows themes to override default components for custom styling.
  *
@@ -123,6 +122,14 @@ class Parser
     public static function getCurrentInstance(): ?Parser
     {
         return self::$currentInstance;
+    }
+
+    /**
+     * Render inline markdown without wrapping block-level tags.
+     */
+    public function renderInlineMarkdown(string $inlineText): string
+    {
+        return $this->processInlineMarkdown($inlineText);
     }
 
     /**
@@ -242,7 +249,6 @@ class Parser
      * Components are resolved in priority order:
      * 1. Theme components (site/themes/{theme}/ → \Modules\ComponentName)
      * 2. Site components (site/components/ → \Components\ComponentName)
-     * 3. Core components (app/core/components/ → \Components\ComponentName)
      *
      * WHY THIS ORDER?
      * - Themes should be able to override default components for styling
@@ -321,29 +327,6 @@ class Parser
                 }
             }
 
-            // PRIORITY 3: Fall back to core components if site component not found
-            if (!$resolvedComponentClass) {
-                $coreComponentClassName = "\\Components\\{$componentName}";
-
-                // Check if core component class is already loaded
-                if (!class_exists($coreComponentClassName)) {
-                    $coreComponentDirectory = $this->application->appDir . '/core/components';
-
-                    // Try to find component file in core directory
-                    $coreComponentFilePath = $this->getComponentPath($coreComponentDirectory, $componentName);
-
-                    if ($coreComponentFilePath !== null) {
-                        // Found component file in core directory, load it
-                        require_once $coreComponentFilePath;
-                    }
-                }
-
-                // Check if core component is now available and has render method
-                if (class_exists($coreComponentClassName) && method_exists($coreComponentClassName, 'render')) {
-                    $resolvedComponentClass = $coreComponentClassName;
-                }
-            }
-
             // If we successfully resolved a component, render it
             if ($resolvedComponentClass) {
                 // Track component usage for debugging and analytics
@@ -394,7 +377,7 @@ class Parser
      * 1. Single file: ComponentName.php
      * 2. Directory: ComponentName/ComponentName.php (for complex components with assets)
      *
-     * @param string $baseDirectory Directory to search in (theme, site, or core)
+     * @param string $baseDirectory Directory to search in (theme or site)
      * @param string $componentName Component name (e.g., "Hero")
      * @return string|null Absolute path to component file or null if not found
      */

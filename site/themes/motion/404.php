@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Motion 404 template.
  *
  * This file is rendered directly by App::render404() with $site + $themeConfig.
  * We keep logic here and emit clean markup below to make maintenance easier.
  */
+
 require_once __DIR__ . '/helpers.php';
 
 // Quotes live in the theme folder so they ship with the theme.

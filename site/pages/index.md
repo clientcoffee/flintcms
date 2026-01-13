@@ -1,13 +1,9 @@
 ---
 title: Welcome to Flint
-description: Your new flat-file CMS is ready to go.
+description: Everything is set up and ready for you to start creating.
 icon: home
 order: 1
 ---
-
-# Hello from your markdown files
-
-Everything is set up and ready for you to start creating.
 
 ## What is Flint?
 
@@ -21,13 +17,13 @@ A simple flat-file CMS that just works:
 
 ## Get started in 3 steps
 
-1. **Login** - Click the login link in the footer to access the admin panel
-2. **Edit** - Modify this page or create new content
-3. **Customize** - Change your theme and site settings
+1. **Login** - Click the [login link](/login) in the footer to access the admin panel
+2. **Edit** - Modify this page or create new content by clicking the edit icon next to the Page Title.
+3. **Customize** - Change your theme and site settings from the admin panel.
 
 ## What is next?
 
-- Explore the admin panel to customize your site
+- Explore the [admin panel](/admin) to customize your site
 - Create new pages by adding markdown files
 - Customize your theme and settings
 

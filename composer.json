@@ -13,7 +13,7 @@
     "autoload": {
         "psr-4": {
             "Flint\\": "app/core/",
-            "Components\\": "app/core/components/",
+            "Components\\": "site/components/",
             "Modules\\": "site/themes/"
         }
     },
@@ -28,7 +28,7 @@
         "test:unit": "phpunit --testsuite Unit",
         "test:integration": "phpunit --testsuite Integration",
         "test:coverage": "phpunit --coverage-html coverage",
-        "analyse": "phpstan analyse app/core app/core/components --level=5",
+        "analyse": "phpstan analyse app/core site/components --level=5",
         "lint:php": "phpcs",
         "lint:php:fix": "phpcbf",
         "check": [

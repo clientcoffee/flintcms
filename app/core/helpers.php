@@ -63,6 +63,27 @@ if (!function_exists('render_flash_markdown')) {
     }
 }
 
+if (!function_exists('render_inline_markdown')) {
+    /**
+     * Render inline markdown without wrapping block-level tags.
+     */
+    function render_inline_markdown(string $text): string
+    {
+        $text = (string)$text;
+        if ($text === '') {
+            return '';
+        }
+
+        $app = ThemeContext::get('app');
+        if ($app instanceof \Flint\App) {
+            $parser = new \Flint\Parser($app);
+            return $parser->renderInlineMarkdown($text);
+        }
+
+        return esc_html($text);
+    }
+}
+
 if (!function_exists('hook')) {
     /**
      * Trigger a hook event.

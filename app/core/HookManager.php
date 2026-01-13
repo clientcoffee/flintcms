@@ -54,24 +54,20 @@ class HookManager
     }
 
     /**
-     * Discover and initialize components from site/components directory
+     * Discover and initialize components from site/components directory.
      */
     private static function loadComponents(): void
     {
-        // Load site components from site/components
+        // Load site components from site/components.
         $siteComponentsDir = self::$app->root . '/site/components';
         self::scanComponentDirectory($siteComponentsDir, 'Components');
-
-        // Load core components from app/core/components
-        $coreComponentsDir = self::$app->appDir . '/core/components';
-        self::scanComponentDirectory($coreComponentsDir, 'Flint\\Components');
     }
 
     /**
-     * Scan a directory for components and load enabled ones
+     * Scan a directory for components and load enabled ones.
      *
-     * @param string $componentsDir Directory to scan
-     * @param string $namespace Namespace prefix for components
+     * @param string $componentsDir Directory to scan.
+     * @param string $namespace Namespace prefix for components.
      */
     private static function scanComponentDirectory(string $componentsDir, string $namespace): void
     {

@@ -170,25 +170,168 @@ function motion_theme_is_safe_inline_script(string $content): bool
            stripos($content, '<script') === false;
 }
 
-if (!function_exists('motion_theme_register_hooks')) {
-    /**
-     * Register Motion theme hooks (styles, scripts).
-     */
-    function motion_theme_register_hooks(): void
-    {
-        // Prevent duplicate registration if helpers are included multiple times.
-        static $registered = false;
-        if ($registered) {
-            return;
-        }
-        $registered = true;
-
-        \Flint\HookManager::on('theme_styles', function (): void {
-            // The CMS calls theme_styles() inside layouts; we attach theme.css here.
-            echo '<link rel="stylesheet" href="' . theme_asset('theme.css') . '">' . "\n";
-        }, 20);
+/**
+ * Parse frontmatter metadata from a markdown file.
+ */
+function motion_theme_parse_frontmatter(string $filePath): array
+{
+    $contents = file_get_contents($filePath);
+    if ($contents === false || !str_starts_with($contents, '---')) {
+        return [];
     }
+
+    $parts = preg_split('/^---$/m', $contents, 3);
+    if (!is_array($parts) || count($parts) !== 3) {
+        return [];
+    }
+
+    return motion_theme_parse_yaml_lite($parts[1]);
 }
 
-// Ensure hooks are registered as soon as the theme helpers load.
-motion_theme_register_hooks();
+/**
+ * Minimal YAML-lite parser for frontmatter blocks.
+ */
+function motion_theme_parse_yaml_lite(string $yamlText): array
+{
+    $metadata = [];
+    $lines = explode("\n", $yamlText);
+
+    foreach ($lines as $line) {
+        if (!str_contains($line, ':')) {
+            continue;
+        }
+
+        [$keyText, $valueText] = explode(':', $line, 2);
+        $key = trim($keyText);
+        if ($key === '') {
+            continue;
+        }
+
+        $value = trim(trim($valueText), "\"'");
+        $metadata[$key] = $value;
+    }
+
+    return $metadata;
+}
+
+/**
+ * Resolve content status from frontmatter.
+ */
+function motion_theme_resolve_status(array $meta): string
+{
+    $status = strtolower(trim((string)($meta['status'] ?? 'published')));
+    if ($status === '') {
+        $status = 'published';
+    }
+
+    $draftFlag = strtolower(trim((string)($meta['draft'] ?? '')));
+    if (in_array($draftFlag, ['1', 'true', 'yes', 'on'], true)) {
+        $status = 'draft';
+    }
+
+    return $status;
+}
+
+/**
+ * Convert a site/pages relative file path into a URL slug.
+ */
+function motion_theme_slug_from_relative(string $relativeFile): string
+{
+    $relativeFile = str_replace('\\', '/', $relativeFile);
+    $trimmed = preg_replace('/\.(md|mdx)$/i', '', $relativeFile);
+    $trimmed = ltrim($trimmed, '/');
+    $baseName = basename($trimmed);
+
+    if ($baseName === 'index') {
+        $dir = trim(dirname($trimmed), '.');
+        if ($dir === '' || $dir === '.') {
+            return '/';
+        }
+        return '/' . $dir;
+    }
+
+    return '/' . $trimmed;
+}
+
+/**
+ * Build a list of recent blog posts for the footer.
+ *
+ * @return array<int, array{label:string,path:string,date:int,status:string}>
+ */
+function motion_theme_get_recent_blog_posts(int $limit = 5, bool $includePrivate = false): array
+{
+    $pagesDir = isset(\Flint\Paths::$pagesDir) ? \Flint\Paths::$pagesDir : '';
+    if ($pagesDir === '') {
+        return [];
+    }
+
+    $blogDir = $pagesDir . '/blog';
+    if (!is_dir($blogDir)) {
+        return [];
+    }
+
+    $entries = scandir($blogDir);
+    if ($entries === false) {
+        return [];
+    }
+
+    $posts = [];
+
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+            continue;
+        }
+
+        $fullPath = $blogDir . '/' . $entry;
+        if (is_dir($fullPath)) {
+            continue;
+        }
+
+        if (!preg_match('/\.(md|mdx)$/i', $entry)) {
+            continue;
+        }
+
+        $baseName = basename($entry, '.' . pathinfo($entry, PATHINFO_EXTENSION));
+        if ($baseName === 'index') {
+            continue;
+        }
+
+        $relativeFile = 'blog/' . $entry;
+        $meta = motion_theme_parse_frontmatter($fullPath);
+        $status = motion_theme_resolve_status($meta);
+        if (!$includePrivate && in_array($status, ['hidden', 'draft'], true)) {
+            continue;
+        }
+
+        $label = trim((string)($meta['title'] ?? ''));
+        if ($label === '') {
+            $label = $baseName;
+        }
+
+        $dateValue = trim((string)($meta['date'] ?? ''));
+        $timestamp = $dateValue === '' ? 0 : (int)(strtotime($dateValue) ?: 0);
+
+        $posts[] = [
+            'label' => $label,
+            'path' => motion_theme_slug_from_relative($relativeFile),
+            'date' => $timestamp,
+            'status' => $status,
+        ];
+    }
+
+    usort($posts, function (array $a, array $b): int {
+        if ($a['date'] !== $b['date']) {
+            return $b['date'] <=> $a['date'];
+        }
+
+        return strcasecmp($a['label'], $b['label']);
+    });
+
+    if ($limit < 1) {
+        return $posts;
+    }
+
+    return array_slice($posts, 0, $limit);
+}
+
+// Theme hooks are registered by the CMS; keep helpers focused on presentation.

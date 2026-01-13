@@ -6,7 +6,7 @@ use Flint\BaseComponent;
 use Flint\HookManager;
 
 /**
- * Form Component
+ * Form Component.
  *
  * Handles form rendering, submission processing, and email delivery.
  * Completely modular - extends core via hooks only.
@@ -14,15 +14,15 @@ use Flint\HookManager;
 class Form extends BaseComponent
 {
     /**
-     * Component initialization
+     * Component initialization.
      */
     protected static function onInit(): void
     {
-        // No storage needed - forms are stateless, submissions handled by core storeSubmission
+        // No storage needed - forms are stateless, submissions handled by core storeSubmission.
     }
 
     /**
-     * Register hooks for API endpoints
+     * Register hooks for API endpoints.
      */
     protected static function registerHooks(): void
     {
@@ -30,20 +30,20 @@ class Form extends BaseComponent
     }
 
     /**
-     * Handle form API endpoints
+     * Handle form API endpoints.
      */
     public static function handleApiEndpoints(array $context): bool
     {
         $path = $context['path'] ?? '';
         $method = $context['method'] ?? 'GET';
 
-        // Handle generic form submission
+        // Handle generic form submission.
         if ($path === '/api/form' && $method === 'POST') {
             self::handleFormSubmission();
             return true;
         }
 
-        // Handle legacy contact form endpoint
+        // Handle legacy contact form endpoint.
         if ($path === '/api/contact' && $method === 'POST') {
             self::handleContactForm();
             return true;
@@ -53,13 +53,13 @@ class Form extends BaseComponent
     }
 
     /**
-     * Handle generic form submission from Form component
+     * Handle generic form submission from Form component.
      */
     private static function handleFormSubmission(): void
     {
         header('Content-Type: application/json');
 
-        // Rate limiting (session-based)
+        // Rate limiting (session-based).
         if (session_status() !== PHP_SESSION_ACTIVE) {
             session_start();
         }
@@ -72,7 +72,7 @@ class Form extends BaseComponent
             return;
         }
 
-        // Rate limiting (IP-based)
+        // Rate limiting (IP-based).
         if (self::isRateLimited()) {
             http_response_code(429);
             echo json_encode([
@@ -82,7 +82,7 @@ class Form extends BaseComponent
             return;
         }
 
-        // Get payload
+        // Get payload.
         $payload = self::readJsonPayload();
         if ($payload === null) {
             http_response_code(400);
@@ -94,11 +94,11 @@ class Form extends BaseComponent
         $successMessage = $payload['success_message'] ?? 'Thank you! Your submission has been received.';
         $redirectUrl = $payload['redirect_url'] ?? null;
 
-        // Remove meta fields
+        // Remove meta fields.
         $formData = $payload;
         unset($formData['form_token'], $formData['form_name'], $formData['success_message'], $formData['redirect_url']);
 
-        // Validate form token via Defense hooks
+        // Validate form token via Defense hooks.
         $defenseResult = HookManager::trigger('form_validate', [
             'form_type' => $formName,
             'data' => $payload
@@ -123,7 +123,7 @@ class Form extends BaseComponent
             }
         }
 
-        // Send email
+        // Send email.
         $emailSent = self::sendFormEmail($formName, $formData);
 
         if ($emailSent) {
@@ -143,13 +143,13 @@ class Form extends BaseComponent
     }
 
     /**
-     * Handle legacy contact form submission
+     * Handle legacy contact form submission.
      */
     private static function handleContactForm(): void
     {
         header('Content-Type: application/json');
 
-        // Rate limiting
+        // Rate limiting.
         if (session_status() !== PHP_SESSION_ACTIVE) {
             session_start();
         }
@@ -162,7 +162,7 @@ class Form extends BaseComponent
             return;
         }
 
-        // Rate limiting (IP-based)
+        // Rate limiting (IP-based).
         if (self::isRateLimited()) {
             http_response_code(429);
             echo json_encode([
@@ -172,7 +172,7 @@ class Form extends BaseComponent
             return;
         }
 
-        // Get payload
+        // Get payload.
         $payload = self::readJsonPayload();
         if ($payload === null) {
             http_response_code(400);
@@ -184,7 +184,7 @@ class Form extends BaseComponent
         $senderEmail = trim((string)($payload['email'] ?? ''));
         $messageBody = trim((string)($payload['message'] ?? ''));
 
-        // Validation
+        // Validation.
         $validationErrors = [];
 
         if ($senderName === '' || strlen($senderName) < 2) {
@@ -214,7 +214,7 @@ class Form extends BaseComponent
             return;
         }
 
-        // Validate via Defense hooks
+        // Validate via Defense hooks.
         $defenseResult = HookManager::trigger('form_validate', [
             'form_type' => 'contact',
             'data' => $payload
@@ -239,12 +239,12 @@ class Form extends BaseComponent
             }
         }
 
-        // Sanitize
+        // Sanitize.
         $safeSenderName = htmlspecialchars($senderName, ENT_QUOTES, 'UTF-8');
         $safeSenderEmail = htmlspecialchars($senderEmail, ENT_QUOTES, 'UTF-8');
         $safeMessageBody = htmlspecialchars($messageBody, ENT_QUOTES, 'UTF-8');
 
-        // Store submission (opt-out via store="false")
+        // Store submission (opt-out via store="false").
         $shouldStore = !isset($payload['store']) || $payload['store'] !== 'false';
         if ($shouldStore) {
             self::$app->writeJson(
@@ -260,7 +260,7 @@ class Form extends BaseComponent
             );
         }
 
-        // Send email
+        // Send email.
         $emailSent = self::sendContactEmail($safeSenderName, $safeSenderEmail, $safeMessageBody);
 
         if ($emailSent) {
@@ -288,15 +288,15 @@ class Form extends BaseComponent
     /**
      * Check IP-based rate limiting (10 requests per 60 seconds).
      *
-     * @return bool True if rate limit exceeded, false otherwise
+     * @return bool True if rate limit exceeded, false otherwise.
      */
     private static function isRateLimited(): bool
     {
         $ip = self::getClientIp();
         $rateLimitFile = self::$app->root . '/site/submissions/.rate-limit-' . md5($ip) . '.json';
         $now = time();
-        $windowSize = 60; // seconds
-        $maxRequests = 10; // max requests per window
+        $windowSize = 60; // seconds.
+        $maxRequests = 10; // max requests per window.
 
         // Load existing rate limit data.
         $requests = [];
@@ -327,7 +327,7 @@ class Form extends BaseComponent
     }
 
     /**
-     * Send form submission email
+     * Send form submission email.
      */
     private static function sendFormEmail(string $formName, array $formData): bool
     {
@@ -337,7 +337,7 @@ class Form extends BaseComponent
             return false;
         }
 
-        // Build email body
+        // Build email body.
         $emailBody = "New form submission from: {$formName}\n\n";
         $emailBody .= "Submitted: " . date('Y-m-d H:i:s') . "\n";
         $emailBody .= "IP Address: " . self::getClientIp() . "\n";
@@ -356,7 +356,7 @@ class Form extends BaseComponent
             }
         }
 
-        // Email headers (sanitize all values to prevent header injection)
+        // Email headers (sanitize all values to prevent header injection).
         $siteName = self::sanitizeEmailHeader(self::$app->config['site']['name'] ?? 'Flint');
         $serverName = self::sanitizeEmailHeader($_SERVER['SERVER_NAME'] ?? 'localhost');
         $safeFormName = self::sanitizeEmailHeader($formName);
@@ -371,11 +371,11 @@ class Form extends BaseComponent
     }
 
     /**
-     * Send contact form email
+     * Send contact form email.
      */
     private static function sendContactEmail(string $senderName, string $senderEmail, string $messageBody): bool
     {
-        // Load email template
+        // Load email template.
         $templatePath = self::$app->root . '/site/blocks/contact-email.md';
 
         if (!file_exists($templatePath)) {
@@ -389,7 +389,7 @@ class Form extends BaseComponent
             return false;
         }
 
-        // Parse frontmatter for subject
+        // Parse frontmatter for subject.
         $subjectLine = 'New Contact Form Submission';
         if (preg_match('/^---\s*\n(.*?)\n---\s*\n(.*)$/s', $templateContents, $frontmatterMatch)) {
             if (preg_match('/subject:\s*(.+)$/m', $frontmatterMatch[1], $subjectMatch)) {
@@ -398,31 +398,31 @@ class Form extends BaseComponent
             $templateContents = $frontmatterMatch[2];
         }
 
-        // Replace template variables
+        // Replace template variables.
         $messageText = str_replace(
             ['{{name}}', '{{email}}', '{{message}}', '{{date}}'],
             [$senderName, $senderEmail, $messageBody, date('F j, Y g:i A')],
             $templateContents
         );
 
-        // Convert markdown to plain text for email
+        // Convert markdown to plain text for email.
         $messageText = strip_tags($messageText);
 
-        // Get admin email
+        // Get admin email.
         $adminEmail = self::$app->config['mail']['admin_email'] ?? '';
         if ($adminEmail === '' || $adminEmail === 'admin@example.com') {
             error_log("Admin email not configured");
             return false;
         }
 
-        // Sanitize all email header values to prevent header injection
+        // Sanitize all email header values to prevent header injection.
         $safeReplyEmail = self::sanitizeEmailHeader($senderEmail);
         if ($safeReplyEmail === '' || !filter_var($safeReplyEmail, FILTER_VALIDATE_EMAIL)) {
             error_log("Invalid reply-to email");
             return false;
         }
 
-        // Email headers (all values sanitized)
+        // Email headers (all values sanitized).
         $siteName = self::sanitizeEmailHeader(self::$app->config['site']['name'] ?? 'Flint');
         $serverName = self::sanitizeEmailHeader($_SERVER['SERVER_NAME'] ?? 'localhost');
         $safeSubject = self::sanitizeEmailHeader($subjectLine);
@@ -436,7 +436,7 @@ class Form extends BaseComponent
     }
 
     /**
-     * Read JSON payload from request body
+     * Read JSON payload from request body.
      */
     private static function readJsonPayload(): ?array
     {
@@ -454,21 +454,21 @@ class Form extends BaseComponent
     }
 
     /**
-     * Render a complete form with fields
+     * Render a complete form with fields.
      *
      * All forms POST to /api/form and email the configured admin.
      *
-     * Props:
-     * - name: Form name/id (required for identification)
-     * - class: Additional CSS classes
-     * - fields: Field definitions (semicolon/newline separated)
-     * - submit: Submit button text
-     * - submit_class: Submit button CSS classes
-     * - success: Success message (optional)
-     * - redirect: Redirect URL after success (optional)
+     * Props include.
+     * - name: Form name/id (required for identification).
+     * - class: Additional CSS classes.
+     * - fields: Field definitions (semicolon/newline separated).
+     * - submit: Submit button text.
+     * - submit_class: Submit button CSS classes.
+     * - success: Success message (optional).
+     * - redirect: Redirect URL after success (optional).
      *
-     * Field format: type:name:label:required:placeholder
-     * Example: text:email:Email Address:true:you@example.com
+     * Field format: type:name:label:required:placeholder.
+     * Example: text:email:Email Address:true:you@example.com.
      */
     public static function render(array $props, string $content): string
     {
@@ -480,10 +480,10 @@ class Form extends BaseComponent
         $successMessage = self::prop($props, 'success', 'Thank you! Your submission has been received.');
         $redirectUrl = self::prop($props, 'redirect');
 
-        // Parse fields
+        // Parse fields.
         $fields = self::parseFields($fieldsRaw);
 
-        // Generate form token via hook (Defense component)
+        // Generate form token via hook (Defense component).
         $formToken = \Flint\HookManager::trigger('form_token_generate', ['form_type' => $name]);
         if ($formToken === null || $formToken === '') {
             $formToken = base64_encode(json_encode([
@@ -492,7 +492,7 @@ class Form extends BaseComponent
             ]));
         }
 
-        // Build form
+        // Build form.
         $formAttrs = [
             'id' => $name,
             'name' => $name,
@@ -501,35 +501,36 @@ class Form extends BaseComponent
             'class' => $class
         ];
 
-        $html = '<form ' . self::buildAttributes($formAttrs) . '>';
+        ob_start();
+        ?>
+        <form <?= self::buildAttributes($formAttrs) ?>>
+            <!-- Hidden fields. -->
+            <input type="hidden" name="form_token" value="<?= self::escape($formToken) ?>" />
+            <input type="hidden" name="form_name" value="<?= self::escape($name) ?>" />
+            <input type="hidden" name="success_message" value="<?= self::escape($successMessage) ?>" />
+            <?php if ($redirectUrl) : ?>
+                <input type="hidden" name="redirect_url" value="<?= self::escape($redirectUrl) ?>" />
+            <?php endif; ?>
 
-        // Hidden fields
-        $html .= '<input type="hidden" name="form_token" value="' . self::escape($formToken) . '" />';
-        $html .= '<input type="hidden" name="form_name" value="' . self::escape($name) . '" />';
-        $html .= '<input type="hidden" name="success_message" value="' . self::escape($successMessage) . '" />';
-        if ($redirectUrl) {
-            $html .= '<input type="hidden" name="redirect_url" value="' . self::escape($redirectUrl) . '" />';
-        }
+            <!-- Render fields. -->
+            <?php foreach ($fields as $field) : ?>
+                <?= self::renderField($field) ?>
+            <?php endforeach; ?>
 
-        // Render fields
-        foreach ($fields as $field) {
-            $html .= self::renderField($field);
-        }
+            <!-- Submit button. -->
+            <div>
+                <button type="submit" class="<?= self::escape($submitClass) ?>">
+                    <?= self::escape($submitText) ?>
+                </button>
+            </div>
+        </form>
+        <?php
 
-        // Submit button
-        $html .= '<div>';
-        $html .= '<button type="submit" class="' . self::escape($submitClass) . '">';
-        $html .= self::escape($submitText);
-        $html .= '</button>';
-        $html .= '</div>';
-
-        $html .= '</form>';
-
-        return $html;
+        return trim((string)ob_get_clean());
     }
 
     /**
-     * Parse field definitions from text
+     * Parse field definitions from text.
      */
     private static function parseFields(string $fieldsRaw): array
     {
@@ -561,7 +562,7 @@ class Form extends BaseComponent
     }
 
     /**
-     * Render a single form field
+     * Render a single form field.
      */
     private static function renderField(array $field): string
     {
@@ -573,30 +574,29 @@ class Form extends BaseComponent
         $rows = $field['rows'];
 
         if ($name === '') {
-            return '<!-- Form: field name required -->';
+            return '<!-- Form: field name required. -->';
         }
 
-        $fieldHtml = '<div>';
-
-        // Label
-        if ($label !== '') {
-            $labelAttrs = [
-                'class' => 'block text-sm font-medium mb-2',
-                'for' => $name
-            ];
-            $fieldHtml .= '<label ' . self::buildAttributes($labelAttrs) . '>';
-            $fieldHtml .= self::escape($label);
-            if ($required) {
-                $fieldHtml .= '<span class="text-red-500 ml-1">*</span>';
-            }
-            $fieldHtml .= '</label>';
-        }
-
-        // Field based on type
         $fieldClass = 'w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
+        $labelAttrs = [
+            'class' => 'block text-sm font-medium mb-2',
+            'for' => $name
+        ];
 
-        switch ($type) {
-            case 'textarea':
+        ob_start();
+        ?>
+        <div>
+            <?php if ($label !== '') : ?>
+                <label <?= self::buildAttributes($labelAttrs) ?>>
+                    <?= self::escape($label) ?>
+                    <?php if ($required) : ?>
+                        <span class="text-red-500 ml-1">*</span>
+                    <?php endif; ?>
+                </label>
+            <?php endif; ?>
+
+            <?php if ($type === 'textarea') : ?>
+                <?php
                 $attrs = [
                     'id' => $name,
                     'name' => $name,
@@ -605,29 +605,28 @@ class Form extends BaseComponent
                     'placeholder' => $placeholder ?: null,
                     'class' => $fieldClass
                 ];
-                $fieldHtml .= '<textarea ' . self::buildAttributes($attrs) . '></textarea>';
-                break;
-
-            case 'select':
+                ?>
+                <textarea <?= self::buildAttributes($attrs) ?>></textarea>
+            <?php elseif ($type === 'select') : ?>
+                <?php
                 $attrs = [
                     'id' => $name,
                     'name' => $name,
                     'required' => $required,
                     'class' => $fieldClass
                 ];
-                $fieldHtml .= '<select ' . self::buildAttributes($attrs) . '>';
-
                 $options = explode(',', $field['options']);
-                foreach ($options as $option) {
-                    $option = trim($option);
-                    if ($option !== '') {
-                        $fieldHtml .= '<option value="' . self::escape($option) . '">' . self::escape($option) . '</option>';
-                    }
-                }
-                $fieldHtml .= '</select>';
-                break;
-
-            case 'checkbox':
+                ?>
+                <select <?= self::buildAttributes($attrs) ?>>
+                    <?php foreach ($options as $option) : ?>
+                        <?php $option = trim($option); ?>
+                        <?php if ($option !== '') : ?>
+                            <option value="<?= self::escape($option) ?>"><?= self::escape($option) ?></option>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </select>
+            <?php elseif ($type === 'checkbox') : ?>
+                <?php
                 $attrs = [
                     'type' => 'checkbox',
                     'id' => $name,
@@ -635,15 +634,17 @@ class Form extends BaseComponent
                     'required' => $required,
                     'class' => 'h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500'
                 ];
-                $fieldHtml .= '<div class="flex items-center">';
-                $fieldHtml .= '<input ' . self::buildAttributes($attrs) . ' />';
-                if ($placeholder) {
-                    $fieldHtml .= '<label for="' . self::escape($name) . '" class="ml-2 text-sm text-gray-600">' . self::escape($placeholder) . '</label>';
-                }
-                $fieldHtml .= '</div>';
-                break;
-
-            default:
+                ?>
+                <div class="flex items-center">
+                    <input <?= self::buildAttributes($attrs) ?> />
+                    <?php if ($placeholder) : ?>
+                        <label for="<?= self::escape($name) ?>" class="ml-2 text-sm text-gray-600">
+                            <?= self::escape($placeholder) ?>
+                        </label>
+                    <?php endif; ?>
+                </div>
+            <?php else : ?>
+                <?php
                 $attrs = [
                     'type' => $type,
                     'id' => $name,
@@ -652,17 +653,17 @@ class Form extends BaseComponent
                     'placeholder' => $placeholder ?: null,
                     'class' => $fieldClass
                 ];
-                $fieldHtml .= '<input ' . self::buildAttributes($attrs) . ' />';
-                break;
-        }
+                ?>
+                <input <?= self::buildAttributes($attrs) ?> />
+            <?php endif; ?>
+        </div>
+        <?php
 
-        $fieldHtml .= '</div>';
-
-        return $fieldHtml;
+        return trim((string)ob_get_clean());
     }
 
     /**
-     * Helper methods from RenderComponent
+     * Helper methods from RenderComponent.
      */
     protected static function prop(array $props, string $key, mixed $default = ''): mixed
     {

@@ -19,7 +19,7 @@
   <source>
     <include>
       <directory suffix=".php">app/core</directory>
-      <directory suffix=".php">app/core/components</directory>
+      <directory suffix=".php">site/components</directory>
     </include>
     <exclude>
       <directory>vendor</directory>

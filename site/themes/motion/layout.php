@@ -25,8 +25,12 @@
  * We compute everything up front to keep the HTML clean and predictable.
  */
 $siteName = $site['name'] ?? '';
-// page_meta() reads from ThemeContext and returns escaped values.
-$pageTitle = page_meta('title', $siteName);
+$pageTitleRaw = (string)($page['meta']['title'] ?? $siteName);
+$pageTitle = render_inline_markdown($pageTitleRaw);
+$pageTitlePlain = trim(strip_tags($pageTitle));
+if ($pageTitlePlain === '') {
+    $pageTitlePlain = $siteName;
+}
 // Optional SEO keywords are stored in frontmatter if present.
 $keywords = page_meta('keywords');
 $hasKeywords = $keywords !== '';
@@ -46,6 +50,25 @@ $navHtml = trim($navItems) !== '' ? \Components\Nav::render(['items' => $navItem
 $showLogout = !empty($isAdmin);
 $loginUrl = '/login';
 $adminUrl = '/admin';
+
+// Footer column content: nav, recent posts, and quick links.
+$footerNavHtml = '';
+if ($navPath !== null && is_readable($navPath)) {
+    $footerNavHtml = render_block('nav');
+}
+
+$recentPosts = function_exists('motion_theme_get_recent_blog_posts')
+    ? motion_theme_get_recent_blog_posts(5, $showLogout)
+    : [];
+
+$footerLinks = [
+    ['label' => 'Sitemap', 'href' => '/sitemap'],
+];
+if ($showLogout) {
+    $footerLinks[] = ['label' => 'Admin', 'href' => $adminUrl];
+} else {
+    $footerLinks[] = ['label' => 'Login', 'href' => $loginUrl];
+}
 
 // Collect head assets here so the template is mostly HTML below.
 // render_assets() injects component CSS; theme_styles() triggers theme hooks.
@@ -70,7 +93,7 @@ $footerAssets = ob_get_clean();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Page title: Use page-specific title if available, otherwise site name -->
-    <title><?= $pageTitle ?> | <?= esc_html($siteName) ?></title>
+    <title><?= esc_html($pageTitlePlain) ?> | <?= esc_html($siteName) ?></title>
 
     <!-- Optional: SEO keywords meta tag (only if page has keywords defined) -->
     <?php if ($hasKeywords) : ?>
@@ -114,20 +137,57 @@ $footerAssets = ob_get_clean();
 
     <!-- Site Footer -->
     <footer class="border-t border-gray-200 bg-white">
-        <div class="max-w-3xl mx-auto px-6 sm:px-12 py-8 flex items-center justify-between">
-            <!-- Copyright/Branding. I'd appreciate it if you left this in your themes. -->
-            <p class="text-sm text-gray-500">
-                Powered by <a href="https://flintcms.com" target="_blank" title="A flat file CMS built on Markdown" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
-            </p>
-
-            <?php if ($showLogout) : ?>
-                <div class="flex items-center gap-4">
-                    <a href="<?= esc_html($adminUrl) ?>" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Admin</a>
-                    <button id="admin-logout-btn" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Logout</button>
+        <div class="max-w-5xl mx-auto px-6 sm:px-12 py-10 motion-footer">
+            <div class="motion-footer__grid">
+                <div class="motion-footer__col">
+                    <h3 class="motion-footer__title">Navigate</h3>
+                    <div class="motion-footer__nav">
+                        <?= $footerNavHtml ?>
+                    </div>
                 </div>
-            <?php else : ?>
-                <a href="<?= esc_html($loginUrl) ?>" class="text-sm text-gray-700 hover:text-gray-900 font-medium nav-link">Login</a>
-            <?php endif; ?>
+
+                <div class="motion-footer__col">
+                    <h3 class="motion-footer__title">Recent posts</h3>
+                    <?php if (!empty($recentPosts)) : ?>
+                        <ul class="motion-footer__list">
+                            <?php foreach ($recentPosts as $post) : ?>
+                                <li>
+                                    <a class="motion-footer__link" href="<?= esc_html($post['path']) ?>">
+                                        <?= esc_html($post['label']) ?>
+                                    </a>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else : ?>
+                        <p class="motion-footer__empty">No posts yet.</p>
+                    <?php endif; ?>
+                </div>
+
+                <div class="motion-footer__col">
+                    <h3 class="motion-footer__title">Account</h3>
+                    <ul class="motion-footer__list">
+                        <?php foreach ($footerLinks as $link) : ?>
+                            <li>
+                                <a class="motion-footer__link" href="<?= esc_html($link['href']) ?>">
+                                    <?= esc_html($link['label']) ?>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                        <?php if ($showLogout) : ?>
+                            <li>
+                                <button id="admin-logout-btn" class="motion-footer__button">Logout</button>
+                            </li>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="motion-footer__meta">
+                <!-- Copyright/Branding. I'd appreciate it if you left this in your themes. -->
+                <p class="text-sm text-gray-500">
+                    Powered by <a href="https://flintcms.com" target="_blank" title="A flat file CMS built on Markdown" class="text-gray-700 hover:text-gray-900 font-medium">Flint</a>
+                </p>
+            </div>
         </div>
     </footer>
 

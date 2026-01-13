@@ -54,9 +54,9 @@ echo "Hello from Flint!";
 
 ### Image embed
 
-Easily embed an image with: `![](/site/uploads/catjam.gif)`. Example:
+Easily embed an image with: `![](/uploads/catjam.gif)`. Example:
 
-![](/site/uploads/catjam.gif)
+![](/uploads/catjam.gif)
 
 ### Video embed
 

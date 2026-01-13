@@ -12,6 +12,7 @@ class App
     public readonly string $root;
     public readonly string $appDir;
     public readonly Scheduler $scheduler;
+    private bool $themeHooksRegistered = false;
 
     /**
      * Bootstrap the application with app and root directories.
@@ -120,6 +121,25 @@ class App
     }
 
     /**
+     * Register CMS-level theme hooks once per request.
+     */
+    private function registerThemeHooks(string $themeName, string $themeDirectory): void
+    {
+        if ($this->themeHooksRegistered) {
+            return;
+        }
+
+        $this->themeHooksRegistered = true;
+
+        $themeStylesPath = $themeDirectory . '/theme.css';
+        if (is_file($themeStylesPath)) {
+            HookManager::on('theme_styles', function () use ($themeName): void {
+                echo '<link rel="stylesheet" href="' . theme_asset('theme.css', $themeName) . '">' . "\n";
+            }, 20);
+        }
+    }
+
+    /**
      * Orchestrate the request lifecycle from routing to rendering.
      */
     public function run(): void
@@ -202,10 +222,12 @@ class App
             }
         }
 
-        // Serve static files from /site/uploads/.
-        if (str_starts_with($requestPath, '/site/uploads/')) {
+        // Serve static files from /uploads/ (preferred) and /site/uploads/ (legacy).
+        if (str_starts_with($requestPath, '/uploads/') || str_starts_with($requestPath, '/site/uploads/')) {
             // Allow direct access to user-uploaded media.
-            $uploadFilePath = $this->root . $requestPath;
+            $uploadFilePath = str_starts_with($requestPath, '/uploads/')
+                ? $this->root . '/site' . $requestPath
+                : $this->root . $requestPath;
 
             // Security: Validate path stays within uploads directory.
             $realUploadPath = realpath($uploadFilePath);
@@ -781,7 +803,7 @@ class App
             }
 
             // Return success with file URL.
-            $fileUrl = '/site/uploads/' . $yearMonth . '/' . $finalFilename;
+            $fileUrl = '/uploads/' . $yearMonth . '/' . $finalFilename;
             echo json_encode([
                 'success' => true,
                 'url' => $fileUrl,
@@ -1965,6 +1987,7 @@ class App
 
         // Prepare the data available to the theme.
         $themeData = [
+            'app' => $this,
             'site' => $this->config['site'],
             'page' => $pagePayload,
             'content' => $pagePayload['content_html'],
@@ -1986,6 +2009,8 @@ class App
         }
 
         ThemeContext::set($themeData);
+
+        $this->registerThemeHooks($themeName, $themeDirectory);
 
         // Include theme helpers if they exist.
         if (file_exists($themeDirectory . '/helpers.php')) {
@@ -4028,7 +4053,6 @@ class App
             $this->root . '/site/components',
             $this->root . '/site/themes',
             $this->appDir . '/core',
-            $this->appDir . '/core/components',
         ];
 
         // Create missing index.php sentinel files.
