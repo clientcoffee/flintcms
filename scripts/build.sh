@@ -171,6 +171,12 @@ if [[ -f "${workspace_root}/LICENSE" ]]; then
   cp "${workspace_root}/LICENSE" "${dist_root}/LICENSE"
 fi
 
+# Copy README to root (if exists)
+if [[ -f "${workspace_root}/README.md" ]]; then
+  echo -e "${BLUE}Copying README.md...${NC}"
+  cp "${workspace_root}/README.md" "${dist_root}/README.md"
+fi
+
 # Copy UPDATES.md to root (if exists)
 if [[ -f "${workspace_root}/UPDATES.md" ]]; then
   echo -e "${BLUE}Copying UPDATES.md...${NC}"
@@ -193,7 +199,7 @@ echo -e "${BLUE}Validating build...${NC}"
 validation_errors=0
 
 # Check for required files
-required_files=("app/index.php" "site/config.example.php" "app/core/App.php" "site/themes")
+required_files=("app/index.php" "site/config.example.php" "app/core/App.php" "site/themes" "README.md")
 for file in "${required_files[@]}"; do
   if [[ ! -e "${dist_root}/${file}" ]]; then
     echo -e "${RED}✗ Missing required file/directory: ${file}${NC}"
