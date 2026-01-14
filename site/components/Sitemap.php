@@ -13,7 +13,7 @@ class Sitemap extends RenderComponent
     public static function render(array $props, string $content): string
     {
         // Resolve the app instance for filesystem access.
-        $app = self::getApp();
+        $app = get_app();
         if (!$app) {
             return '';
         }
@@ -31,16 +31,16 @@ class Sitemap extends RenderComponent
 
         // Collect list attributes for the wrapper.
         $attrs = [
-            'class' => trim((string)self::prop($props, 'class', 'sitemap'))
+            'class' => trim((string)prop($props, 'class', 'sitemap'))
         ];
-        $id = trim((string)self::prop($props, 'id', ''));
+        $id = trim((string)prop($props, 'id', ''));
         if ($id !== '') {
             $attrs['id'] = $id;
         }
 
         ob_start();
         ?>
-        <ul <?= self::buildAttributes($attrs) ?>>
+        <ul <?= html_attrs($attrs) ?>>
             <?= self::renderItems($items, $isAdmin) ?>
         </ul>
         <?php
@@ -92,9 +92,9 @@ class Sitemap extends RenderComponent
             }
 
             $relativeFile = ltrim($relativeDir . '/' . $entry, '/');
-            $slug = self::slugFromRelative($relativeFile);
-            $meta = self::extractFrontmatter($fullPath);
-            $status = self::resolveStatus($meta);
+            $slug = slug_from_path($relativeFile);
+            $meta = extract_frontmatter($fullPath);
+            $status = resolve_status($meta);
 
             if (!$includePrivate && in_array($status, ['hidden', 'draft'], true)) {
                 continue;
@@ -129,7 +129,7 @@ class Sitemap extends RenderComponent
             if ($item['type'] === 'directory') {
                 ?>
                 <li class="sitemap__group">
-                    <span class="sitemap__group-label"><?= self::escape($item['label']) ?></span>
+                    <span class="sitemap__group-label"><?= esc_html($item['label']) ?></span>
                     <ul class="sitemap__group-list">
                         <?= self::renderItems($item['children'], $isAdmin) ?>
                     </ul>
@@ -148,8 +148,8 @@ class Sitemap extends RenderComponent
             }
             ?>
             <li class="sitemap__item<?= $statusClass ?>">
-                <a class="sitemap__link" href="<?= self::escape($item['path']) ?>">
-                    <?= self::escape($item['label']) ?>
+                <a class="sitemap__link" href="<?= esc_html($item['path']) ?>">
+                    <?= esc_html($item['label']) ?>
                 </a>
                 <?php if ($isAdmin && $isHidden) : ?>
                     <?= self::statusIcon('hidden', 'Hidden') ?>
@@ -179,89 +179,13 @@ class Sitemap extends RenderComponent
 
         ob_start();
         ?>
-        <svg class="sitemap__icon" role="img" aria-label="<?= self::escape($label) ?>" viewBox="0 0 24 24" width="14" height="14"
+        <svg class="sitemap__icon" role="img" aria-label="<?= esc_html($label) ?>" viewBox="0 0 24 24" width="14" height="14"
             fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <?= $path ?>
         </svg>
         <?php
 
         return trim((string)ob_get_clean());
-    }
-
-    private static function extractFrontmatter(string $filePath): array
-    {
-        // Read frontmatter only when present at the top of the file.
-        $contents = file_get_contents($filePath);
-        if ($contents === false || !str_starts_with($contents, "---")) {
-            return [];
-        }
-
-        $parts = preg_split('/^---$/m', $contents, 3);
-        if (!is_array($parts) || count($parts) !== 3) {
-            return [];
-        }
-
-        return self::parseYamlLite($parts[1]);
-    }
-
-    private static function parseYamlLite(string $yamlText): array
-    {
-        // Parse simple key:value YAML without nesting.
-        $metadata = [];
-        $lines = explode("\n", $yamlText);
-
-        foreach ($lines as $line) {
-            if (!str_contains($line, ':')) {
-                continue;
-            }
-
-            [$keyText, $valueText] = explode(':', $line, 2);
-            $key = trim($keyText);
-            if ($key === '') {
-                continue;
-            }
-
-            $value = trim(trim($valueText), "\"'");
-            $metadata[$key] = $value;
-        }
-
-        return $metadata;
-    }
-
-    private static function resolveStatus(array $meta): string
-    {
-        // Resolve status with draft override semantics.
-        $status = strtolower(trim((string)($meta['status'] ?? 'published')));
-
-        if ($status === '') {
-            $status = 'published';
-        }
-
-        $draftFlag = strtolower(trim((string)($meta['draft'] ?? '')));
-        if (in_array($draftFlag, ['1', 'true', 'yes', 'on'], true)) {
-            $status = 'draft';
-        }
-
-        return $status;
-    }
-
-    private static function slugFromRelative(string $relativeFile): string
-    {
-        // Convert a relative path to a route slug.
-        $relativeFile = str_replace('\\', '/', $relativeFile);
-        $trimmed = preg_replace('/\.(md|mdx)$/i', '', $relativeFile);
-        $trimmed = ltrim($trimmed, '/');
-        $baseName = basename($trimmed);
-
-        if ($baseName === 'index') {
-            $dir = trim(dirname($trimmed), '.');
-            if ($dir === '' || $dir === '.') {
-                return '/';
-            }
-            return '/' . $dir;
-        }
-
-        return '/' . $trimmed;
     }
 
     private static function labelFromRelative(string $relativeFile, string $slug): string

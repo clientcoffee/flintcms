@@ -12,10 +12,10 @@ class ProgressBar extends RenderComponent
     public static function render(array $props, string $content): string
     {
         // Group numeric inputs and label text.
-        $progressLabel = self::prop($props, 'label');
-        $currentValue = (float)self::prop($props, 'value', 0);
-        $maximumValue = (float)self::prop($props, 'max', 100);
-        $showValueText = self::prop($props, 'show_value', 'true') !== 'false';
+        $progressLabel = prop($props, 'label');
+        $currentValue = (float)prop($props, 'value', 0);
+        $maximumValue = (float)prop($props, 'max', 100);
+        $showValueText = prop($props, 'show_value', 'true') !== 'false';
 
         // Normalize invalid max values.
         if ($maximumValue <= 0) {
@@ -32,9 +32,9 @@ class ProgressBar extends RenderComponent
         ?>
         <div class="motion-progress my-6">
             <div class="mb-2 flex items-center justify-between text-sm">
-                <span class="font-semibold text-gray-700"><?= self::escape($progressLabel) ?></span>
+                <span class="font-semibold text-gray-700"><?= esc_html($progressLabel) ?></span>
                 <?php if ($showValueText) : ?>
-                    <span class="text-gray-500"><?= self::escape($valueText) ?></span>
+                    <span class="text-gray-500"><?= esc_html($valueText) ?></span>
                 <?php endif; ?>
             </div>
             <div class="h-3 w-full rounded-full bg-gray-200">

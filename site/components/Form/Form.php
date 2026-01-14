@@ -26,7 +26,7 @@ class Form extends BaseComponent
      */
     protected static function registerHooks(): void
     {
-        self::registerHook('custom_api_endpoints', [self::class, 'handleApiEndpoints']);
+        self::register_hook('custom_api_endpoints', [self::class, 'handleApiEndpoints']);
     }
 
     /**
@@ -109,7 +109,7 @@ class Form extends BaseComponent
                 HookManager::trigger('request_start', [
                     'path' => '/api/form',
                     'method' => 'POST',
-                    'ip' => self::getClientIp(),
+                    'ip' => get_client_ip(),
                     'context' => 'form_abuse'
                 ]);
             }
@@ -225,7 +225,7 @@ class Form extends BaseComponent
                 HookManager::trigger('request_start', [
                     'path' => '/api/contact',
                     'method' => 'POST',
-                    'ip' => self::getClientIp(),
+                    'ip' => get_client_ip(),
                     'context' => 'form_abuse'
                 ]);
             }
@@ -255,7 +255,7 @@ class Form extends BaseComponent
                     'message' => $safeMessageBody,
                     'submitted_at' => time(),
                     'submitted_from' => $payload['from'] ?? $_SERVER['HTTP_REFERER'] ?? '',
-                    'ip_address' => self::getClientIp(),
+                    'ip_address' => get_client_ip(),
                 ]
             );
         }
@@ -276,23 +276,13 @@ class Form extends BaseComponent
     }
 
     /**
-     * Sanitize email header value to prevent header injection attacks.
-     */
-    private static function sanitizeEmailHeader(string $value): string
-    {
-        // Remove any characters that could be used for header injection.
-        // This includes newlines, carriage returns, and null bytes.
-        return str_replace(["\r", "\n", "\0", "%0a", "%0d"], '', $value);
-    }
-
-    /**
      * Check IP-based rate limiting (10 requests per 60 seconds).
      *
      * @return bool True if rate limit exceeded, false otherwise.
      */
     private static function isRateLimited(): bool
     {
-        $ip = self::getClientIp();
+        $ip = get_client_ip();
         $rateLimitFile = self::$app->root . '/site/submissions/.rate-limit-' . md5($ip) . '.json';
         $now = time();
         $windowSize = 60; // seconds.
@@ -340,7 +330,7 @@ class Form extends BaseComponent
         // Build email body.
         $emailBody = "New form submission from: {$formName}\n\n";
         $emailBody .= "Submitted: " . date('Y-m-d H:i:s') . "\n";
-        $emailBody .= "IP Address: " . self::getClientIp() . "\n";
+        $emailBody .= "IP Address: " . get_client_ip() . "\n";
         $emailBody .= "Referrer: " . ($_SERVER['HTTP_REFERER'] ?? 'Direct') . "\n\n";
         $emailBody .= "Form Data:\n";
         $emailBody .= str_repeat('-', 50) . "\n\n";
@@ -357,9 +347,9 @@ class Form extends BaseComponent
         }
 
         // Email headers (sanitize all values to prevent header injection).
-        $siteName = self::sanitizeEmailHeader(self::$app->config['site']['name'] ?? 'Flint');
-        $serverName = self::sanitizeEmailHeader($_SERVER['SERVER_NAME'] ?? 'localhost');
-        $safeFormName = self::sanitizeEmailHeader($formName);
+        $siteName = sanitize_email_header(self::$app->config['site']['name'] ?? 'Flint');
+        $serverName = sanitize_email_header($_SERVER['SERVER_NAME'] ?? 'localhost');
+        $safeFormName = sanitize_email_header($formName);
 
         $subject = "[{$siteName}] New {$safeFormName} submission";
         $headers = "From: {$siteName} <noreply@{$serverName}>\r\n";
@@ -416,16 +406,16 @@ class Form extends BaseComponent
         }
 
         // Sanitize all email header values to prevent header injection.
-        $safeReplyEmail = self::sanitizeEmailHeader($senderEmail);
+        $safeReplyEmail = sanitize_email_header($senderEmail);
         if ($safeReplyEmail === '' || !filter_var($safeReplyEmail, FILTER_VALIDATE_EMAIL)) {
             error_log("Invalid reply-to email");
             return false;
         }
 
         // Email headers (all values sanitized).
-        $siteName = self::sanitizeEmailHeader(self::$app->config['site']['name'] ?? 'Flint');
-        $serverName = self::sanitizeEmailHeader($_SERVER['SERVER_NAME'] ?? 'localhost');
-        $safeSubject = self::sanitizeEmailHeader($subjectLine);
+        $siteName = sanitize_email_header(self::$app->config['site']['name'] ?? 'Flint');
+        $serverName = sanitize_email_header($_SERVER['SERVER_NAME'] ?? 'localhost');
+        $safeSubject = sanitize_email_header($subjectLine);
 
         $headers = "From: {$siteName} <noreply@{$serverName}>\r\n";
         $headers .= "Reply-To: {$safeReplyEmail}\r\n";
@@ -472,13 +462,13 @@ class Form extends BaseComponent
      */
     public static function render(array $props, string $content): string
     {
-        $name = self::prop($props, 'name', 'contact');
-        $class = self::prop($props, 'class', 'space-y-4');
-        $fieldsRaw = self::contentOrProp($content, $props, 'fields');
-        $submitText = self::prop($props, 'submit', 'Submit');
-        $submitClass = self::prop($props, 'submit_class', 'w-full bg-gray-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-800 transition');
-        $successMessage = self::prop($props, 'success', 'Thank you! Your submission has been received.');
-        $redirectUrl = self::prop($props, 'redirect');
+        $name = prop($props, 'name', 'contact');
+        $class = prop($props, 'class', 'space-y-4');
+        $fieldsRaw = content_or_prop($content, $props, 'fields');
+        $submitText = prop($props, 'submit', 'Submit');
+        $submitClass = prop($props, 'submit_class', 'w-full bg-gray-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-800 transition');
+        $successMessage = prop($props, 'success', 'Thank you! Your submission has been received.');
+        $redirectUrl = prop($props, 'redirect');
 
         // Parse fields.
         $fields = self::parseFields($fieldsRaw);
@@ -503,13 +493,13 @@ class Form extends BaseComponent
 
         ob_start();
         ?>
-        <form <?= self::buildAttributes($formAttrs) ?>>
+        <form <?= html_attrs($formAttrs) ?>>
             <!-- Hidden fields. -->
-            <input type="hidden" name="form_token" value="<?= self::escape($formToken) ?>" />
-            <input type="hidden" name="form_name" value="<?= self::escape($name) ?>" />
-            <input type="hidden" name="success_message" value="<?= self::escape($successMessage) ?>" />
+            <input type="hidden" name="form_token" value="<?= esc_html($formToken) ?>" />
+            <input type="hidden" name="form_name" value="<?= esc_html($name) ?>" />
+            <input type="hidden" name="success_message" value="<?= esc_html($successMessage) ?>" />
             <?php if ($redirectUrl) : ?>
-                <input type="hidden" name="redirect_url" value="<?= self::escape($redirectUrl) ?>" />
+                <input type="hidden" name="redirect_url" value="<?= esc_html($redirectUrl) ?>" />
             <?php endif; ?>
 
             <!-- Render fields. -->
@@ -519,8 +509,8 @@ class Form extends BaseComponent
 
             <!-- Submit button. -->
             <div>
-                <button type="submit" class="<?= self::escape($submitClass) ?>">
-                    <?= self::escape($submitText) ?>
+                <button type="submit" class="<?= esc_html($submitClass) ?>">
+                    <?= esc_html($submitText) ?>
                 </button>
             </div>
         </form>
@@ -587,8 +577,8 @@ class Form extends BaseComponent
         ?>
         <div>
             <?php if ($label !== '') : ?>
-                <label <?= self::buildAttributes($labelAttrs) ?>>
-                    <?= self::escape($label) ?>
+                <label <?= html_attrs($labelAttrs) ?>>
+                    <?= esc_html($label) ?>
                     <?php if ($required) : ?>
                         <span class="text-red-500 ml-1">*</span>
                     <?php endif; ?>
@@ -606,7 +596,7 @@ class Form extends BaseComponent
                     'class' => $fieldClass
                 ];
                 ?>
-                <textarea <?= self::buildAttributes($attrs) ?>></textarea>
+                <textarea <?= html_attrs($attrs) ?>></textarea>
             <?php elseif ($type === 'select') : ?>
                 <?php
                 $attrs = [
@@ -617,11 +607,11 @@ class Form extends BaseComponent
                 ];
                 $options = explode(',', $field['options']);
                 ?>
-                <select <?= self::buildAttributes($attrs) ?>>
+                <select <?= html_attrs($attrs) ?>>
                     <?php foreach ($options as $option) : ?>
                         <?php $option = trim($option); ?>
                         <?php if ($option !== '') : ?>
-                            <option value="<?= self::escape($option) ?>"><?= self::escape($option) ?></option>
+                            <option value="<?= esc_html($option) ?>"><?= esc_html($option) ?></option>
                         <?php endif; ?>
                     <?php endforeach; ?>
                 </select>
@@ -636,10 +626,10 @@ class Form extends BaseComponent
                 ];
                 ?>
                 <div class="flex items-center">
-                    <input <?= self::buildAttributes($attrs) ?> />
+                    <input <?= html_attrs($attrs) ?> />
                     <?php if ($placeholder) : ?>
-                        <label for="<?= self::escape($name) ?>" class="ml-2 text-sm text-gray-600">
-                            <?= self::escape($placeholder) ?>
+                        <label for="<?= esc_html($name) ?>" class="ml-2 text-sm text-gray-600">
+                            <?= esc_html($placeholder) ?>
                         </label>
                     <?php endif; ?>
                 </div>
@@ -654,7 +644,7 @@ class Form extends BaseComponent
                     'class' => $fieldClass
                 ];
                 ?>
-                <input <?= self::buildAttributes($attrs) ?> />
+                <input <?= html_attrs($attrs) ?> />
             <?php endif; ?>
         </div>
         <?php
@@ -663,40 +653,8 @@ class Form extends BaseComponent
     }
 
     /**
-     * Helper methods from RenderComponent.
+     * Split multiline field definitions into rows.
      */
-    protected static function prop(array $props, string $key, mixed $default = ''): mixed
-    {
-        return $props[$key] ?? $default;
-    }
-
-    protected static function contentOrProp(string $content, array $props, string $propKey): string
-    {
-        $trimmedContent = trim($content);
-        return $trimmedContent !== '' ? $trimmedContent : (string)($props[$propKey] ?? '');
-    }
-
-    protected static function escape(string $text): string
-    {
-        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
-    }
-
-    protected static function buildAttributes(array $attributes): string
-    {
-        $attrs = [];
-        foreach ($attributes as $key => $value) {
-            if ($value === null || $value === false) {
-                continue;
-            }
-            if ($value === true) {
-                $attrs[] = $key;
-            } else {
-                $attrs[] = $key . '="' . htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8') . '"';
-            }
-        }
-        return implode(' ', $attrs);
-    }
-
     protected static function parseList(string $text): array
     {
         $lines = preg_split('/\r?\n|;/', $text);

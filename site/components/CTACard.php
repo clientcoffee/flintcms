@@ -12,12 +12,12 @@ class CTACard extends RenderComponent
     public static function render(array $props, string $content): string
     {
         // Group primary call-to-action content.
-        $cardTitle = self::prop($props, 'title');
-        $cardBody = self::contentOrProp($content, $props, 'body');
-        $primaryButtonText = self::prop($props, 'button_text', 'Get Started');
-        $primaryButtonUrl = self::prop($props, 'button_url', '#');
-        $secondaryButtonText = self::prop($props, 'secondary_text');
-        $secondaryButtonUrl = self::prop($props, 'secondary_url');
+        $cardTitle = prop($props, 'title');
+        $cardBody = content_or_prop($content, $props, 'body');
+        $primaryButtonText = prop($props, 'button_text', 'Get Started');
+        $primaryButtonUrl = prop($props, 'button_url', '#');
+        $secondaryButtonText = prop($props, 'secondary_text');
+        $secondaryButtonUrl = prop($props, 'secondary_url');
 
         // Exit early if there is nothing to display.
         if ($cardTitle === '' && $cardBody === '') {
@@ -28,18 +28,18 @@ class CTACard extends RenderComponent
         ?>
         <div class="motion-cta my-8 rounded-3xl border border-gray-200 bg-gradient-to-br from-white via-white to-gray-100 p-6 shadow-sm">
             <?php if ($cardTitle !== '') : ?>
-                <h3 class="text-xl font-semibold text-gray-900"><?= self::escape($cardTitle) ?></h3>
+                <h3 class="text-xl font-semibold text-gray-900"><?= esc_html($cardTitle) ?></h3>
             <?php endif; ?>
             <?php if ($cardBody !== '') : ?>
-                <p class="mt-2 text-sm text-gray-600"><?= self::escape($cardBody) ?></p>
+                <p class="mt-2 text-sm text-gray-600"><?= esc_html($cardBody) ?></p>
             <?php endif; ?>
             <div class="mt-4 flex flex-wrap gap-3">
-                <a class="inline-flex items-center rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800" href="<?= self::escape($primaryButtonUrl) ?>">
-                    <?= self::escape($primaryButtonText) ?>
+                <a class="inline-flex items-center rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800" href="<?= esc_html($primaryButtonUrl) ?>">
+                    <?= esc_html($primaryButtonText) ?>
                 </a>
                 <?php if ($secondaryButtonText !== '' && $secondaryButtonUrl !== '') : ?>
-                    <a class="inline-flex items-center rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-white" href="<?= self::escape($secondaryButtonUrl) ?>">
-                        <?= self::escape($secondaryButtonText) ?>
+                    <a class="inline-flex items-center rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-white" href="<?= esc_html($secondaryButtonUrl) ?>">
+                        <?= esc_html($secondaryButtonText) ?>
                     </a>
                 <?php endif; ?>
             </div>

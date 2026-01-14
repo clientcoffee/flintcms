@@ -10,7 +10,7 @@ class ChildrenNav extends ContentNavBase
     public static function render(array $props, string $content): string
     {
         // Resolve the current page context and ensure this is an index page.
-        $context = self::resolveCurrentContext();
+        $context = resolve_current_context();
         if ($context === null || !$context['isIndex']) {
             return '';
         }
@@ -21,10 +21,10 @@ class ChildrenNav extends ContentNavBase
         }
 
         // Collect child pages within the current directory.
-        $children = self::listChildPages(
+        $children = list_child_pages(
             $context['dirPath'],
             $context['relativeDir'],
-            self::isAdmin(),
+            is_admin(),
             true
         );
 
@@ -33,21 +33,21 @@ class ChildrenNav extends ContentNavBase
         }
 
         // Normalize display props.
-        $title = trim((string)self::prop($props, 'title', 'More in this section'));
-        $wrapperClass = trim('motion-children-nav ' . (string)self::prop($props, 'class', ''));
+        $title = trim((string)prop($props, 'title', 'More in this section'));
+        $wrapperClass = trim('motion-children-nav ' . (string)prop($props, 'class', ''));
 
         ob_start();
         ?>
-        <section class="<?= self::escape($wrapperClass) ?>">
+        <section class="<?= esc_html($wrapperClass) ?>">
             <?php if ($title !== '') : ?>
-                <h2 class="motion-children-nav__title"><?= self::escape($title) ?></h2>
+                <h2 class="motion-children-nav__title"><?= esc_html($title) ?></h2>
             <?php endif; ?>
 
             <ul class="motion-children-nav__list">
                 <?php foreach ($children as $child) : ?>
                     <li>
-                        <a class="motion-children-nav__link" href="<?= self::escape($child['path']) ?>">
-                            <?= self::escape($child['label']) ?>
+                        <a class="motion-children-nav__link" href="<?= esc_html($child['path']) ?>">
+                            <?= esc_html($child['label']) ?>
                         </a>
                     </li>
                 <?php endforeach; ?>

@@ -12,7 +12,7 @@ class Accordion extends RenderComponent
     public static function render(array $props, string $content): string
     {
         // Collect and normalize the accordion items.
-        $rawItemsText = self::contentOrProp($content, $props, 'items');
+        $rawItemsText = content_or_prop($content, $props, 'items');
         $accordionItems = self::parseItems($rawItemsText);
 
         // Exit early when there is nothing to render.
@@ -21,15 +21,15 @@ class Accordion extends RenderComponent
         }
 
         // Compute display flags used by the markup block.
-        $openFirstPanel = self::prop($props, 'open') === 'first';
+        $openFirstPanel = prop($props, 'open') === 'first';
 
         ob_start();
         ?>
         <div class="motion-accordion my-6 space-y-3">
             <?php foreach ($accordionItems as $panelIndex => $panelData) : ?>
                 <?php
-                $panelTitle = self::escape($panelData['title']);
-                $panelBody = self::escape($panelData['body']);
+                $panelTitle = esc_html($panelData['title']);
+                $panelBody = esc_html($panelData['body']);
                 $openAttribute = ($openFirstPanel && $panelIndex === 0) ? ' open' : '';
                 ?>
                 <details class="group rounded-2xl border border-gray-200 bg-white/80 shadow-sm"<?= $openAttribute ?>>
@@ -53,9 +53,9 @@ class Accordion extends RenderComponent
     private static function parseItems(string $rawItemsText): array
     {
         // Try :: delimiter first, fallback to |.
-        $items = self::parseKeyValue($rawItemsText, '::');
+        $items = parse_key_value($rawItemsText, '::');
         if (empty($items)) {
-            $items = self::parseKeyValue($rawItemsText, '|');
+            $items = parse_key_value($rawItemsText, '|');
         }
 
         // Convert to the accordion-friendly shape.
