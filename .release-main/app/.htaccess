@@ -1,3 +1,0 @@
-# Deny all web access to app directory
-Order Allow,Deny
-Deny from all

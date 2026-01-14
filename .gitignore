@@ -20,6 +20,7 @@ node_modules/
 
 # Build artifacts
 dist/
+.release-*/
 
 # Test artifacts
 .phpunit.cache/

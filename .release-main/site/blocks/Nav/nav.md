@@ -1,5 +1,0 @@
-- [Home](/)
-- [About](/about)
-- [Blog](/blog)
-- [Markdown Demo](/markdown-demo)
-- [Contact](/contact)
