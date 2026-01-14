@@ -13,7 +13,7 @@ class UpdateChecker
     private array $config;
     private string $cacheFile;
     private const CACHE_DURATION = 3600; // 1 hour
-    private const GITHUB_REPO = 'yourname/flint'; // Update with actual repo
+    private const UPDATE_REPO = 'clientcoffee/flintcms';
 
     public function __construct(string $appDir, string $rootDir, array $config)
     {
@@ -68,7 +68,7 @@ class UpdateChecker
      */
     private function fetchLatestRelease(): ?array
     {
-        $url = "https://api.github.com/repos/" . self::GITHUB_REPO . "/releases/latest";
+        $url = "https://api.github.com/repos/" . self::UPDATE_REPO . "/releases/latest";
 
         $context = stream_context_create([
             'http' => [
