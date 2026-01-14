@@ -21,7 +21,7 @@ class GoogleTagManager extends RenderComponent
      */
     public static function render(array $props, string $content): string
     {
-        $containerId = self::prop($props, 'container_id', '');
+        $containerId = prop($props, 'container_id', '');
 
         // If no container ID is provided, return empty string.
         if (empty($containerId)) {
@@ -29,7 +29,7 @@ class GoogleTagManager extends RenderComponent
         }
 
         // Escape the container ID for safety.
-        $safeContainerId = self::escape($containerId);
+        $safeContainerId = esc_html($containerId);
 
         // Return Google Tag Manager head script.
         ob_start();

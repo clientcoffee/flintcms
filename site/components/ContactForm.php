@@ -13,15 +13,15 @@ class ContactForm extends RenderComponent
     public static function render(array $props, string $content): string
     {
         // Normalize form configuration inputs.
-        $formName = trim((string) self::prop($props, 'name', 'contact'));
-        $formId = trim((string) self::prop($props, 'id', 'contact-form'));
-        $fieldsBlock = trim((string) self::prop($props, 'fields', 'contact-form'));
-        $formClass = self::prop($props, 'class', 'max-w-2xl mx-auto space-y-6');
-        $wrapperClass = self::prop($props, 'wrapper_class', 'my-8');
-        $submitText = self::prop($props, 'submit', 'Send Message');
-        $submitClass = self::prop($props, 'submit_class', 'inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 transition-colors font-medium');
-        $successMessage = self::prop($props, 'success', 'Thank you! Your message has been sent successfully.');
-        $redirectUrl = self::prop($props, 'redirect', '');
+        $formName = trim((string) prop($props, 'name', 'contact'));
+        $formId = trim((string) prop($props, 'id', 'contact-form'));
+        $fieldsBlock = trim((string) prop($props, 'fields', 'contact-form'));
+        $formClass = prop($props, 'class', 'max-w-2xl mx-auto space-y-6');
+        $wrapperClass = prop($props, 'wrapper_class', 'my-8');
+        $submitText = prop($props, 'submit', 'Send Message');
+        $submitClass = prop($props, 'submit_class', 'inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 transition-colors font-medium');
+        $successMessage = prop($props, 'success', 'Thank you! Your message has been sent successfully.');
+        $redirectUrl = prop($props, 'redirect', '');
 
         // Prefer inline fields, fallback to a reusable block.
         $fieldsHtml = trim($content) !== '' ? $content : self::loadBlockFields($fieldsBlock);
@@ -44,30 +44,30 @@ class ContactForm extends RenderComponent
 
         ob_start();
         ?>
-        <div class="<?= self::escape($wrapperClass) ?>">
-            <div id="<?= self::escape($messageId) ?>" class="hidden mb-4 rounded-2xl border px-4 py-3 text-sm"></div>
-            <form id="<?= self::escape($formId) ?>" class="<?= self::escape($formClass) ?>" action="/api/form" method="POST">
+        <div class="<?= esc_html($wrapperClass) ?>">
+            <div id="<?= esc_html($messageId) ?>" class="hidden mb-4 rounded-2xl border px-4 py-3 text-sm"></div>
+            <form id="<?= esc_html($formId) ?>" class="<?= esc_html($formClass) ?>" action="/api/form" method="POST">
                 <!-- Honeypot fields. -->
                 <input type="text" name="website" style="position:absolute;left:-9999px;width:1px;height:1px" tabindex="-1" autocomplete="off">
                 <input type="text" name="url" style="position:absolute;left:-9999px;width:1px;height:1px" tabindex="-1" autocomplete="off">
                 <input type="text" name="company" style="position:absolute;left:-9999px;width:1px;height:1px" tabindex="-1" autocomplete="off">
 
                 <!-- Defense tokens. -->
-                <input type="hidden" name="form_token" value="<?= self::escape($formToken) ?>">
-                <input type="hidden" name="form_name" value="<?= self::escape($formName) ?>">
-                <input type="hidden" name="success_message" value="<?= self::escape($successMessage) ?>">
+                <input type="hidden" name="form_token" value="<?= esc_html($formToken) ?>">
+                <input type="hidden" name="form_name" value="<?= esc_html($formName) ?>">
+                <input type="hidden" name="success_message" value="<?= esc_html($successMessage) ?>">
                 <?php if ($redirectUrl !== '') : ?>
-                    <input type="hidden" name="redirect_url" value="<?= self::escape($redirectUrl) ?>">
+                    <input type="hidden" name="redirect_url" value="<?= esc_html($redirectUrl) ?>">
                 <?php endif; ?>
-                <input type="hidden" name="field_order" value="<?= self::escape($fieldOrder) ?>">
+                <input type="hidden" name="field_order" value="<?= esc_html($fieldOrder) ?>">
                 <input type="hidden" name="mouse_entropy" value="0">
                 <input type="hidden" name="page_title" value="">
                 <input type="hidden" name="page_url" value="">
 
                 <?= $fieldsHtml ?>
 
-                <button type="submit" class="<?= self::escape($submitClass) ?>">
-                    <span><?= self::escape($submitText) ?></span>
+                <button type="submit" class="<?= esc_html($submitClass) ?>">
+                    <span><?= esc_html($submitText) ?></span>
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"></path>
                     </svg>
@@ -181,7 +181,7 @@ class ContactForm extends RenderComponent
     private static function loadBlockFields(string $blockName): string
     {
         // Look up the app to resolve block paths.
-        $app = self::getApp();
+        $app = get_app();
         if ($app === null) {
             return '';
         }

@@ -1,6 +1,7 @@
 <?php
 
 use Flint\HookManager;
+use Flint\Paths;
 use Flint\ThemeContext;
 
 if (!function_exists('esc_html')) {
@@ -20,6 +21,606 @@ if (!function_exists('esc_html')) {
         $text = str_replace("\0", '', (string)$value);
 
         return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8', false);
+    }
+}
+
+if (!function_exists('prop')) {
+    /**
+     * Read a prop value with a default fallback.
+     */
+    function prop(array $props, string $key, mixed $default = ''): mixed
+    {
+        return $props[$key] ?? $default;
+    }
+}
+
+if (!function_exists('content_or_prop')) {
+    /**
+     * Prefer inline content over a prop value.
+     */
+    function content_or_prop(string $content, array $props, string $propKey): string
+    {
+        $trimmedContent = trim($content);
+        if ($trimmedContent !== '') {
+            return $trimmedContent;
+        }
+
+        return trim((string)($props[$propKey] ?? ''));
+    }
+}
+
+if (!function_exists('html_attrs')) {
+    /**
+     * Build HTML attributes from a key/value array.
+     */
+    function html_attrs(array $attributes): string
+    {
+        $attributeParts = [];
+
+        foreach ($attributes as $attributeName => $attributeValue) {
+            if ($attributeValue === true) {
+                $attributeParts[] = esc_html($attributeName);
+                continue;
+            }
+
+            if ($attributeValue !== false && $attributeValue !== null) {
+                $escapedName = esc_html($attributeName);
+                $escapedValue = esc_html((string)$attributeValue);
+                $attributeParts[] = $escapedName . '="' . $escapedValue . '"';
+            }
+        }
+
+        return implode(' ', $attributeParts);
+    }
+}
+
+if (!function_exists('parse_key_value')) {
+    /**
+     * Parse key/value pairs from a delimited list.
+     */
+    function parse_key_value(string $text, string $delimiter = '|'): array
+    {
+        $trimmed = trim($text);
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $lines = preg_split('/\r?\n|;/', $trimmed) ?: [];
+        $parsedPairs = [];
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || !str_contains($line, $delimiter)) {
+                continue;
+            }
+
+            $parts = explode($delimiter, $line, 2);
+            $key = trim($parts[0] ?? '');
+            $value = trim($parts[1] ?? '');
+
+            if ($key !== '' && $value !== '') {
+                $parsedPairs[] = ['key' => $key, 'value' => $value];
+            }
+        }
+
+        return $parsedPairs;
+    }
+}
+
+if (!function_exists('parse_markdown_list')) {
+    /**
+     * Parse a markdown bullet list into a nested array.
+     */
+    function parse_markdown_list(string $text): array
+    {
+        if (trim($text) === '') {
+            return [];
+        }
+
+        $listLines = preg_split('/\r?\n/', $text) ?: [];
+        $rootItems = [];
+        $stackFrames = [
+            ['indent' => -1, 'items' => &$rootItems],
+        ];
+        $stackDepth = 1;
+
+        foreach ($listLines as $lineText) {
+            if (trim($lineText) === '') {
+                continue;
+            }
+
+            if (!preg_match('/^(\s*)([-*])\s+(.*)$/', $lineText, $lineMatch)) {
+                continue;
+            }
+
+            $lineIndentation = strlen($lineMatch[1]);
+            $lineBody = trim($lineMatch[3]);
+            $itemLabel = '';
+            $itemUrl = '';
+
+            if (preg_match('/^\[(.+)\]\((.+)\)$/', $lineBody, $linkMatch)) {
+                $itemLabel = trim($linkMatch[1]);
+                $itemUrl = trim($linkMatch[2]);
+            } elseif (preg_match('/^(.+)\(([^)]+)\)$/', $lineBody, $plainMatch)) {
+                $itemLabel = trim($plainMatch[1]);
+                $itemUrl = trim($plainMatch[2]);
+            } else {
+                $itemLabel = $lineBody;
+            }
+
+            $navItem = [
+                'label' => $itemLabel,
+                'url' => $itemUrl,
+                'children' => [],
+            ];
+
+            while ($stackDepth > 1 && $lineIndentation <= $stackFrames[$stackDepth - 1]['indent']) {
+                array_pop($stackFrames);
+                $stackDepth--;
+            }
+
+            $parentItems = &$stackFrames[$stackDepth - 1]['items'];
+            $parentItems[] = $navItem;
+            $lastIndex = null;
+            foreach ($parentItems as $itemIndex => $unusedValue) {
+                $lastIndex = $itemIndex;
+            }
+
+            $stackFrames[] = [
+                'indent' => $lineIndentation,
+                'items' => &$parentItems[$lastIndex]['children'],
+            ];
+            $stackDepth++;
+        }
+
+        return $rootItems;
+    }
+}
+
+if (!function_exists('parse_yaml')) {
+    /**
+     * Parse simple YAML-style key/value pairs.
+     */
+    function parse_yaml(string $yamlText): array
+    {
+        $metadata = [];
+        $lines = explode("\n", $yamlText);
+
+        foreach ($lines as $line) {
+            if (!str_contains($line, ':')) {
+                continue;
+            }
+
+            [$keyText, $valueText] = explode(':', $line, 2);
+            $key = trim($keyText);
+            if ($key === '') {
+                continue;
+            }
+
+            $value = trim(trim($valueText), "\"'");
+            $metadata[$key] = $value;
+        }
+
+        return $metadata;
+    }
+}
+
+if (!function_exists('slug_from_path')) {
+    /**
+     * Convert a relative content path into a route slug.
+     */
+    function slug_from_path(string $relativeFile): string
+    {
+        $relativeFile = str_replace('\\', '/', $relativeFile);
+        $trimmed = preg_replace('/\.(md|mdx)$/i', '', $relativeFile);
+        $trimmed = ltrim($trimmed, '/');
+        $baseName = basename((string)$trimmed);
+
+        if ($baseName === 'index') {
+            $dir = trim(dirname((string)$trimmed), '.');
+            if ($dir === '' || $dir === '.') {
+                return '/';
+            }
+            return '/' . $dir;
+        }
+
+        return '/' . $trimmed;
+    }
+}
+
+if (!function_exists('extract_frontmatter')) {
+    /**
+     * Extract YAML frontmatter from a markdown file.
+     */
+    function extract_frontmatter(string $filePath): array
+    {
+        $contents = file_get_contents($filePath);
+        if ($contents === false || !str_starts_with($contents, "---")) {
+            return [];
+        }
+
+        $parts = preg_split('/^---$/m', $contents, 3);
+        if (!is_array($parts) || count($parts) !== 3) {
+            return [];
+        }
+
+        return parse_yaml($parts[1]);
+    }
+}
+
+if (!function_exists('resolve_status')) {
+    /**
+     * Normalize published/hidden/draft page status from metadata.
+     */
+    function resolve_status(array $meta): string
+    {
+        $status = strtolower(trim((string)($meta['status'] ?? 'published')));
+        if ($status === '') {
+            $status = 'published';
+        }
+
+        $draftFlag = strtolower(trim((string)($meta['draft'] ?? '')));
+        if (in_array($draftFlag, ['1', 'true', 'yes', 'on'], true)) {
+            $status = 'draft';
+        }
+
+        return $status;
+    }
+}
+
+if (!function_exists('resolve_current_context')) {
+    /**
+     * Resolve the current page context from the request path.
+     *
+     * @return array{filePath:string,relativeFile:string,relativeDir:string,dirPath:string,slug:string,isIndex:bool}|null
+     */
+    function resolve_current_context(): ?array
+    {
+        $pagesDir = isset(Paths::$pagesDir) ? Paths::$pagesDir : '';
+        if ($pagesDir === '' || !is_dir($pagesDir)) {
+            return null;
+        }
+
+        $path = (string)ThemeContext::get('currentPath', '');
+        if ($path === '') {
+            $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+        }
+
+        if ($path === '') {
+            $path = '/';
+        }
+
+        $normalizedSlug = trim($path, '/');
+        if ($normalizedSlug === '') {
+            $normalizedSlug = 'index';
+        }
+
+        if (
+            $normalizedSlug === '' ||
+            str_contains($normalizedSlug, '..') ||
+            str_contains($normalizedSlug, '\\') ||
+            str_contains($normalizedSlug, "\0") ||
+            !preg_match('/^[a-zA-Z0-9\/_-]+$/', $normalizedSlug)
+        ) {
+            return null;
+        }
+
+        $candidatePaths = [
+            $pagesDir . '/' . $normalizedSlug . '.md',
+            $pagesDir . '/' . $normalizedSlug . '.mdx',
+            $pagesDir . '/' . $normalizedSlug . '/index.md',
+            $pagesDir . '/' . $normalizedSlug . '/index.mdx',
+        ];
+
+        $filePath = '';
+        foreach ($candidatePaths as $candidatePath) {
+            if (file_exists($candidatePath)) {
+                $filePath = $candidatePath;
+                break;
+            }
+        }
+
+        if ($filePath === '') {
+            return null;
+        }
+
+        $relativeFile = ltrim(str_replace($pagesDir, '', $filePath), '/');
+        $relativeDir = trim(dirname($relativeFile), '.');
+        if ($relativeDir === '.') {
+            $relativeDir = '';
+        }
+        $dirPath = $relativeDir === '' ? $pagesDir : $pagesDir . '/' . $relativeDir;
+
+        $baseName = basename(preg_replace('/\.(md|mdx)$/i', '', $relativeFile));
+        $isIndex = $baseName === 'index';
+
+        return [
+            'filePath' => $filePath,
+            'relativeFile' => $relativeFile,
+            'relativeDir' => $relativeDir,
+            'dirPath' => $dirPath,
+            'slug' => slug_from_path($relativeFile),
+            'isIndex' => $isIndex,
+        ];
+    }
+}
+
+if (!function_exists('is_admin')) {
+    /**
+     * Read admin state from theme context.
+     */
+    function is_admin(): bool
+    {
+        return (bool)ThemeContext::get('isAdmin', false);
+    }
+}
+
+if (!function_exists('list_child_pages')) {
+    /**
+     * List child pages for a directory, sorted by order/date/label.
+     */
+    function list_child_pages(
+        string $directory,
+        string $relativeDir,
+        bool $includePrivate,
+        bool $excludeIndex = true
+    ): array {
+        if (!is_dir($directory)) {
+            return [];
+        }
+
+        $entries = scandir($directory);
+        if ($entries === false) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+                continue;
+            }
+
+            $fullPath = $directory . '/' . $entry;
+            if (is_dir($fullPath)) {
+                continue;
+            }
+
+            if (!preg_match('/\.(md|mdx)$/i', $entry)) {
+                continue;
+            }
+
+            $baseName = basename($entry, '.' . pathinfo($entry, PATHINFO_EXTENSION));
+            if ($excludeIndex && $baseName === 'index') {
+                continue;
+            }
+
+            $relativeFile = ltrim($relativeDir . '/' . $entry, '/');
+            $meta = extract_frontmatter($fullPath);
+            $status = resolve_status($meta);
+
+            if (!$includePrivate && in_array($status, ['hidden', 'draft'], true)) {
+                continue;
+            }
+
+            $label = trim((string)($meta['title'] ?? ''));
+            if ($label === '') {
+                $slug = slug_from_path($relativeFile);
+                if ($slug === '/') {
+                    $label = 'home';
+                } else {
+                    $trimmed = preg_replace('/\.(md|mdx)$/i', '', $relativeFile);
+                    $baseName = basename((string)$trimmed);
+                    $label = $baseName === 'index' ? 'index' : $baseName;
+                }
+            }
+
+            $order = null;
+            if (array_key_exists('order', $meta)) {
+                $rawOrder = trim((string)$meta['order']);
+                if ($rawOrder !== '' && is_numeric($rawOrder)) {
+                    $order = (int)$rawOrder;
+                }
+            }
+
+            $dateValue = null;
+            $rawDate = trim((string)($meta['date'] ?? ''));
+            if ($rawDate !== '') {
+                $timestamp = strtotime($rawDate);
+                if ($timestamp !== false) {
+                    $dateValue = $timestamp;
+                }
+            }
+
+            $items[] = [
+                'label' => $label,
+                'path' => slug_from_path($relativeFile),
+                'relativeFile' => $relativeFile,
+                'order' => $order,
+                'date' => $dateValue,
+            ];
+        }
+
+        $hasOrder = false;
+        $hasDate = false;
+        foreach ($items as $item) {
+            if ($item['order'] !== null) {
+                $hasOrder = true;
+            }
+            if ($item['date'] !== null) {
+                $hasDate = true;
+            }
+        }
+
+        usort($items, function (array $a, array $b) use ($hasOrder, $hasDate) {
+            if ($hasOrder) {
+                return ($a['order'] ?? PHP_INT_MAX) <=> ($b['order'] ?? PHP_INT_MAX);
+            }
+
+            if ($hasDate) {
+                return ($a['date'] ?? PHP_INT_MAX) <=> ($b['date'] ?? PHP_INT_MAX);
+            }
+
+            return strcasecmp($a['label'], $b['label']);
+        });
+
+        return $items;
+    }
+}
+
+if (!function_exists('get_app')) {
+    /**
+     * Fetch the current application instance when available.
+     */
+    function get_app(): ?\Flint\App
+    {
+        $parser = \Flint\Parser::getCurrentInstance();
+        if ($parser) {
+            return $parser->getApplication();
+        }
+
+        $app = ThemeContext::get('app');
+        return $app instanceof \Flint\App ? $app : null;
+    }
+}
+
+if (!function_exists('get_config')) {
+    /**
+     * Read a config value using dot notation.
+     */
+    function get_config(string $keyPath, mixed $default = null, ?array $config = null): mixed
+    {
+        if ($config === null) {
+            $app = get_app();
+            if ($app instanceof \Flint\App) {
+                $config = $app->config ?? [];
+            } else {
+                $config = ['site' => ThemeContext::get('site', [])];
+            }
+        }
+
+        if (!is_array($config)) {
+            return $default;
+        }
+
+        $segments = explode('.', $keyPath);
+        $currentValue = $config;
+
+        foreach ($segments as $segment) {
+            if (!is_array($currentValue) || !array_key_exists($segment, $currentValue)) {
+                return $default;
+            }
+
+            $currentValue = $currentValue[$segment];
+        }
+
+        return $currentValue;
+    }
+}
+
+if (!function_exists('register_hook')) {
+    /**
+     * Register a hook listener with the CMS.
+     */
+    function register_hook(string $eventName, callable $callback, int $priority = 100): void
+    {
+        HookManager::on($eventName, $callback, $priority);
+    }
+}
+
+if (!function_exists('app_log')) {
+    /**
+     * Log a message to the app log file.
+     */
+    function app_log(string $message, string $level = 'info'): void
+    {
+        $app = get_app();
+        if (!$app instanceof \Flint\App) {
+            error_log('[' . $level . '] ' . $message);
+            return;
+        }
+
+        $logDirectory = $app->appDir . '/storage/logs';
+        if (!is_dir($logDirectory)) {
+            mkdir($logDirectory, 0755, true);
+        }
+
+        $logFilePath = $logDirectory . '/app.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $logLine = "[{$timestamp}] [{$level}] {$message}\n";
+
+        file_put_contents($logFilePath, $logLine, FILE_APPEND | LOCK_EX);
+    }
+}
+
+if (!function_exists('sanitize_email_header')) {
+    /**
+     * Sanitize email header values to prevent injection.
+     */
+    function sanitize_email_header(string $value): string
+    {
+        return str_replace(["\r", "\n", "\0", "%0a", "%0d"], '', $value);
+    }
+}
+
+if (!function_exists('get_client_ip')) {
+    /**
+     * Resolve the best-guess client IP address.
+     */
+    function get_client_ip(): string
+    {
+        $headersToCheck = [
+            'HTTP_CF_CONNECTING_IP',
+            'HTTP_X_FORWARDED_FOR',
+            'HTTP_X_REAL_IP',
+            'REMOTE_ADDR',
+        ];
+
+        foreach ($headersToCheck as $headerName) {
+            if (!empty($_SERVER[$headerName])) {
+                $ipAddress = explode(',', $_SERVER[$headerName])[0];
+                return trim($ipAddress);
+            }
+        }
+
+        return '0.0.0.0';
+    }
+}
+
+if (!function_exists('ensure_storage_dir')) {
+    /**
+     * Ensure a directory exists, creating it if needed.
+     */
+    function ensure_storage_dir(string $directoryPath, int $permissions = 0755): bool
+    {
+        if (is_dir($directoryPath)) {
+            return true;
+        }
+
+        if (file_exists($directoryPath)) {
+            return false;
+        }
+
+        return mkdir($directoryPath, $permissions, true);
+    }
+}
+
+if (!function_exists('read_json_file')) {
+    /**
+     * Read a JSON file into an array or object.
+     */
+    function read_json_file(string $filePath, bool $associative = true): mixed
+    {
+        if (!file_exists($filePath) || !is_file($filePath)) {
+            return null;
+        }
+
+        $jsonString = file_get_contents($filePath);
+        if ($jsonString === false) {
+            return null;
+        }
+
+        return json_decode($jsonString, $associative);
     }
 }
 

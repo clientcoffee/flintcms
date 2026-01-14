@@ -12,7 +12,7 @@ class TeamMemberCard extends RenderComponent
     public static function render(array $props, string $content): string
     {
         // Collect primary identity fields.
-        $memberName = self::prop($props, 'name');
+        $memberName = prop($props, 'name');
 
         // Exit early without a name.
         if ($memberName === '') {
@@ -20,12 +20,12 @@ class TeamMemberCard extends RenderComponent
         }
 
         // Group profile metadata and content.
-        $memberRole = self::prop($props, 'role');
-        $memberBio = self::contentOrProp($content, $props, 'bio');
-        $memberPhotoUrl = self::prop($props, 'photo');
-        $memberLocation = self::prop($props, 'location');
-        $memberEmail = self::prop($props, 'email');
-        $memberLinksRaw = self::prop($props, 'links');
+        $memberRole = prop($props, 'role');
+        $memberBio = content_or_prop($content, $props, 'bio');
+        $memberPhotoUrl = prop($props, 'photo');
+        $memberLocation = prop($props, 'location');
+        $memberEmail = prop($props, 'email');
+        $memberLinksRaw = prop($props, 'links');
 
         // Create a fallback initial for when no photo is provided.
         $memberInitial = strtoupper(substr($memberName, 0, 1));
@@ -35,29 +35,29 @@ class TeamMemberCard extends RenderComponent
         <div class="motion-team-card my-6 rounded-2xl border border-gray-200 bg-white/80 p-5 shadow-sm">
             <div class="flex items-start gap-4">
                 <?php if ($memberPhotoUrl !== '') : ?>
-                    <img class="h-16 w-16 rounded-2xl object-cover border border-gray-200" src="<?= self::escape($memberPhotoUrl) ?>" alt="<?= self::escape($memberName) ?>">
+                    <img class="h-16 w-16 rounded-2xl object-cover border border-gray-200" src="<?= esc_html($memberPhotoUrl) ?>" alt="<?= esc_html($memberName) ?>">
                 <?php else : ?>
                     <div class="h-16 w-16 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center text-xl font-semibold text-gray-500">
-                        <?= self::escape($memberInitial) ?>
+                        <?= esc_html($memberInitial) ?>
                     </div>
                 <?php endif; ?>
                 <div class="flex-1">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h3 class="text-lg font-semibold text-gray-900"><?= self::escape($memberName) ?></h3>
+                        <h3 class="text-lg font-semibold text-gray-900"><?= esc_html($memberName) ?></h3>
                         <?php if ($memberRole !== '') : ?>
-                            <span class="text-sm text-gray-500">· <?= self::escape($memberRole) ?></span>
+                            <span class="text-sm text-gray-500">· <?= esc_html($memberRole) ?></span>
                         <?php endif; ?>
                     </div>
 
                     <?php if ($memberLocation !== '') : ?>
-                        <div class="text-sm text-gray-500 mt-1"><?= self::escape($memberLocation) ?></div>
+                        <div class="text-sm text-gray-500 mt-1"><?= esc_html($memberLocation) ?></div>
                     <?php endif; ?>
                     <?php if ($memberBio !== '') : ?>
-                        <p class="mt-3 text-sm text-gray-600"><?= self::escape($memberBio) ?></p>
+                        <p class="mt-3 text-sm text-gray-600"><?= esc_html($memberBio) ?></p>
                     <?php endif; ?>
                     <?php if ($memberEmail !== '') : ?>
-                        <a class="mt-3 inline-block text-sm text-gray-700 underline" href="mailto:<?= self::escape($memberEmail) ?>">
-                            <?= self::escape($memberEmail) ?>
+                        <a class="mt-3 inline-block text-sm text-gray-700 underline" href="mailto:<?= esc_html($memberEmail) ?>">
+                            <?= esc_html($memberEmail) ?>
                         </a>
                     <?php endif; ?>
                     <?php if ($memberLinksRaw !== '') : ?>
@@ -75,7 +75,7 @@ class TeamMemberCard extends RenderComponent
     private static function renderLinks(string $linksRaw): string
     {
         // Parse link tokens into structured data using parent's helper.
-        $linkItems = self::parseKeyValue($linksRaw, '|');
+        $linkItems = parse_key_value($linksRaw, '|');
 
         // Exit early if there are no valid links.
         if (empty($linkItems)) {
@@ -87,8 +87,8 @@ class TeamMemberCard extends RenderComponent
         <div class="mt-3 flex flex-wrap gap-3">
             <?php foreach ($linkItems as $linkItem) : ?>
                 <?php
-                $linkLabel = self::escape($linkItem['key']);
-                $linkUrl = self::escape($linkItem['value']);
+                $linkLabel = esc_html($linkItem['key']);
+                $linkUrl = esc_html($linkItem['value']);
                 ?>
                 <a class="text-sm text-gray-700 underline hover:text-gray-900" href="<?= $linkUrl ?>" rel="noopener noreferrer">
                     <?= $linkLabel ?>

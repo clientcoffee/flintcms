@@ -20,7 +20,7 @@ class GoogleAnalytics extends RenderComponent
      */
     public static function render(array $props, string $content): string
     {
-        $measurementId = self::prop($props, 'measurement_id', '');
+        $measurementId = prop($props, 'measurement_id', '');
 
         // If no measurement ID is provided, return empty string.
         if (empty($measurementId)) {
@@ -28,7 +28,7 @@ class GoogleAnalytics extends RenderComponent
         }
 
         // Escape the measurement ID for safety.
-        $safeMeasurementId = self::escape($measurementId);
+        $safeMeasurementId = esc_html($measurementId);
 
         // Return Google Analytics gtag.js script.
         ob_start();
