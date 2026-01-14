@@ -1,0 +1,6 @@
+- [Home](/)
+- [About](/about)
+- [Blog](/blog)
+  - [Building a Modern CMS](/blog/example-post)
+- [Markdown Demo](/markdown-demo)
+- [Contact](/contact)

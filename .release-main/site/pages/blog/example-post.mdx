@@ -1,0 +1,44 @@
+---
+title: Building a Modern CMS
+type: post
+description: Exploring the architecture of a drop-in flat-file CMS with zero dependencies
+author: Flint Team
+date: January 3, 2026
+readtime: 5
+icon: rocket
+keywords: cms, php, flat-file, architecture
+---
+
+# Introduction
+
+Welcome to this example post! This post uses the `layout-post.php` layout instead of the default `layout.php`, giving it a unique design with a gradient header and reading progress bar.
+
+## How Layout Types Work
+
+By adding `type: post` to the frontmatter, Flint automatically uses the `layout-post.php` file. The cascade works like this:
+
+1. Check for `layout-{type}.php` (e.g., `layout-post.php`)
+2. Fall back to `layout.php` if type-specific layout doesn't exist
+
+## Benefits
+
+This system is **versatile and flexible**:
+
+- **Posts** can have a reading-focused layout with progress bars
+- **Landing pages** can have full-width hero sections
+- **Documentation** pages can have a sidebar navigation
+- **Portfolio** items can showcase images prominently
+
+All without touching the core code - just create new layout files!
+
+## Example Types
+
+You can create any layout you want:
+
+- `layout-post.php` - Blog posts (like this one)
+- `layout-landing.php` - Landing pages with CTAs
+- `layout-docs.php` - Documentation with sidebar
+- `layout-portfolio.php` - Portfolio items
+- `layout-minimal.php` - Distraction-free reading
+
+The possibilities are endless!
