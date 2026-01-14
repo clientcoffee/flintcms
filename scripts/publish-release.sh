@@ -30,7 +30,7 @@ else
   git -C "${workspace_root}" worktree add "${worktree_root}" "${release_branch}"
 fi
 
-rsync -a --delete "${dist_root}/" "${worktree_root}/"
+rsync -a --delete --exclude=".git" "${dist_root}/" "${worktree_root}/"
 
 git -C "${worktree_root}" add -A
 if git -C "${worktree_root}" diff --cached --quiet; then
