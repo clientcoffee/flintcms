@@ -51,7 +51,7 @@ SCRIPT;
         ob_start();
         ?>
         <div class="mermaid-wrapper my-8">
-            <div id="<?= self::escape($diagramId) ?>" class="mermaid"><?= $diagramSource ?></div>
+            <div id="<?= esc_html($diagramId) ?>" class="mermaid"><?= $diagramSource ?></div>
         </div>
         <?php
 

@@ -22,9 +22,9 @@ class Alert extends RenderComponent
     public static function render(array $props, string $content): string
     {
         // RenderComponent::prop() reads props passed from markdown like {{Alert type="info"}}.
-        $type = self::prop($props, 'type', 'info');
+        $type = prop($props, 'type', 'info');
         // Optional title renders a bold heading inside the alert.
-        $title = self::prop($props, 'title');
+        $title = prop($props, 'title');
 
         $styles = [
             'info' => 'bg-blue-50 border-blue-200 text-blue-900',
@@ -58,7 +58,7 @@ class Alert extends RenderComponent
                 <div class="flex-1">
                     <!-- Title is optional to keep alerts compact. -->
                     <?php if ($hasTitle) : ?>
-                        <h4 class="font-semibold mb-1"><?= self::escape($title) ?></h4>
+                        <h4 class="font-semibold mb-1"><?= esc_html($title) ?></h4>
                     <?php endif; ?>
 
                     <!-- Content is already parsed HTML from the CMS. -->

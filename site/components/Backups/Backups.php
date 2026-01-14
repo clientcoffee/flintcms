@@ -24,11 +24,11 @@ class Backups extends BaseComponent
         self::$metadataDir = self::$app->root . '/site/submissions/backups';
 
         // Ensure metadata directory exists.
-        self::ensureStorageDir(self::$metadataDir);
+        ensure_storage_dir(self::$metadataDir);
 
         // Ensure base uploads directory has .htaccess protection.
         $uploadsDir = self::$app->root . '/site/uploads';
-        self::ensureStorageDir($uploadsDir);
+        ensure_storage_dir($uploadsDir);
 
         $htaccess = $uploadsDir . '/.htaccess';
         if (!file_exists($htaccess)) {
@@ -81,16 +81,16 @@ HTACCESS;
     protected static function registerHooks(): void
     {
         // Hook for manual backup trigger.
-        self::registerHook('admin_panel_load', [self::class, 'onAdminLoad']);
+        self::register_hook('admin_panel_load', [self::class, 'onAdminLoad']);
 
         // Register custom routes for backup downloads.
-        self::registerHook('custom_routes', [self::class, 'handleCustomRoutes']);
+        self::register_hook('custom_routes', [self::class, 'handleCustomRoutes']);
 
         // Register custom API endpoints for backup management.
-        self::registerHook('custom_api_endpoints', [self::class, 'handleApiEndpoints']);
+        self::register_hook('custom_api_endpoints', [self::class, 'handleApiEndpoints']);
 
         // Register scheduled backup task.
-        self::registerHook('register_scheduled_tasks', [self::class, 'registerScheduledTasks']);
+        self::register_hook('register_scheduled_tasks', [self::class, 'registerScheduledTasks']);
     }
 
     /**
@@ -104,7 +104,7 @@ HTACCESS;
         }
 
         // Get backup schedule configuration.
-        $scheduleType = self::getConfig('backups.schedule', 'manual');
+        $scheduleType = self::get_config('backups.schedule', 'manual');
 
         // Don't register if schedule is manual (admin-triggered only).
         if ($scheduleType === 'manual') {
@@ -116,15 +116,15 @@ HTACCESS;
 
         // Add schedule-specific options.
         if ($scheduleType === 'daily') {
-            $schedule['time'] = self::getConfig('backups.schedule_time', '03:00');
+            $schedule['time'] = self::get_config('backups.schedule_time', '03:00');
         } elseif ($scheduleType === 'weekly') {
-            $schedule['time'] = self::getConfig('backups.schedule_time', '03:00');
-            $schedule['day'] = (int)self::getConfig('backups.schedule_day', 0); // 0 = Sunday.
+            $schedule['time'] = self::get_config('backups.schedule_time', '03:00');
+            $schedule['day'] = (int)self::get_config('backups.schedule_day', 0); // 0 = Sunday.
         } elseif ($scheduleType === 'monthly') {
-            $schedule['time'] = self::getConfig('backups.schedule_time', '03:00');
-            $schedule['day'] = (int)self::getConfig('backups.schedule_day', 1); // 1st of month.
+            $schedule['time'] = self::get_config('backups.schedule_time', '03:00');
+            $schedule['day'] = (int)self::get_config('backups.schedule_day', 1); // 1st of month.
         } elseif ($scheduleType === 'interval') {
-            $schedule['seconds'] = (int)self::getConfig('backups.schedule_interval', 86400); // Default: 24 hours.
+            $schedule['seconds'] = (int)self::get_config('backups.schedule_interval', 86400); // Default: 24 hours.
         }
 
         // Register task with scheduler.
@@ -214,7 +214,7 @@ HTACCESS;
 
             // Create temporary directory for staging.
             $tempDir = $backupDir . '/temp-' . $backupId;
-            self::ensureStorageDir($tempDir);
+            ensure_storage_dir($tempDir);
 
             // Copy files to temp directory.
             self::stageBackupFiles($tempDir);
@@ -234,7 +234,7 @@ HTACCESS;
 
             // Generate download token.
             $token = bin2hex(random_bytes(32));
-            $expiry = $timestamp + self::getConfig('backups.link_expiration', 86400);
+            $expiry = $timestamp + self::get_config('backups.link_expiration', 86400);
 
             // Store metadata.
             $metadata = [
@@ -268,7 +268,7 @@ HTACCESS;
                 'email_sent' => $emailSent
             ];
         } catch (\Exception $e) {
-            self::log("Backup failed: " . $e->getMessage(), 'error');
+            self::app_log("Backup failed: " . $e->getMessage(), 'error');
             return [
                 'success' => false,
                 'error' => $e->getMessage()
@@ -284,7 +284,7 @@ HTACCESS;
         $root = self::$app->root;
 
         // Copy site/config.php if enabled.
-        if (self::getConfig('backups.include_config', true)) {
+        if (self::get_config('backups.include_config', true)) {
             $configCandidates = [
                 $root . '/site/config.php',
                 $root . '/config.php',
@@ -309,7 +309,7 @@ HTACCESS;
         }
 
         // Copy content directory.
-        if (self::getConfig('backups.include_content', true)) {
+        if (self::get_config('backups.include_content', true)) {
             $contentSrc = $root . '/site';
             $contentDest = $tempDir . '/site';
 
@@ -317,7 +317,7 @@ HTACCESS;
                 self::copyDirectory($contentSrc, $contentDest);
 
                 // Exclude uploads if configured.
-                if (!self::getConfig('backups.include_uploads', true)) {
+                if (!self::get_config('backups.include_uploads', true)) {
                     $uploadsDir = $contentDest . '/uploads';
                     if (is_dir($uploadsDir)) {
                         self::removeDirectory($uploadsDir);
@@ -327,7 +327,7 @@ HTACCESS;
         }
 
         // Copy themes if enabled.
-        if (self::getConfig('backups.include_themes', false)) {
+        if (self::get_config('backups.include_themes', false)) {
             $themesSrc = $root . '/site/themes';
             $themesDest = $tempDir . '/themes';
             if (is_dir($themesSrc)) {
@@ -355,7 +355,7 @@ HTACCESS;
         chdir($cwd);
 
         if ($returnCode !== 0) {
-            self::log("Tarball creation failed: " . implode("\n", $output), 'error');
+            self::app_log("Tarball creation failed: " . implode("\n", $output), 'error');
             return false;
         }
 
@@ -421,7 +421,7 @@ HTACCESS;
     {
         $adminEmail = self::$app->config['mail']['admin_email'] ?? '';
         if (!$adminEmail || !filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
-            self::log("Invalid admin email, cannot send backup link", 'error');
+            self::app_log("Invalid admin email, cannot send backup link", 'error');
             return false;
         }
 
@@ -476,9 +476,9 @@ EMAIL;
         $sent = mail($adminEmail, $subject, $body, $headers);
 
         if ($sent) {
-            self::log("Backup email sent to {$adminEmail}");
+            self::app_log("Backup email sent to {$adminEmail}");
         } else {
-            self::log("Failed to send backup email", 'error');
+            self::app_log("Failed to send backup email", 'error');
         }
 
         return $sent;
@@ -530,7 +530,7 @@ EMAIL;
 
         readfile($metadata['filepath']);
 
-        self::log("Backup downloaded: {$metadata['backup_id']}");
+        self::app_log("Backup downloaded: {$metadata['backup_id']}");
 
         return true;
     }
@@ -543,7 +543,7 @@ EMAIL;
         $files = glob(self::$metadataDir . '/backup-*.json');
 
         foreach ($files as $file) {
-            $metadata = self::readJsonFile($file);
+            $metadata = read_json_file($file);
             if ($metadata && isset($metadata['token']) && $metadata['token'] === $token) {
                 return $metadata;
             }
@@ -561,11 +561,11 @@ EMAIL;
         $now = time();
 
         foreach ($files as $file) {
-            $metadata = self::readJsonFile($file);
+            $metadata = read_json_file($file);
 
             if ($metadata && $now > $metadata['expires']) {
                 self::deleteBackup($metadata['backup_id']);
-                self::log("Cleaned up expired backup: {$metadata['backup_id']}");
+                self::app_log("Cleaned up expired backup: {$metadata['backup_id']}");
             }
         }
     }
@@ -575,7 +575,7 @@ EMAIL;
      */
     private static function cleanupOldBackups(): void
     {
-        $maxBackups = self::getConfig('backups.max_backups', 10);
+        $maxBackups = self::get_config('backups.max_backups', 10);
         $files = glob(self::$metadataDir . '/backup-*.json');
 
         // Sort by creation time (newest first).
@@ -588,10 +588,10 @@ EMAIL;
         foreach ($files as $file) {
             $count++;
             if ($count > $maxBackups) {
-                $metadata = self::readJsonFile($file);
+                $metadata = read_json_file($file);
                 if ($metadata) {
                     self::deleteBackup($metadata['backup_id']);
-                    self::log("Cleaned up old backup: {$metadata['backup_id']}");
+                    self::app_log("Cleaned up old backup: {$metadata['backup_id']}");
                 }
             }
         }
@@ -607,7 +607,7 @@ EMAIL;
         $metadata = null;
 
         if (file_exists($metadataFile)) {
-            $metadata = self::readJsonFile($metadataFile);
+            $metadata = read_json_file($metadataFile);
             unlink($metadataFile);
         }
 
@@ -652,7 +652,7 @@ EMAIL;
         $backups = [];
 
         foreach ($files as $file) {
-            $metadata = self::readJsonFile($file);
+            $metadata = read_json_file($file);
             if ($metadata) {
                 $metadata['expired'] = time() > $metadata['expires'];
                 $metadata['size_formatted'] = self::formatBytes($metadata['size']);
