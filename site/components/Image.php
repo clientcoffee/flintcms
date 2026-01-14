@@ -12,19 +12,19 @@ class Image extends RenderComponent
     public static function render(array $props, string $content): string
     {
         // Require a source URL before rendering.
-        $src = trim((string) self::prop($props, 'src'));
+        $src = trim((string) prop($props, 'src'));
         if ($src === '') {
             return '<!-- Image component: missing src. -->';
         }
 
         // Normalize optional text metadata.
-        $alt = (string) self::prop($props, 'alt', '');
-        $title = (string) self::prop($props, 'title', '');
+        $alt = (string) prop($props, 'alt', '');
+        $title = (string) prop($props, 'title', '');
 
         // Resolve alignment from props with a default of block.
-        $alignment = strtolower(trim((string) self::prop($props, 'alignment', '')));
+        $alignment = strtolower(trim((string) prop($props, 'alignment', '')));
         if ($alignment === '') {
-            $alignment = strtolower(trim((string) self::prop($props, 'align', 'block')));
+            $alignment = strtolower(trim((string) prop($props, 'align', 'block')));
         }
 
         if (!in_array($alignment, ['left', 'right', 'block'], true)) {
@@ -55,7 +55,7 @@ class Image extends RenderComponent
         }
 
         // Support captions via inline content or props.
-        $captionSource = self::contentOrProp($content, $props, 'caption');
+        $captionSource = content_or_prop($content, $props, 'caption');
         $captionHtml = '';
         if ($captionSource !== '') {
             if (trim($content) !== '') {
@@ -67,8 +67,8 @@ class Image extends RenderComponent
 
         ob_start();
         ?>
-        <figure class="<?= self::escape($figureClass) ?>" style="<?= self::escape($figureStyle) ?>">
-            <img <?= self::buildAttributes($attributes) ?>>
+        <figure class="<?= esc_html($figureClass) ?>" style="<?= esc_html($figureStyle) ?>">
+            <img <?= html_attrs($attributes) ?>>
             <?php if ($captionHtml !== '') : ?>
                 <figcaption style="margin-top: 0.5rem; font-size: 0.875rem; color: #6b7280; line-height: 1.4;">
                     <?= $captionHtml ?>
@@ -84,9 +84,9 @@ class Image extends RenderComponent
     private static function renderCaptionMarkdown(string $caption): string
     {
         // Fallback to escaped HTML when the app is not available.
-        $app = self::getApp();
+        $app = get_app();
         if ($app === null) {
-            return sprintf('<p>%s</p>', self::escape($caption));
+            return sprintf('<p>%s</p>', esc_html($caption));
         }
 
         // Parse markdown captions with the CMS parser.

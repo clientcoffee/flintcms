@@ -15,14 +15,14 @@ class Block extends RenderComponent
     public static function render(array $props, string $content): string
     {
         // Read the block name from props or component body.
-        $blockName = self::contentOrProp($content, $props, 'name');
+        $blockName = content_or_prop($content, $props, 'name');
 
         if ($blockName === '') {
             return '<!-- Block component: no name specified. -->';
         }
 
         // Fetch the active app so we can resolve filesystem paths.
-        $app = self::getApp();
+        $app = get_app();
         if ($app === null) {
             return '<!-- Block component: application context not available. -->';
         }
@@ -30,7 +30,7 @@ class Block extends RenderComponent
         $blockPath = self::resolveMarkdownBlockPath($app->root, $blockName);
 
         if ($blockPath === null) {
-            return sprintf('<!-- Block "%s" not found. -->', self::escape($blockName));
+            return sprintf('<!-- Block "%s" not found. -->', esc_html($blockName));
         }
 
         // Read and parse the block content through the CMS parser.

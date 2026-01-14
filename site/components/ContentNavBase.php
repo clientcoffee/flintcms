@@ -93,7 +93,7 @@ abstract class ContentNavBase extends RenderComponent
             'relativeFile' => $relativeFile,
             'relativeDir' => $relativeDir,
             'dirPath' => $dirPath,
-            'slug' => self::slugFromRelative($relativeFile),
+            'slug' => slug_from_path($relativeFile),
             'isIndex' => $isIndex,
         ];
     }
@@ -167,8 +167,8 @@ abstract class ContentNavBase extends RenderComponent
             }
 
             $relativeFile = ltrim($relativeDir . '/' . $entry, '/');
-            $meta = self::extractFrontmatter($fullPath);
-            $status = self::resolveStatus($meta);
+            $meta = extract_frontmatter($fullPath);
+            $status = resolve_status($meta);
 
             if (!$includePrivate && in_array($status, ['hidden', 'draft'], true)) {
                 continue;
@@ -177,12 +177,12 @@ abstract class ContentNavBase extends RenderComponent
             // Derive a human label from title or filename.
             $label = trim((string)($meta['title'] ?? ''));
             if ($label === '') {
-                $label = self::labelFromRelative($relativeFile, self::slugFromRelative($relativeFile));
+                $label = self::labelFromRelative($relativeFile, slug_from_path($relativeFile));
             }
 
             $items[] = [
                 'label' => $label,
-                'path' => self::slugFromRelative($relativeFile),
+                'path' => slug_from_path($relativeFile),
                 'relativeFile' => $relativeFile,
                 'order' => self::getOrderValue($meta),
                 'date' => self::getDateValue($meta),
@@ -260,31 +260,7 @@ abstract class ContentNavBase extends RenderComponent
             return [];
         }
 
-        return self::parseYamlLite($parts[1]);
-    }
-
-    protected static function parseYamlLite(string $yamlText): array
-    {
-        // Simple YAML-ish parser for key:value pairs.
-        $metadata = [];
-        $lines = explode("\n", $yamlText);
-
-        foreach ($lines as $line) {
-            if (!str_contains($line, ':')) {
-                continue;
-            }
-
-            [$keyText, $valueText] = explode(':', $line, 2);
-            $key = trim($keyText);
-            if ($key === '') {
-                continue;
-            }
-
-            $value = trim(trim($valueText), "\"'");
-            $metadata[$key] = $value;
-        }
-
-        return $metadata;
+        return parse_yaml($parts[1]);
     }
 
     protected static function resolveStatus(array $meta): string

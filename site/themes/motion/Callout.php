@@ -22,7 +22,7 @@ class Callout extends RenderComponent
     public static function render(array $props, string $content): string
     {
         // Props are passed from markdown like {{Callout type="info"}}.
-        $calloutType = self::prop($props, 'type', 'info');
+        $calloutType = prop($props, 'type', 'info');
 
         // Theme-specific visual mapping for each callout type.
         $styleMap = [
