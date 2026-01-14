@@ -12,8 +12,9 @@ class UpdateChecker
     private string $appDir;
     private array $config;
     private string $cacheFile;
+    private string $repo;
     private const CACHE_DURATION = 3600; // 1 hour
-    private const GITHUB_REPO = 'yourname/flint'; // Update with actual repo
+    private const DEFAULT_REPO = 'clientcoffee/flintcms';
 
     public function __construct(string $appDir, string $rootDir, array $config)
     {
@@ -21,6 +22,11 @@ class UpdateChecker
         $this->root = $rootDir;
         $this->config = $config;
         $this->cacheFile = $appDir . '/.update-cache.json';
+        $repo = $this->normalizeRepo((string)($config['updates']['repo'] ?? self::DEFAULT_REPO));
+        if ($repo === '') {
+            $repo = self::DEFAULT_REPO;
+        }
+        $this->repo = $repo;
     }
 
     /**
@@ -68,7 +74,11 @@ class UpdateChecker
      */
     private function fetchLatestRelease(): ?array
     {
-        $url = "https://api.github.com/repos/" . self::GITHUB_REPO . "/releases/latest";
+        if ($this->repo === '') {
+            return null;
+        }
+
+        $url = "https://api.github.com/repos/" . $this->repo . "/releases/latest";
 
         $context = stream_context_create([
             'http' => [
@@ -117,6 +127,31 @@ class UpdateChecker
             'body' => $data['body'] ?? '',
             'published_at' => $data['published_at'] ?? '',
         ];
+    }
+
+    /**
+     * Normalize a repo reference into owner/name format.
+     */
+    private function normalizeRepo(string $repo): string
+    {
+        $repo = trim($repo);
+        if ($repo === '') {
+            return '';
+        }
+
+        if (str_starts_with($repo, 'https://github.com/')) {
+            $repo = substr($repo, strlen('https://github.com/'));
+        } elseif (str_starts_with($repo, 'http://github.com/')) {
+            $repo = substr($repo, strlen('http://github.com/'));
+        }
+
+        $repo = trim($repo, '/');
+
+        if (substr_count($repo, '/') !== 1) {
+            return '';
+        }
+
+        return $repo;
     }
 
     /**

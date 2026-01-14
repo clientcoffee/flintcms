@@ -123,6 +123,7 @@ class Setup
             ],
             'updates' => [
                 'auto_update' => 'ask',
+                'repo' => 'clientcoffee/flintcms',
             ],
         ];
 

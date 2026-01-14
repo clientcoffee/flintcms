@@ -38,6 +38,7 @@ return [
     'updates' => [
         // Auto-update behavior: true = auto-install, false = notify only, 'ask' = prompt before installing
         'auto_update' => 'ask',
-        // Check for updates on admin login
+        // GitHub repo to check for release updates (owner/name or full URL)
+        'repo' => 'clientcoffee/flintcms',
     ],
 ];
