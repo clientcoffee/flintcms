@@ -37,7 +37,20 @@
   // Fetch JSON while preserving the raw Response for status checks.
   const fetchJson = async (url, options = {}) => {
     const response = await secureFetch(url, options);
-    const data = await response.json();
+    const contentType = response.headers.get("Content-Type") || "";
+    const text = await response.text();
+    let data = {};
+
+    if (contentType.includes("application/json")) {
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (error) {
+        data = { success: false, error: text || "Invalid JSON response." };
+      }
+    } else {
+      data = { success: false, error: text || "Request failed." };
+    }
+
     return { response, data };
   };
 
@@ -222,6 +235,7 @@
     editor.placeholder.classList.toggle("hidden", enabled);
     editor.saveButton.disabled = !enabled;
     editor.cancelButton.disabled = !enabled;
+    editor.state.isEditing = enabled;
   };
 
   // Toggle the active button styling in tree lists.
@@ -633,6 +647,105 @@
     const securityMessage = qs("#security-message");
     const resetButton = qs("#security-password-reset-btn");
     const clearBlocklistButton = qs("#clear-blocklist-btn");
+    const blockedHostsList = qs("#blocked-hosts-list");
+    const blockedHostsToggle = qs("#blocked-hosts-toggle");
+    const blockedHostsFade = qs("#blocked-hosts-fade");
+
+    const renderBlockedHosts = (items) => {
+      if (!blockedHostsList) {
+        return;
+      }
+
+      blockedHostsList.innerHTML = "";
+      const maxVisible = 20;
+      const hasEntries = Array.isArray(items) && items.length > 0;
+
+      if (!hasEntries) {
+        blockedHostsList.innerHTML = "<li class=\"text-sm text-gray-500\">No blocked hosts.</li>";
+        blockedHostsToggle?.classList.add("hidden");
+        blockedHostsFade?.classList.add("hidden");
+        return;
+      }
+
+      const rows = items.map((entry, index) => {
+        const item = document.createElement("li");
+        item.className = "flex flex-col gap-1 rounded-lg border border-gray-200 px-3 py-2";
+        if (index >= maxVisible) {
+          item.classList.add("hidden");
+        }
+
+        const header = document.createElement("div");
+        header.className = "flex items-center justify-between gap-2";
+
+        const ip = document.createElement("span");
+        ip.className = "text-sm font-semibold text-gray-800";
+        ip.textContent = entry.ip || "Unknown";
+
+        const expires = document.createElement("span");
+        expires.className = "text-xs text-gray-400";
+        expires.textContent = entry.expires_in || "Unknown expiry";
+
+        header.appendChild(ip);
+        header.appendChild(expires);
+
+        const reason = document.createElement("p");
+        reason.className = "text-xs text-gray-500";
+        reason.textContent = entry.reason || "Security block";
+
+        item.appendChild(header);
+        item.appendChild(reason);
+        blockedHostsList.appendChild(item);
+        return item;
+      });
+
+      if (blockedHostsToggle) {
+        if (rows.length > maxVisible) {
+          blockedHostsToggle.classList.remove("hidden");
+          blockedHostsToggle.textContent = `More (${rows.length - maxVisible})`;
+          blockedHostsToggle.dataset.expanded = "false";
+        } else {
+          blockedHostsToggle.classList.add("hidden");
+        }
+      }
+
+      if (blockedHostsFade) {
+        blockedHostsFade.classList.toggle("hidden", rows.length <= maxVisible);
+      }
+
+      if (blockedHostsToggle) {
+        blockedHostsToggle.onclick = () => {
+          const expanded = blockedHostsToggle.dataset.expanded === "true";
+          const nextState = !expanded;
+          blockedHostsToggle.dataset.expanded = nextState ? "true" : "false";
+          rows.forEach((row, index) => {
+            if (index >= maxVisible) {
+              row.classList.toggle("hidden", !nextState);
+            }
+          });
+          blockedHostsToggle.textContent = nextState ? "Less" : `More (${rows.length - maxVisible})`;
+          if (blockedHostsFade) {
+            blockedHostsFade.classList.toggle("hidden", nextState);
+          }
+        };
+      }
+    };
+
+    const loadBlockedHosts = async () => {
+      if (!blockedHostsList) {
+        return;
+      }
+
+      try {
+        const { data } = await fetchJson("/api/blocklist/list");
+        if (data.success) {
+          renderBlockedHosts(data.items || []);
+          return;
+        }
+      } catch (error) {
+      }
+
+      renderBlockedHosts([]);
+    };
 
     if (resetButton) {
       resetButton.addEventListener("click", async () => {
@@ -670,6 +783,7 @@
           const { data } = await fetchJson("/api/blocklist/clear", { method: "POST" });
           if (data.success) {
             alert("Blocklist cleared.");
+            loadBlockedHosts();
             return;
           }
           alert("Failed to clear blocklist.");
@@ -678,6 +792,8 @@
         }
       });
     }
+
+    loadBlockedHosts();
   };
 
   const getExportFilename = (response, fallback) => {
@@ -771,6 +887,15 @@
     return `<a href="${releaseUrl}" target="_blank" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">View Release</a>`;
   };
 
+  // Reset banner visibility classes before writing new content.
+  const resetUpdateBanner = (banner) => {
+    if (!banner) {
+      return;
+    }
+
+    banner.classList.remove("hidden", "opacity-0", "transition-opacity");
+  };
+
   // Show the update banner after a successful check.
   const showUpdateBanner = (data) => {
     const banner = qs("#update-banner");
@@ -778,9 +903,9 @@
       return;
     }
 
+    resetUpdateBanner(banner);
     const actions = renderUpdateActions(data);
     banner.innerHTML = `<div class="bg-blue-50 border border-blue-200 rounded-lg p-6"><div class="flex items-start justify-between"><div class="flex-1"><h3 class="text-lg font-semibold text-blue-900 mb-2">Update Available: v${data.update.version}</h3><p class="text-blue-800 text-sm mb-4">A new version is available. Your content and themes will be preserved.</p><div class="flex gap-3">${actions}</div></div></div></div>`;
-    banner.classList.remove("hidden");
   };
 
   // Check for updates when the button is pressed.
@@ -795,20 +920,27 @@
     setButtonState(button, { loading: true, html: `${SPINNER_ICON}Checking...` });
 
     try {
-      const { data } = await fetchJson("/api/updates/check");
+      const { data } = await fetchJson("/api/updates/check?force=1");
+      if (data.error) {
+        resetUpdateBanner(banner);
+        banner.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-4"><p class="text-red-800 text-sm font-medium">✗ ${data.error}</p></div>`;
+        setTimeout(() => banner.classList.add("hidden"), 6000);
+        return;
+      }
+
       if (data.update_available && data.update) {
         showUpdateBanner(data);
       } else {
+        resetUpdateBanner(banner);
         banner.innerHTML = `<div class="bg-green-50 border border-green-200 rounded-lg p-4 transition-all"><p class="text-green-800 text-sm font-medium">✓ You are running the latest version (${data.current_version})</p></div>`;
-        banner.classList.remove("hidden");
         setTimeout(() => {
           banner.classList.add("opacity-0", "transition-opacity");
           setTimeout(() => banner.classList.add("hidden"), 300);
         }, 4000);
       }
     } catch (error) {
+      resetUpdateBanner(banner);
       banner.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-4"><p class="text-red-800 text-sm font-medium">✗ Failed to check for updates. Please try again.</p></div>`;
-      banner.classList.remove("hidden");
       setTimeout(() => banner.classList.add("hidden"), 6000);
     } finally {
       setButtonState(button, { loading: false, html: originalHtml });
@@ -1240,43 +1372,78 @@
   };
 
   // Build a nested tree list UI from API data.
-  const renderTreeList = (items, container, depth, onFileClick) => {
-    items.forEach((item) => {
-      if (item.type === "directory") {
-        const header = document.createElement("div");
-        header.className = "text-xs uppercase tracking-wide text-gray-400 mt-3";
-        header.style.paddingLeft = `${depth * 12}px`;
-        header.textContent = item.name;
-        container.appendChild(header);
+  const buildTreeList = (items, depth, onFileClick) => {
+    const list = document.createElement("ul");
+    list.className =
+      depth === 0
+        ? "space-y-1 text-sm text-gray-700"
+        : "mt-2 space-y-1 border-l border-gray-200 pl-4";
 
-        if (Array.isArray(item.children)) {
-          renderTreeList(item.children, container, depth + 1, onFileClick);
+    items.forEach((item) => {
+      const listItem = document.createElement("li");
+
+      if (item.type === "directory") {
+        const header = document.createElement("span");
+        header.className = "block text-sm font-semibold text-gray-600";
+        header.textContent = item.name;
+        listItem.appendChild(header);
+
+        if (Array.isArray(item.children) && item.children.length > 0) {
+          listItem.appendChild(buildTreeList(item.children, depth + 1, onFileClick));
         }
+
+        list.appendChild(listItem);
         return;
       }
 
       if (item.type === "file") {
+        const label = item.label || item.path;
+        const status = item.status || "published";
+        const isHidden = status === "hidden";
+        const isDraft = status === "draft";
+
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "w-full text-left px-2 py-2 rounded-md text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors";
-        button.style.paddingLeft = `${depth * 12 + 8}px`;
+        button.className =
+          "w-full text-left px-2 py-2 rounded-md transition-colors";
+        if (isHidden || isDraft) {
+          button.classList.add("text-gray-400", "hover:text-gray-500");
+        } else {
+          button.classList.add("text-gray-700", "hover:bg-indigo-50", "hover:text-indigo-700");
+        }
 
-        const label = item.label || item.path;
+        const labelRow = document.createElement("div");
+        labelRow.className = "flex flex-wrap items-center gap-2";
+
         const labelSpan = document.createElement("span");
-        labelSpan.className = "block text-sm";
+        labelSpan.className = "text-sm font-medium";
         labelSpan.textContent = label;
+        labelRow.appendChild(labelSpan);
+
+        if (isHidden || isDraft) {
+          const icon = document.createElement("span");
+          icon.className = "text-gray-400";
+          icon.innerHTML = isHidden
+            ? `<svg class="inline-block" role="img" aria-label="Hidden" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0112 20c-5 0-9.27-3.11-11-8 1.04-2.79 2.8-5 5-6.28"></path><path d="M9.9 4.24A10.94 10.94 0 0112 4c5 0 9.27 3.11 11 8-0.55 1.47-1.32 2.78-2.25 3.88"></path><path d="M14.12 14.12a3 3 0 01-4.24-4.24"></path><path d="M1 1l22 22"></path></svg>`
+            : `<svg class="inline-block" role="img" aria-label="Draft" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>`;
+          labelRow.appendChild(icon);
+        }
 
         const pathSpan = document.createElement("span");
-        pathSpan.className = "block text-xs text-gray-400";
-        pathSpan.textContent = item.path;
+        pathSpan.className = "text-xs text-gray-400";
+        pathSpan.textContent = `(${item.path})`;
+        labelRow.appendChild(pathSpan);
 
-        button.appendChild(labelSpan);
-        button.appendChild(pathSpan);
+        button.appendChild(labelRow);
         button.dataset.path = item.path;
         button.addEventListener("click", () => onFileClick(item.path, label, button));
-        container.appendChild(button);
+
+        listItem.appendChild(button);
+        list.appendChild(listItem);
       }
     });
+
+    return list;
   };
 
   // Load a tree list from the API.
@@ -1298,9 +1465,10 @@
         if (!Array.isArray(data.items) || data.items.length === 0) {
           editor.list.innerHTML = `<p class="text-xs text-gray-500">${editor.emptyText}</p>`;
         } else {
-          renderTreeList(data.items, editor.list, 0, (path, label, button) =>
+          const list = buildTreeList(data.items, 0, (path, label, button) =>
             openEditorItem(editor, path, label, button)
           );
+          editor.list.appendChild(list);
         }
         editor.state.loaded = true;
         return;
@@ -1370,6 +1538,14 @@
     }
 
     editor.editorArea.value = editor.state.originalBody;
+    setEditorState(editor, false);
+    editor.state.currentPath = "";
+    editor.state.originalBody = "";
+    editor.pathLabel?.classList.add("hidden");
+    if (editor.title && editor.defaultTitle) {
+      editor.title.textContent = editor.defaultTitle;
+    }
+    editor.state.activeButton = setActiveButton(null, editor.state.activeButton);
   };
 
   // Wire editor buttons for a given editor definition.
@@ -1380,6 +1556,14 @@
 
     if (editor.cancelButton) {
       editor.cancelButton.addEventListener("click", () => cancelEditorContent(editor));
+    }
+
+    if (editor.editorArea) {
+      editor.editorArea.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          cancelEditorContent(editor);
+        }
+      });
     }
 
     if (editor.refreshButton) {
@@ -1401,6 +1585,7 @@
       title: qs("#content-editor-title"),
       pathLabel: qs("#content-editor-path"),
       refreshButton: qs("#refresh-content-btn"),
+      defaultTitle: "Select a page",
       endpoints: {
         list: "/api/site/list",
         load: "/api/site",
@@ -1418,7 +1603,8 @@
         loaded: false,
         currentPath: "",
         originalBody: "",
-        activeButton: null
+        activeButton: null,
+        isEditing: false
       }
     };
 
@@ -1431,6 +1617,7 @@
       title: qs("#block-editor-title"),
       pathLabel: qs("#block-editor-path"),
       refreshButton: qs("#refresh-blocks-btn"),
+      defaultTitle: "Select a block",
       endpoints: {
         list: "/api/blocks/list",
         load: "/api/blocks",
@@ -1448,12 +1635,28 @@
         loaded: false,
         currentPath: "",
         originalBody: "",
-        activeButton: null
+        activeButton: null,
+        isEditing: false
       }
     };
 
     initEditor(contentEditor);
     initEditor(blockEditor);
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      if (contentEditor.state.isEditing) {
+        cancelEditorContent(contentEditor);
+        return;
+      }
+
+      if (blockEditor.state.isEditing) {
+        cancelEditorContent(blockEditor);
+      }
+    });
 
     const contentTab = qs("[data-tab='content']");
     if (contentTab) {
