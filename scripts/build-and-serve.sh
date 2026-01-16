@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-workspace_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./_shared.sh
+source "${script_dir}/_shared.sh"
+
+workspace_root="$(cd "${script_dir}/.." && pwd)"
 cd "${workspace_root}"
 
 BUILD_ARGS=()
@@ -24,15 +28,17 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-echo "Running Flint build..."
+ui_banner "Flint build + serve"
+ui_step "Build"
 ./scripts/build.sh "${BUILD_ARGS[@]}"
 
 if [[ -x "./scripts/seed-content.sh" ]]; then
-  echo "Seeding default content into dist/site (if needed)..."
+  ui_step "Seed content (if needed)"
   ./scripts/seed-content.sh --root "${workspace_root}/dist"
 fi
 
-echo "Serving dist/app on http://localhost:${PORT} (Ctrl+C to stop)"
+ui_step "Serve"
+ui_note "http://localhost:${PORT} (Ctrl+C to stop)"
 cd dist/app
 
 # shellcheck disable=SC2086

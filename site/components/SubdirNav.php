@@ -111,6 +111,9 @@ class SubdirNav extends ContentNavBase
 
             // Derive a label and link for the section heading.
             $label = trim((string)($indexMeta['title'] ?? ''));
+            if ($label !== '') {
+                $label = strip_inline_markdown($label);
+            }
             if ($label === '') {
                 $label = $entry;
             }

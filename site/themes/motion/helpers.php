@@ -304,6 +304,10 @@ function motion_theme_get_recent_blog_posts(int $limit = 5, bool $includePrivate
         }
 
         $label = trim((string)($meta['title'] ?? ''));
+        if ($label !== '') {
+            $label = strip_inline_markdown($label);
+        }
+
         if ($label === '') {
             $label = $baseName;
         }

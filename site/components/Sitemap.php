@@ -18,13 +18,15 @@ class Sitemap extends RenderComponent
             return '';
         }
 
+        $parser = new \Flint\Parser($app);
+
         // Determine admin state for hidden/draft visibility.
         $auth = new Auth($app);
         $isAdmin = $auth->isAdmin();
         $pagesDir = $app->root . '/site/pages';
 
         // Build a recursive tree of pages.
-        $items = self::buildTree($pagesDir, '', $isAdmin);
+        $items = self::buildTree($pagesDir, '', $isAdmin, $parser);
         if (empty($items)) {
             return '';
         }
@@ -49,8 +51,12 @@ class Sitemap extends RenderComponent
         return trim((string)ob_get_clean());
     }
 
-    private static function buildTree(string $baseDir, string $relativeDir, bool $includePrivate): array
-    {
+    private static function buildTree(
+        string $baseDir,
+        string $relativeDir,
+        bool $includePrivate,
+        \Flint\Parser $parser
+    ): array {
         // Walk the pages directory and build a mixed tree.
         if (!is_dir($baseDir)) {
             return [];
@@ -75,7 +81,7 @@ class Sitemap extends RenderComponent
             if (is_dir($fullPath)) {
                 // Recurse into subdirectories and keep non-empty branches.
                 $childRelative = ltrim($relativeDir . '/' . $entry, '/');
-                $children = self::buildTree($baseDir, $childRelative, $includePrivate);
+                $children = self::buildTree($baseDir, $childRelative, $includePrivate, $parser);
                 if (!empty($children)) {
                     $directories[] = [
                         'type' => 'directory',
@@ -102,6 +108,14 @@ class Sitemap extends RenderComponent
 
             // Use frontmatter title when available.
             $label = trim((string)($meta['title'] ?? ''));
+            if ($label !== '') {
+                $label = strip_inline_markdown($label);
+            }
+
+            if ($label !== '') {
+                $label = self::stripInlineLabel($label, $parser);
+            }
+
             if ($label === '') {
                 $label = self::labelFromRelative($relativeFile, $slug);
             }
@@ -149,13 +163,14 @@ class Sitemap extends RenderComponent
             ?>
             <li class="sitemap__item<?= $statusClass ?>">
                 <a class="sitemap__link" href="<?= esc_html($item['path']) ?>">
-                    <?= esc_html($item['label']) ?>
+                    <span class="sitemap__label"><?= esc_html($item['label']) ?></span>
+                    <?php if ($isAdmin && $isHidden) : ?>
+                        <?= self::statusIcon('hidden', 'Hidden') ?>
+                    <?php elseif ($isAdmin && $isDraft) : ?>
+                        <?= self::statusIcon('draft', 'Draft') ?>
+                    <?php endif; ?>
+                    <span class="sitemap__path">(<?= esc_html($item['path']) ?>)</span>
                 </a>
-                <?php if ($isAdmin && $isHidden) : ?>
-                    <?= self::statusIcon('hidden', 'Hidden') ?>
-                <?php elseif ($isAdmin && $isDraft) : ?>
-                    <?= self::statusIcon('draft', 'Draft') ?>
-                <?php endif; ?>
             </li>
             <?php
         }
@@ -186,6 +201,22 @@ class Sitemap extends RenderComponent
         <?php
 
         return trim((string)ob_get_clean());
+    }
+
+    private static function stripInlineLabel(string $label, \Flint\Parser $parser): string
+    {
+        $label = trim($label);
+        if ($label === '') {
+            return '';
+        }
+
+        $rendered = $parser->renderInlineMarkdown($label);
+        $plain = trim(strip_tags($rendered));
+        if ($plain === '') {
+            return '';
+        }
+
+        return html_entity_decode($plain, ENT_QUOTES, 'UTF-8');
     }
 
     private static function labelFromRelative(string $relativeFile, string $slug): string
