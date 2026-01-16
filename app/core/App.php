@@ -442,6 +442,13 @@ class App
             return;
         }
 
+        // Logout via browser navigation.
+        if ($requestPath === '/logout') {
+            $authService->logout();
+            header('Location: /');
+            return;
+        }
+
         // Logout.
         if ($requestPath === '/api/logout') {
             $authService->logout();
@@ -831,6 +838,13 @@ class App
             }
             $this->clearBlockedIps();
             echo json_encode(['success' => true]);
+            return;
+        }
+
+        // List blocked IPs (admin only).
+        if ($requestPath === '/api/blocklist/list' && $requestMethod === 'GET') {
+            $items = $this->listBlockedIps();
+            echo json_encode(['success' => true, 'items' => $items]);
             return;
         }
 
@@ -1248,7 +1262,7 @@ class App
             return;
         }
 
-        $checker = new UpdateChecker($this->appDir, $this->root, $this->config);
+        $checker = new UpdateChecker($this->appDir, $this->root);
         $checker->checkForUpdates();
 
         $payload = [
@@ -1273,11 +1287,17 @@ class App
                 return;
             }
 
-            $checker = new UpdateChecker($this->appDir, $this->root, $this->config);
+            $checker = new UpdateChecker($this->appDir, $this->root);
+            $force = ($_GET['force'] ?? '') === '1';
+            if ($force) {
+                $checker->clearCache();
+            }
             $updateInfo = $checker->checkForUpdates();
+            $updateError = $checker->getLastError();
 
             echo json_encode([
-                'success' => true,
+                'success' => $updateError === null,
+                'error' => $updateError,
                 'current_version' => Version::VERSION,
                 'update_available' => $updateInfo !== null,
                 'update' => $updateInfo,
@@ -1307,7 +1327,7 @@ class App
                 return;
             }
 
-            $checker = new UpdateChecker($this->appDir, $this->root, $this->config);
+            $checker = new UpdateChecker($this->appDir, $this->root);
 
             // Download update
             $zipFile = $checker->downloadUpdate($payload['download_url']);
@@ -1602,7 +1622,8 @@ class App
      */
     private function listContentTree(): array
     {
-        return $this->buildMarkdownTree(Paths::$pagesDir, '', true);
+        $parser = new Parser($this);
+        return $this->buildMarkdownTreeWithParser(Paths::$pagesDir, '', true, $parser);
     }
 
     /**
@@ -1610,19 +1631,22 @@ class App
      */
     private function listBlockTree(): array
     {
-        return $this->buildMarkdownTree(Paths::$blocksDir, '', false);
+        return $this->buildMarkdownTreeWithParser(Paths::$blocksDir, '', false, null);
     }
 
     /**
-     * Recursively build a markdown file tree.
-     *
-     * @param string $baseDir Base directory to scan
-     * @param string $relativeDir Relative directory inside base
-     * @param bool $useContentSlug Whether to map content file slugs
-     * @return array
+     * Recursively build a markdown file tree with an optional parser for labels.
      */
-    private function buildMarkdownTree(string $baseDir, string $relativeDir, bool $useContentSlug): array
-    {
+    private function buildMarkdownTreeWithParser(
+        string $baseDir,
+        string $relativeDir,
+        bool $useContentSlug,
+        ?Parser $parser
+    ): array {
+        if ($parser === null && $useContentSlug) {
+            $parser = new Parser($this);
+        }
+
         if (!is_dir($baseDir)) {
             return [];
         }
@@ -1644,7 +1668,7 @@ class App
             $fullPath = $directory . '/' . $entry;
             if (is_dir($fullPath)) {
                 $childRelative = ltrim($relativeDir . '/' . $entry, '/');
-                $children = $this->buildMarkdownTree($baseDir, $childRelative, $useContentSlug);
+                $children = $this->buildMarkdownTreeWithParser($baseDir, $childRelative, $useContentSlug, $parser);
                 if (!empty($children)) {
                     $directories[] = [
                         'type' => 'directory',
@@ -1662,11 +1686,20 @@ class App
             $relativeFile = ltrim($relativeDir . '/' . $entry, '/');
             if ($useContentSlug) {
                 $slug = $this->contentSlugFromRelative($relativeFile);
-                $label = $this->contentLabelFromRelative($relativeFile, $slug);
+                $meta = extract_frontmatter($fullPath);
+                $status = resolve_status($meta);
+                $label = trim((string)($meta['title'] ?? ''));
+                if ($label !== '') {
+                    $label = $this->stripInlineLabel($label, $parser);
+                }
+                if ($label === '') {
+                    $label = $this->contentLabelFromRelative($relativeFile, $slug);
+                }
                 $files[] = [
                     'type' => 'file',
                     'label' => $label,
-                    'path' => $slug
+                    'path' => $slug,
+                    'status' => $status,
                 ];
             } else {
                 $label = preg_replace('/\.(md|mdx)$/i', '', $entry);
@@ -1719,10 +1752,38 @@ class App
         $baseName = basename($trimmed);
 
         if ($baseName === 'index') {
-            return 'index';
+            $dir = trim(dirname($trimmed), '.');
+            if ($dir === '' || $dir === '.') {
+                return 'home';
+            }
+
+            return basename($dir);
         }
 
         return $baseName;
+    }
+
+    /**
+     * Convert inline markdown to a plain label string.
+     */
+    private function stripInlineLabel(string $label, ?Parser $parser): string
+    {
+        $label = trim($label);
+        if ($label === '') {
+            return '';
+        }
+
+        if ($parser === null) {
+            return $label;
+        }
+
+        $rendered = $parser->renderInlineMarkdown($label);
+        $plain = trim(strip_tags($rendered));
+        if ($plain === '') {
+            return '';
+        }
+
+        return html_entity_decode($plain, ENT_QUOTES, 'UTF-8');
     }
 
     /**
@@ -2054,7 +2115,7 @@ class App
 
         // Inject admin UI HTML (buttons, controls) if user is admin.
         if ($isAdmin) {
-            $admin = new Admin($this, $isAdmin, $themeData['currentPath']);
+            $admin = new Admin($isAdmin);
             $finalHtml = $admin->injectAdminUI($finalHtml, $pageStatus);
         }
 
@@ -2191,7 +2252,8 @@ class App
             return;
         }
 
-        $this->renderMagicLinkPage(true, 'You are signed in. Continue to your admin dashboard.');
+        header('Location: /admin');
+        return;
     }
 
     /**
@@ -2424,7 +2486,7 @@ class App
     /**
      * Issue a magic link for login or password reset.
      *
-     * @return array{success:bool, message?:string, error?:string}
+     * @return array{success:bool, message?:string, error?:string, magic_link?:string}
      */
     private function issueMagicLink(string $mode): array
     {
@@ -2683,10 +2745,20 @@ class App
         $successMessage = $_POST['success_message'] ?? 'Thank you! Your submission has been received.';
         $redirectUrl = $_POST['redirect_url'] ?? '';
 
+        // Validate one-time form nonce.
+        if (!validate_form_nonce($formToken, 3600, $this->getClientIp())) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid or expired form token. Please refresh and try again.'
+            ]);
+            return;
+        }
+
         // Validate form token via Defense hooks
         $defenseResult = HookManager::trigger('form_validate', [
             'token' => $formToken,
-            'form_type' => $formName
+            'form_type' => $formName,
+            'data' => $_POST
         ]);
 
         if (is_array($defenseResult)) {
@@ -2710,7 +2782,16 @@ class App
 
         // Extract all form fields (except hidden system fields)
         $formData = [];
-        $systemFields = ['form_token', 'form_name', 'success_message', 'redirect_url'];
+        $systemFields = [
+            'form_token',
+            'form_name',
+            'success_message',
+            'redirect_url',
+            'field_order',
+            'mouse_entropy',
+            'page_title',
+            'page_url'
+        ];
 
         foreach ($_POST as $key => $value) {
             if (!in_array($key, $systemFields)) {
@@ -3150,6 +3231,10 @@ class App
 
             $allElements = $xpath->query('//*');
             foreach ($allElements as $element) {
+                if (!$element instanceof \DOMElement) {
+                    continue;
+                }
+
                 // Remove event handler attributes.
                 foreach ($dangerousAttrs as $attr) {
                     if ($element->hasAttribute($attr)) {
@@ -3341,6 +3426,86 @@ class App
     }
 
     /**
+     * Return the current blocklist entries with human-friendly metadata.
+     *
+     * @return array<int, array{ip:string,expires_at:int,expires_in:string,reason:string}>
+     */
+    private function listBlockedIps(): array
+    {
+        $blockedIps = $this->loadBlockedIps();
+        if (empty($blockedIps)) {
+            return [];
+        }
+
+        $now = time();
+        $items = [];
+        $updated = false;
+
+        foreach ($blockedIps as $blockedIp => $entry) {
+            $expiresAt = null;
+            $reason = 'Security block';
+
+            if (is_array($entry)) {
+                if (isset($entry['expires_at'])) {
+                    $expiresAt = (int)$entry['expires_at'];
+                }
+                if (isset($entry['reason']) && is_string($entry['reason'])) {
+                    $reason = $entry['reason'];
+                }
+            } elseif (is_int($entry)) {
+                $expiresAt = $entry;
+            }
+
+            if ($expiresAt === null || $expiresAt <= $now) {
+                unset($blockedIps[$blockedIp]);
+                $updated = true;
+                continue;
+            }
+
+            $items[] = [
+                'ip' => $blockedIp,
+                'expires_at' => $expiresAt,
+                'expires_in' => $this->formatExpiryWindow($expiresAt - $now),
+                'reason' => $reason,
+            ];
+        }
+
+        if ($updated) {
+            $this->saveBlockedIps($blockedIps);
+        }
+
+        usort($items, fn($a, $b) => $b['expires_at'] <=> $a['expires_at']);
+
+        return $items;
+    }
+
+    /**
+     * Format a remaining seconds window into a short label.
+     */
+    private function formatExpiryWindow(int $remainingSeconds): string
+    {
+        if ($remainingSeconds <= 0) {
+            return 'Expired';
+        }
+
+        $minutes = (int)ceil($remainingSeconds / 60);
+        if ($minutes < 60) {
+            return $minutes . ' min left';
+        }
+
+        $hours = (int)floor($minutes / 60);
+        $leftMinutes = $minutes % 60;
+        if ($hours < 24) {
+            return $leftMinutes > 0
+                ? $hours . 'h ' . $leftMinutes . 'm left'
+                : $hours . 'h left';
+        }
+
+        $days = (int)floor($hours / 24);
+        return $days . 'd left';
+    }
+
+    /**
      * Clear stored session files from disk.
      *
      * @return array{success:bool,removed?:int,errors?:int,message?:string,error?:string}
@@ -3446,9 +3611,12 @@ class App
             return null;
         }
 
-        $parts = array_values(array_filter(explode(';', $rawPath), 'strlen'));
+        $parts = array_values(array_filter(
+            explode(';', $rawPath),
+            static fn (string $value): bool => $value !== ''
+        ));
         $path = end($parts);
-        if (!is_string($path) || $path === '') {
+        if (!is_string($path)) {
             return null;
         }
 
@@ -4279,41 +4447,15 @@ class App
      */
     private function validateSecurePath(string $filePath, ?string $allowedBaseDir = null): string
     {
-        // Default to site directory if not specified
         if ($allowedBaseDir === null) {
             $allowedBaseDir = Paths::$siteDir;
         }
 
-        // Resolve the real path (follows symlinks)
-        $realPath = realpath($filePath);
-
-        // Check if path exists and is accessible
-        if ($realPath === false) {
-            // Path doesn't exist yet (file creation case)
-            // Validate the directory instead
-            $dir = dirname($filePath);
-            $realDir = realpath($dir);
-
-            if ($realDir === false) {
-                throw new \Exception('Invalid directory path');
-            }
-
-            $realPath = $realDir . '/' . basename($filePath);
-        }
-
-        // Get the real path of the allowed base directory
-        $realAllowedBase = realpath($allowedBaseDir);
-        if ($realAllowedBase === false) {
-            throw new \Exception('Invalid base directory');
-        }
-
-        // SECURITY: Verify the real path starts with the allowed base directory
-        // This prevents directory traversal and symlink attacks
-        if (!str_starts_with($realPath, $realAllowedBase)) {
-            error_log("Security: Path traversal attempt blocked - path: {$filePath}, real: {$realPath}, base: {$realAllowedBase}, IP: " . $this->getClientIp());
+        try {
+            return resolve_secure_path($filePath, $allowedBaseDir, true);
+        } catch (\RuntimeException $e) {
+            error_log("Security: Path traversal attempt blocked - path: {$filePath}, base: {$allowedBaseDir}, IP: " . $this->getClientIp());
             throw new \Exception('Invalid file path - security violation');
         }
-
-        return $realPath;
     }
 }

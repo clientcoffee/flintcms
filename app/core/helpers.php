@@ -296,7 +296,6 @@ if (!function_exists('resolve_current_context')) {
         }
 
         if (
-            $normalizedSlug === '' ||
             str_contains($normalizedSlug, '..') ||
             str_contains($normalizedSlug, '\\') ||
             str_contains($normalizedSlug, "\0") ||
@@ -404,6 +403,10 @@ if (!function_exists('list_child_pages')) {
             }
 
             $label = trim((string)($meta['title'] ?? ''));
+            if ($label !== '') {
+                $label = strip_inline_markdown($label);
+            }
+
             if ($label === '') {
                 $slug = slug_from_path($relativeFile);
                 if ($slug === '/') {
@@ -605,6 +608,334 @@ if (!function_exists('ensure_storage_dir')) {
     }
 }
 
+if (!function_exists('validate_form_nonce')) {
+    /**
+     * Validate a one-time form nonce encoded in the form token.
+     */
+    function validate_form_nonce(string $token, int $ttlSeconds = 3600, ?string $clientIp = null): bool
+    {
+        if ($token === '') {
+            return false;
+        }
+
+        $decoded = base64_decode($token, true);
+        if ($decoded === false) {
+            return false;
+        }
+
+        $data = json_decode($decoded, true);
+        if (!is_array($data)) {
+            return false;
+        }
+
+        $created = (int)($data['created'] ?? 0);
+        $nonce = (string)($data['nonce'] ?? '');
+        if ($created <= 0 || $nonce === '') {
+            return false;
+        }
+
+        $age = time() - $created;
+        if ($age < 0 || $age > $ttlSeconds) {
+            return false;
+        }
+
+        if ($clientIp !== null && isset($data['ip']) && $data['ip'] !== $clientIp) {
+            return false;
+        }
+
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+
+        if (!isset($_SESSION['form_nonces']) || !is_array($_SESSION['form_nonces'])) {
+            $_SESSION['form_nonces'] = [];
+        }
+
+        $cutoff = time() - $ttlSeconds;
+        foreach ($_SESSION['form_nonces'] as $storedNonce => $storedAt) {
+            if (!is_int($storedAt) || $storedAt < $cutoff) {
+                unset($_SESSION['form_nonces'][$storedNonce]);
+            }
+        }
+
+        if (isset($_SESSION['form_nonces'][$nonce])) {
+            return false;
+        }
+
+        $_SESSION['form_nonces'][$nonce] = time();
+
+        return true;
+    }
+}
+
+if (!function_exists('is_absolute_path')) {
+    /**
+     * Check if a path is absolute.
+     */
+    function is_absolute_path(string $path): bool
+    {
+        if ($path === '') {
+            return false;
+        }
+
+        if ($path[0] === '/' || $path[0] === '\\') {
+            return true;
+        }
+
+        return (bool)preg_match('/^[A-Za-z]:[\\\\\\/]/', $path);
+    }
+}
+
+if (!function_exists('normalize_path')) {
+    /**
+     * Normalize a path without touching the filesystem.
+     */
+    function normalize_path(string $path): string
+    {
+        $path = str_replace('\\', '/', $path);
+        $isAbsolute = str_starts_with($path, '/');
+        $segments = explode('/', $path);
+        $stack = [];
+
+        foreach ($segments as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                array_pop($stack);
+                continue;
+            }
+            $stack[] = $segment;
+        }
+
+        $normalized = ($isAbsolute ? '/' : '') . implode('/', $stack);
+        return $normalized === '' ? ($isAbsolute ? '/' : '.') : $normalized;
+    }
+}
+
+if (!function_exists('path_is_within')) {
+    /**
+     * Check if a path is within a base directory.
+     */
+    function path_is_within(string $path, string $baseDir): bool
+    {
+        $path = rtrim(normalize_path($path), '/');
+        $baseDir = rtrim(normalize_path($baseDir), '/');
+
+        if ($path === $baseDir) {
+            return true;
+        }
+
+        return str_starts_with($path, $baseDir . '/');
+    }
+}
+
+if (!function_exists('path_has_symlink')) {
+    /**
+     * Detect symlinks between base and target path.
+     */
+    function path_has_symlink(string $path, string $baseDir): bool
+    {
+        if (!path_is_within($path, $baseDir)) {
+            return true;
+        }
+
+        $relative = ltrim(substr(normalize_path($path), strlen(normalize_path($baseDir))), '/');
+        if ($relative === '') {
+            return false;
+        }
+
+        $current = rtrim(normalize_path($baseDir), '/');
+        foreach (explode('/', $relative) as $segment) {
+            $current .= '/' . $segment;
+            if (is_link($current)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('resolve_secure_path')) {
+    /**
+     * Resolve a path to a safe absolute location within allowed bases.
+     */
+    function resolve_secure_path(string $path, string|array $allowedBaseDirs, bool $allowMissing = true): string
+    {
+        if (!is_absolute_path($path)) {
+            throw new \RuntimeException('Path must be absolute');
+        }
+
+        if (preg_match('/[\x00-\x1F]/', $path)) {
+            throw new \RuntimeException('Path contains control characters');
+        }
+
+        $bases = is_array($allowedBaseDirs) ? $allowedBaseDirs : [$allowedBaseDirs];
+        $realBases = [];
+        foreach ($bases as $base) {
+            if (!is_string($base) || $base === '') {
+                continue;
+            }
+            $realBase = realpath($base);
+            if ($realBase !== false) {
+                $realBases[] = normalize_path($realBase);
+            }
+        }
+
+        if ($realBases === []) {
+            throw new \RuntimeException('No valid base directories');
+        }
+
+        $realPath = realpath($path);
+        if ($realPath === false) {
+            if (!$allowMissing) {
+                throw new \RuntimeException('Path not found');
+            }
+            $realDir = realpath(dirname($path));
+            if ($realDir === false) {
+                throw new \RuntimeException('Invalid directory path');
+            }
+            $realPath = normalize_path($realDir . '/' . basename($path));
+        } else {
+            $realPath = normalize_path($realPath);
+        }
+
+        foreach ($realBases as $base) {
+            if (!path_is_within($realPath, $base)) {
+                continue;
+            }
+            if (path_has_symlink($realPath, $base)) {
+                throw new \RuntimeException('Symlink traversal blocked');
+            }
+            return $realPath;
+        }
+
+        throw new \RuntimeException('Path outside allowed base directories');
+    }
+}
+
+if (!function_exists('safe_mkdir')) {
+    /**
+     * Create a directory within an allowed base.
+     */
+    function safe_mkdir(string $path, string|array $allowedBaseDirs, int $permissions = 0755): bool
+    {
+        $resolved = resolve_secure_path($path, $allowedBaseDirs, true);
+        if (is_dir($resolved)) {
+            return true;
+        }
+
+        return mkdir($resolved, $permissions, true);
+    }
+}
+
+if (!function_exists('safe_write_file')) {
+    /**
+     * Write a file within an allowed base directory.
+     */
+    function safe_write_file(string $path, string $contents, string|array $allowedBaseDirs, int $flags = LOCK_EX): bool
+    {
+        $resolved = resolve_secure_path($path, $allowedBaseDirs, true);
+        $dir = dirname($resolved);
+        if (!is_dir($dir) && !safe_mkdir($dir, $allowedBaseDirs, 0755)) {
+            return false;
+        }
+
+        return file_put_contents($resolved, $contents, $flags) !== false;
+    }
+}
+
+if (!function_exists('safe_unlink')) {
+    /**
+     * Delete a file within an allowed base.
+     */
+    function safe_unlink(string $path, string|array $allowedBaseDirs): bool
+    {
+        $resolved = resolve_secure_path($path, $allowedBaseDirs, false);
+        if (!is_file($resolved)) {
+            return false;
+        }
+
+        return unlink($resolved);
+    }
+}
+
+if (!function_exists('safe_rmdir')) {
+    /**
+     * Remove an empty directory within an allowed base.
+     */
+    function safe_rmdir(string $path, string|array $allowedBaseDirs): bool
+    {
+        $resolved = resolve_secure_path($path, $allowedBaseDirs, false);
+        if (!is_dir($resolved)) {
+            return false;
+        }
+
+        return rmdir($resolved);
+    }
+}
+
+if (!function_exists('safe_copy')) {
+    /**
+     * Copy a file between allowed base directories.
+     */
+    function safe_copy(string $src, string $dst, string|array $allowedSrcBases, string|array $allowedDestBases): bool
+    {
+        $resolvedSrc = resolve_secure_path($src, $allowedSrcBases, false);
+        $resolvedDst = resolve_secure_path($dst, $allowedDestBases, true);
+
+        if (!is_file($resolvedSrc)) {
+            return false;
+        }
+
+        $dir = dirname($resolvedDst);
+        if (!is_dir($dir) && !safe_mkdir($dir, $allowedDestBases, 0755)) {
+            return false;
+        }
+
+        return copy($resolvedSrc, $resolvedDst);
+    }
+}
+
+if (!function_exists('safe_rename')) {
+    /**
+     * Rename a file or directory between allowed base directories.
+     */
+    function safe_rename(
+        string $src,
+        string $dst,
+        string|array $allowedSrcBases,
+        string|array $allowedDestBases
+    ): bool {
+        $resolvedSrc = resolve_secure_path($src, $allowedSrcBases, false);
+        $resolvedDst = resolve_secure_path($dst, $allowedDestBases, true);
+
+        $dir = dirname($resolvedDst);
+        if (!is_dir($dir) && !safe_mkdir($dir, $allowedDestBases, 0755)) {
+            return false;
+        }
+
+        return rename($resolvedSrc, $resolvedDst);
+    }
+}
+
+if (!function_exists('safe_move_uploaded_file')) {
+    /**
+     * Move an uploaded file to a safe destination.
+     */
+    function safe_move_uploaded_file(string $tmpPath, string $destPath, string|array $allowedDestBases): bool
+    {
+        $resolvedDest = resolve_secure_path($destPath, $allowedDestBases, true);
+        $dir = dirname($resolvedDest);
+        if (!is_dir($dir) && !safe_mkdir($dir, $allowedDestBases, 0755)) {
+            return false;
+        }
+
+        return move_uploaded_file($tmpPath, $resolvedDest);
+    }
+}
+
 if (!function_exists('read_json_file')) {
     /**
      * Read a JSON file into an array or object.
@@ -682,6 +1013,26 @@ if (!function_exists('render_inline_markdown')) {
         }
 
         return esc_html($text);
+    }
+}
+
+if (!function_exists('strip_inline_markdown')) {
+    /**
+     * Convert inline markdown into plain text.
+     */
+    function strip_inline_markdown(string $text): string
+    {
+        $rendered = render_inline_markdown($text);
+        if ($rendered === '') {
+            return '';
+        }
+
+        $plain = trim(strip_tags($rendered));
+        if ($plain === '') {
+            return '';
+        }
+
+        return html_entity_decode($plain, ENT_QUOTES, 'UTF-8');
     }
 }
 
