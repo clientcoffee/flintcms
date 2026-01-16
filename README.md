@@ -83,7 +83,7 @@ flint/
 
 - Read `docs/CLAUDE.md` first.
 - Use feature branches and keep PRs focused.
-- Run lint + tests before opening a PR.
+- Run `bun run test` before opening a PR (use `bun run test:fix` to auto-fix).
 
 ## License
 

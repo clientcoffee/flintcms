@@ -10,13 +10,18 @@ desktop.ini
 *.swo
 *~
 
+# Repo meta
 .github/
 .claude/
 
-# Dependencies
+# Dependencies and lockfiles
 vendor/
 app/vendor/
 node_modules/
+composer.lock
+package-lock.json
+bun.lock
+bun.lockb
 
 # Build artifacts
 dist/
@@ -42,10 +47,6 @@ site/submissions/
 # site/components/*/
 # !site/components/Defense/
 
-
-composer.lock
-package-lock.json
-
-
+# Docs
 docs/
 documentation/
