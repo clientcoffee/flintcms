@@ -28,7 +28,7 @@
         "test:unit": "phpunit --testsuite Unit",
         "test:integration": "phpunit --testsuite Integration",
         "test:coverage": "phpunit --coverage-html coverage",
-        "analyse": "phpstan analyse app/core site/components --level=5",
+        "analyse": "phpstan analyse app/core site/components --level=5 --memory-limit=512M",
         "lint:php": "phpcs",
         "lint:php:fix": "phpcbf",
         "check": [

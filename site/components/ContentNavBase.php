@@ -176,6 +176,10 @@ abstract class ContentNavBase extends RenderComponent
 
             // Derive a human label from title or filename.
             $label = trim((string)($meta['title'] ?? ''));
+            if ($label !== '') {
+                $label = strip_inline_markdown($label);
+            }
+
             if ($label === '') {
                 $label = self::labelFromRelative($relativeFile, slug_from_path($relativeFile));
             }

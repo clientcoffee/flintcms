@@ -35,6 +35,14 @@ if ($pageTitlePlain === '') {
 $keywords = page_meta('keywords');
 $hasKeywords = $keywords !== '';
 
+// Adjust content spacing when a banner is present on non-post pages.
+$themeConfig = \Flint\ThemeContext::get('themeConfig', []);
+$contentType = strtolower((string)($page['meta']['type'] ?? ''));
+$bannerUrl = $page['meta']['banner'] ?? ($themeConfig['settings']['default_banner'] ?? '');
+$hasBanner = $contentType !== 'post' && $bannerUrl !== '';
+$mainPaddingClass = $hasBanner ? 'pt-10 sm:pt-8' : 'pt-14 sm:pt-10';
+$contentPaddingClass = $hasBanner ? 'pb-12 sm:pb-16' : 'py-12 sm:py-16';
+
 // Nav content comes from a markdown block in /site/blocks/nav.md.
 $navItems = '';
 $navPath = \Components\Block::resolveMarkdownBlockPath(\Flint\Paths::$rootDir, 'nav');
@@ -108,7 +116,7 @@ $footerAssets = ob_get_clean();
     <!-- Fixed Top Navigation Bar -->
     <!-- This stays at the top of the viewport as users scroll -->
     <div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200/60 shadow-sm z-50">
-        <div class="max-w-5xl mx-auto px-6 sm:px-12 py-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <div class="max-w-5xl mx-auto px-6 sm:px-12 py-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
             <!-- Site Logo/Home Link -->
             <a href="/" class="flex items-center gap-2 text-gray-900 hover:text-gray-600 font-semibold text-sm nav-link">
                 <!-- Home icon (SVG) -->
@@ -128,8 +136,8 @@ $footerAssets = ob_get_clean();
 
     <!-- Main Content Area -->
     <!-- pt-16 creates top padding to account for fixed header -->
-    <main class="pt-24 sm:pt-16 min-h-screen">
-        <div class="max-w-3xl mx-auto px-6 sm:px-12 py-12 sm:py-16">
+    <main class="<?= esc_html($mainPaddingClass) ?> min-h-screen">
+        <div class="max-w-3xl mx-auto px-6 sm:px-12 <?= esc_html($contentPaddingClass) ?>">
             <!-- $viewContent is the fully rendered HTML from Parser + view.php. -->
             <?= $viewContent ?>
         </div>
