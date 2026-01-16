@@ -229,14 +229,6 @@ abstract class BaseComponent implements ComponentInterface
     }
 
     /**
-     * Friendly alias for registerHook().
-     */
-    protected static function register_hook(string $eventName, callable $callbackFunction, ?int $priorityOverride = null): void
-    {
-        static::registerHook($eventName, $callbackFunction, $priorityOverride);
-    }
-
-    /**
      * Get configuration value with dot notation support
      *
      * DOT NOTATION:
@@ -279,14 +271,6 @@ abstract class BaseComponent implements ComponentInterface
 
         // Successfully traversed entire path, return value
         return $currentValue;
-    }
-
-    /**
-     * Friendly alias for getConfig().
-     */
-    protected static function get_config(string $keyPath, mixed $defaultValue = null): mixed
-    {
-        return static::getConfig($keyPath, $defaultValue);
     }
 
     /**
@@ -458,17 +442,9 @@ abstract class BaseComponent implements ComponentInterface
     }
 
     /**
-     * Friendly alias for getClientIp().
-     */
-    protected static function get_client_ip(): string
-    {
-        return static::getClientIp();
-    }
-
-    /**
      * Sanitize email headers to prevent injection.
      */
-    protected static function sanitize_email_header(string $value): string
+    protected static function sanitizeEmailHeader(string $value): string
     {
         return str_replace(["\r", "\n", "\0", "%0a", "%0d"], '', $value);
     }
@@ -508,16 +484,8 @@ abstract class BaseComponent implements ComponentInterface
 
         // Check if encoding failed (invalid data)
         if ($jsonString === false) {
-        return false;
-    }
-
-    /**
-     * Friendly alias for ensureStorageDir().
-     */
-    protected static function ensure_storage_dir(string $directoryPath, int $permissions = 0755): bool
-    {
-        return static::ensureStorageDir($directoryPath, $permissions);
-    }
+            return false;
+        }
 
         // Write to file with exclusive lock (LOCK_EX)
         // Returns number of bytes written, or false on failure
@@ -564,14 +532,6 @@ abstract class BaseComponent implements ComponentInterface
         // Decode JSON string
         // Second parameter determines array vs object
         return json_decode($jsonString, $associative);
-    }
-
-    /**
-     * Friendly alias for readJsonFile().
-     */
-    protected static function read_json_file(string $filePath, bool $associative = true): mixed
-    {
-        return static::readJsonFile($filePath, $associative);
     }
 
     /**
@@ -631,13 +591,5 @@ abstract class BaseComponent implements ComponentInterface
         // FILE_APPEND: Add to end of file (don't overwrite)
         // LOCK_EX: Lock file during write (concurrency safe)
         file_put_contents($logFilePath, $logLine, FILE_APPEND | LOCK_EX);
-    }
-
-    /**
-     * Friendly alias for log().
-     */
-    protected static function app_log(string $message, string $level = 'info'): void
-    {
-        static::log($message, $level);
     }
 }
