@@ -425,6 +425,10 @@ button,
 .sitemap__link {
   color: rgb(55, 53, 47);
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
 }
 
 .sitemap__link:hover {
@@ -440,4 +444,9 @@ button,
 
 .sitemap__icon {
   color: rgba(100, 116, 139, 0.9);
+}
+
+.sitemap__path {
+  color: rgba(100, 116, 139, 0.9);
+  font-size: 0.85rem;
 }

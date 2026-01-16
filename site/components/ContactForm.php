@@ -39,7 +39,13 @@ class ContactForm extends RenderComponent
         }
 
         // Precompute runtime IDs used in the markup and JS.
-        $fieldOrder = bin2hex(random_bytes(8));
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        if (!isset($_SESSION['field_order'])) {
+            $_SESSION['field_order'] = bin2hex(random_bytes(8));
+        }
+        $fieldOrder = $_SESSION['field_order'];
         $messageId = $formId . '-message';
 
         ob_start();

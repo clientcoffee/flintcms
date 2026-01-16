@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./_shared.sh
+source "${script_dir}/_shared.sh"
+
 ROOT_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
@@ -17,14 +21,14 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "Unknown option: $1"
-      echo "Run with --help for usage information"
+      ui_error "Unknown option: $1"
+      ui_note "Run with --help for usage."
       exit 1
       ;;
   esac
 done
 
-workspace_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+workspace_root="$(cd "${script_dir}/.." && pwd)"
 root="${ROOT_OVERRIDE:-$workspace_root}"
 
 app_root="${root}/app"
@@ -63,15 +67,16 @@ copy_missing() {
 }
 
 if [[ ! -d "${seed_root}" ]]; then
-  echo "Seed content not found at ${seed_root}."
+  ui_warn "Seed content not found at ${seed_root}."
   exit 0
 fi
 
 if has_markdown "${pages_dest}"; then
-  echo "Seed pages skipped (site/pages already has content)."
+  ui_note "Seed pages skipped (site/pages already has content)."
 else
   copy_missing "${pages_seed}" "${pages_dest}"
-  echo "Seed pages copied into site/pages."
+  ui_success "Seed pages copied into site/pages."
 fi
 
 copy_missing "${blocks_seed}" "${blocks_dest}"
+ui_success "Seed blocks synchronized."

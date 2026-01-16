@@ -10,16 +10,15 @@ class UpdateChecker
 {
     private string $root;
     private string $appDir;
-    private array $config;
     private string $cacheFile;
+    private ?string $lastError = null;
     private const CACHE_DURATION = 3600; // 1 hour
     private const UPDATE_REPO = 'clientcoffee/flintcms';
 
-    public function __construct(string $appDir, string $rootDir, array $config)
+    public function __construct(string $appDir, string $rootDir)
     {
         $this->appDir = $appDir;
         $this->root = $rootDir;
-        $this->config = $config;
         $this->cacheFile = $appDir . '/.update-cache.json';
     }
 
@@ -29,6 +28,8 @@ class UpdateChecker
      */
     public function checkForUpdates(): ?array
     {
+        $this->lastError = null;
+
         // Check cache first
         if ($cached = $this->getCachedUpdate()) {
             return $cached;
@@ -82,12 +83,72 @@ class UpdateChecker
         ]);
 
         $response = @file_get_contents($url, false, $context);
+        if ($response === false && function_exists('curl_init')) {
+            $ch = curl_init($url);
+            if ($ch !== false) {
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'User-Agent: Flint/' . Version::VERSION,
+                    'Accept: application/vnd.github.v3+json',
+                ]);
+                $response = curl_exec($ch);
+            }
+        }
+
         if ($response === false) {
+            $this->lastError = 'Unable to reach GitHub for updates.';
+            $fallback = $this->fetchLatestReleaseFromRedirect();
+            if ($fallback) {
+                $this->lastError = null;
+                return $fallback;
+            }
             return null;
         }
 
         $data = json_decode($response, true);
-        if (!$data || !isset($data['tag_name'])) {
+        if (!$data) {
+            $this->lastError = 'Unexpected update response from GitHub.';
+            $fallback = $this->fetchLatestReleaseFromRedirect();
+            if ($fallback) {
+                $this->lastError = null;
+                return $fallback;
+            }
+            $tagFallback = $this->fetchLatestTag();
+            if ($tagFallback) {
+                $this->lastError = null;
+                return $tagFallback;
+            }
+            return null;
+        }
+
+        if (isset($data['message'])) {
+            $this->lastError = 'GitHub API error: ' . $data['message'];
+            $fallback = $this->fetchLatestReleaseFromRedirect();
+            if ($fallback) {
+                $this->lastError = null;
+                return $fallback;
+            }
+            $tagFallback = $this->fetchLatestTag();
+            if ($tagFallback) {
+                $this->lastError = null;
+                return $tagFallback;
+            }
+            return null;
+        }
+
+        if (!isset($data['tag_name'])) {
+            $this->lastError = 'Unexpected update response from GitHub.';
+            $fallback = $this->fetchLatestReleaseFromRedirect();
+            if ($fallback) {
+                $this->lastError = null;
+                return $fallback;
+            }
+            $tagFallback = $this->fetchLatestTag();
+            if ($tagFallback) {
+                $this->lastError = null;
+                return $tagFallback;
+            }
             return null;
         }
 
@@ -120,6 +181,123 @@ class UpdateChecker
     }
 
     /**
+     * Fallback: resolve latest release via GitHub redirect.
+     */
+    private function fetchLatestReleaseFromRedirect(): ?array
+    {
+        $latestUrl = "https://github.com/" . self::UPDATE_REPO . "/releases/latest";
+        $finalUrl = null;
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($latestUrl);
+            if ($ch !== false) {
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_NOBODY, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'User-Agent: Flint/' . Version::VERSION,
+                ]);
+                curl_exec($ch);
+                $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+            }
+        }
+
+        if (!$finalUrl) {
+            $headers = @get_headers($latestUrl, true);
+            if (is_array($headers) && isset($headers['Location'])) {
+                $location = $headers['Location'];
+                if (is_array($location)) {
+                    $finalUrl = end($location);
+                } else {
+                    $finalUrl = $location;
+                }
+            }
+        }
+
+        if (!$finalUrl || !preg_match('~/tag/v?([^/]+)$~', $finalUrl, $matches)) {
+            return null;
+        }
+
+        $version = ltrim($matches[1], 'v');
+        $tag = 'v' . $version;
+        $downloadUrl = "https://github.com/" . self::UPDATE_REPO . "/archive/refs/tags/" . $tag . ".zip";
+
+        return [
+            'version' => $version,
+            'url' => $finalUrl,
+            'download_url' => $downloadUrl,
+            'body' => '',
+            'published_at' => '',
+        ];
+    }
+
+    /**
+     * Fallback: resolve the latest tag when no releases are published.
+     */
+    private function fetchLatestTag(): ?array
+    {
+        $url = "https://api.github.com/repos/" . self::UPDATE_REPO . "/tags?per_page=1";
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => [
+                    'User-Agent: Flint/' . Version::VERSION,
+                    'Accept: application/vnd.github.v3+json'
+                ],
+                'timeout' => 5,
+            ]
+        ]);
+
+        $response = @file_get_contents($url, false, $context);
+        if ($response === false && function_exists('curl_init')) {
+            $ch = curl_init($url);
+            if ($ch !== false) {
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'User-Agent: Flint/' . Version::VERSION,
+                    'Accept: application/vnd.github.v3+json',
+                ]);
+                $response = curl_exec($ch);
+            }
+        }
+
+        if ($response === false) {
+            return null;
+        }
+
+        $data = json_decode($response, true);
+        if (!is_array($data) || !isset($data[0]['name'])) {
+            return null;
+        }
+
+        $tagName = (string)$data[0]['name'];
+        $version = ltrim($tagName, 'v');
+        $downloadUrl = $data[0]['zipball_url'] ?? null;
+        if (!$downloadUrl) {
+            $downloadUrl = "https://github.com/" . self::UPDATE_REPO . "/archive/refs/tags/" . $tagName . ".zip";
+        }
+
+        return [
+            'version' => $version,
+            'url' => "https://github.com/" . self::UPDATE_REPO . "/tree/" . $tagName,
+            'download_url' => $downloadUrl,
+            'body' => '',
+            'published_at' => '',
+        ];
+    }
+
+    /**
+     * Get the last update check error, if any.
+     */
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
+
+    /**
      * Get cached update info.
      */
     private function getCachedUpdate(): ?array
@@ -133,12 +311,21 @@ class UpdateChecker
             return null;
         }
 
-        // Check if cache is expired
-        if (time() - $cache['timestamp'] > self::CACHE_DURATION) {
+        if (!isset($cache['current_version']) || $cache['current_version'] !== Version::VERSION) {
             return null;
         }
 
-        return $cache['data'];
+        $duration = isset($cache['duration']) ? (int)$cache['duration'] : self::CACHE_DURATION;
+        if ($duration <= 0) {
+            $duration = self::CACHE_DURATION;
+        }
+
+        // Check if cache is expired
+        if (time() - $cache['timestamp'] > $duration) {
+            return null;
+        }
+
+        return $cache['data'] ?? null;
     }
 
     /**
@@ -150,9 +337,10 @@ class UpdateChecker
             'timestamp' => time(),
             'duration' => $duration,
             'data' => $data,
+            'current_version' => Version::VERSION,
         ];
 
-        @file_put_contents($this->cacheFile, json_encode($cache, JSON_PRETTY_PRINT));
+        safe_write_file($this->cacheFile, json_encode($cache, JSON_PRETTY_PRINT), $this->appDir);
     }
 
     /**
@@ -161,7 +349,7 @@ class UpdateChecker
     public function clearCache(): void
     {
         if (file_exists($this->cacheFile)) {
-            @unlink($this->cacheFile);
+            safe_unlink($this->cacheFile, $this->appDir);
         }
     }
 
@@ -188,7 +376,7 @@ class UpdateChecker
             return null;
         }
 
-        if (@file_put_contents($zipFile, $data) === false) {
+        if (!safe_write_file($zipFile, $data, sys_get_temp_dir(), LOCK_EX)) {
             return null;
         }
 
@@ -234,17 +422,17 @@ class UpdateChecker
 
             // Replace app directory
             $appTarget = $this->root . '/app';
-            if (!$this->recursiveRemoveDirectory($appTarget)) {
+            if (!$this->recursiveRemoveDirectory($appTarget, $this->root)) {
                 throw new \Exception("Failed to remove old app directory");
             }
 
-            if (!rename($appSource, $appTarget)) {
+            if (!$this->moveDirectory($appSource, $appTarget)) {
                 throw new \Exception("Failed to move new app directory");
             }
 
             // Clean up
-            $this->recursiveRemoveDirectory($tempExtractDir);
-            @unlink($zipFile);
+            $this->recursiveRemoveDirectory($tempExtractDir, sys_get_temp_dir());
+            safe_unlink($zipFile, sys_get_temp_dir());
 
             // Clear update cache
             $this->clearCache();
@@ -269,7 +457,7 @@ class UpdateChecker
             return false;
         }
 
-        return $this->recursiveCopy($appDir, $backupDir);
+        return $this->recursiveCopy($appDir, $backupDir, $this->root, $this->root);
     }
 
     /**
@@ -281,11 +469,11 @@ class UpdateChecker
 
         // Remove failed update
         if (is_dir($appDir)) {
-            $this->recursiveRemoveDirectory($appDir);
+            $this->recursiveRemoveDirectory($appDir, $this->root);
         }
 
         // Restore backup
-        return rename($backupDir, $appDir);
+        return safe_rename($backupDir, $appDir, $this->root, $this->root);
     }
 
     /**
@@ -316,13 +504,17 @@ class UpdateChecker
     /**
      * Recursively copy directory.
      */
-    private function recursiveCopy(string $src, string $dst): bool
-    {
+    private function recursiveCopy(
+        string $src,
+        string $dst,
+        string|array $allowedSrcBases,
+        string|array $allowedDestBases
+    ): bool {
         if (!is_dir($src)) {
             return false;
         }
 
-        if (!mkdir($dst, 0755, true)) {
+        if (!safe_mkdir($dst, $allowedDestBases, 0755)) {
             return false;
         }
 
@@ -336,11 +528,11 @@ class UpdateChecker
             $dstPath = $dst . '/' . $item;
 
             if (is_dir($srcPath)) {
-                if (!$this->recursiveCopy($srcPath, $dstPath)) {
+                if (!$this->recursiveCopy($srcPath, $dstPath, $allowedSrcBases, $allowedDestBases)) {
                     return false;
                 }
             } else {
-                if (!copy($srcPath, $dstPath)) {
+                if (!safe_copy($srcPath, $dstPath, $allowedSrcBases, $allowedDestBases)) {
                     return false;
                 }
             }
@@ -350,9 +542,29 @@ class UpdateChecker
     }
 
     /**
+     * Move a directory across filesystems with a copy fallback.
+     */
+    private function moveDirectory(string $src, string $dst): bool
+    {
+        if (safe_rename($src, $dst, sys_get_temp_dir(), $this->root)) {
+            return true;
+        }
+
+        if (!$this->recursiveCopy($src, $dst, sys_get_temp_dir(), $this->root)) {
+            if (is_dir($dst)) {
+                $this->recursiveRemoveDirectory($dst, $this->root);
+            }
+            return false;
+        }
+
+        $this->recursiveRemoveDirectory($src, sys_get_temp_dir());
+        return true;
+    }
+
+    /**
      * Recursively remove directory.
      */
-    private function recursiveRemoveDirectory(string $dir): bool
+    private function recursiveRemoveDirectory(string $dir, string|array $allowedBaseDirs): bool
     {
         if (!is_dir($dir)) {
             return true;
@@ -364,9 +576,13 @@ class UpdateChecker
                 continue;
             }
             $path = $dir . '/' . $item;
-            is_dir($path) ? $this->recursiveRemoveDirectory($path) : unlink($path);
+            if (is_dir($path)) {
+                $this->recursiveRemoveDirectory($path, $allowedBaseDirs);
+            } else {
+                safe_unlink($path, $allowedBaseDirs);
+            }
         }
 
-        return rmdir($dir);
+        return safe_rmdir($dir, $allowedBaseDirs);
     }
 }
