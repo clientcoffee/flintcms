@@ -93,10 +93,25 @@ class Form extends BaseComponent
         $formName = $payload['form_name'] ?? 'contact';
         $successMessage = $payload['success_message'] ?? 'Thank you! Your submission has been received.';
         $redirectUrl = $payload['redirect_url'] ?? null;
+        $formToken = (string)($payload['form_token'] ?? '');
+
+        // Validate one-time form nonce.
+        if (!validate_form_nonce($formToken, 3600, get_client_ip())) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid or expired form token. Please refresh and try again.'
+            ]);
+            return;
+        }
 
         // Remove meta fields.
         $formData = $payload;
-        unset($formData['form_token'], $formData['form_name'], $formData['success_message'], $formData['redirect_url']);
+        unset(
+            $formData['form_token'],
+            $formData['form_name'],
+            $formData['success_message'],
+            $formData['redirect_url']
+        );
 
         // Validate form token via Defense hooks.
         $defenseResult = HookManager::trigger('form_validate', [
