@@ -26,7 +26,7 @@ class Form extends BaseComponent
      */
     protected static function registerHooks(): void
     {
-        self::register_hook('custom_api_endpoints', [self::class, 'handleApiEndpoints']);
+        self::registerHook('custom_api_endpoints', [self::class, 'handleApiEndpoints']);
     }
 
     /**
