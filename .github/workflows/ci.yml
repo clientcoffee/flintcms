@@ -262,6 +262,8 @@ jobs:
 
       - name: Secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-smoke:
     runs-on: ubuntu-latest
