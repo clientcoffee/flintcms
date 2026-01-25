@@ -13,6 +13,7 @@ desktop.ini
 # Repo meta
 .github/
 .claude/
+.worktrees/
 
 # Dependencies and lockfiles
 vendor/
