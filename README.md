@@ -83,6 +83,7 @@ flint/
 
 - Read `docs/CLAUDE.md` first.
 - Use feature branches and keep PRs focused.
+- Target `dev` for all PRs; `main` is build-only for public releases.
 - Run `bun run test` before opening a PR (use `bun run test:fix` to auto-fix).
 
 ## License
