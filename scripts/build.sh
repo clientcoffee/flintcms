@@ -40,37 +40,46 @@ workspace_root="$(cd "${script_dir}/.." && pwd)"
 app_root="${workspace_root}/app"
 site_root="${workspace_root}/site"
 dist_root="${workspace_root}/dist"
+clean_script="${workspace_root}/scripts/clean.sh"
 
 FLINT_VERBOSE="${VERBOSE}"
 
-# Ensure dist/ is wiped before anything else runs so build output is always fresh.
-if [[ -d "${dist_root}" ]]; then
-  rm -rf "${dist_root}"
-fi
-
 ui_banner "Flint build"
 ui_note "Output: ${dist_root}"
+
+if [[ -x "${clean_script}" ]]; then
+  ui_step "Clean build inputs"
+  FLINT_VERBOSE="${VERBOSE}" "${clean_script}" --dist --runtime
+else
+  ui_warn "Clean script missing; removing dist/ manually."
+  rm -rf "${dist_root}"
+fi
 
 # Pre-build checks
 if [[ "${SKIP_CHECKS}" == "false" ]]; then
   ui_step "Pre-build checks"
 
-  # Check if composer dependencies are installed
-  if [[ ! -d "${workspace_root}/vendor" ]]; then
-    ui_warn "vendor/ not found. Run 'composer install' first."
-    ui_warn "Skipping tests and analysis."
-  else
-    if run_with_spinner "Running tests" composer test --working-dir="${workspace_root}"; then
-      :
-    else
-      ui_warn "Tests failed (build continues)."
-    fi
+  # Ensure a clean dependency set before running checks.
+  if [[ -x "${clean_script}" ]]; then
+    FLINT_VERBOSE="${VERBOSE}" "${clean_script}" --vendor
+  elif [[ -d "${workspace_root}/vendor" ]]; then
+    ui_step "Clean vendor/"
+    rm -rf "${workspace_root}/vendor"
+  fi
 
-    if run_with_spinner "Static analysis" composer analyse --working-dir="${workspace_root}"; then
-      :
-    else
-      ui_warn "Static analysis reported issues."
-    fi
+  if ! run_with_spinner "Install composer dependencies" composer install --working-dir="${workspace_root}" --no-interaction --prefer-dist; then
+    ui_error "Composer install failed. Halting build."
+    exit 1
+  fi
+
+  if ! run_with_spinner "Running tests" composer test --working-dir="${workspace_root}"; then
+    ui_error "Tests failed. Halting build."
+    exit 1
+  fi
+
+  if ! run_with_spinner "Static analysis" composer analyse --working-dir="${workspace_root}"; then
+    ui_error "Static analysis reported issues. Halting build."
+    exit 1
   fi
 else
   ui_warn "Skipping checks (--skip-checks)."
@@ -122,6 +131,10 @@ seed_script="${workspace_root}/scripts/seed-content.sh"
 if [[ -x "${seed_script}" ]]; then
   ui_step "Seed default content (if needed)"
   "${seed_script}" --root "${dist_root}"
+fi
+
+if [[ -x "${clean_script}" ]]; then
+  FLINT_VERBOSE="${VERBOSE}" "${clean_script}" --runtime --root "${dist_root}"
 fi
 
 # Create empty uploads directory
@@ -196,6 +209,22 @@ for file in "${excluded_files[@]}"; do
     ((validation_errors++))
   fi
 done
+
+# Check for runtime cache files that should not ship.
+shopt -s nullglob
+runtime_cache_files=(
+  "${dist_root}"/site/submissions/.magic-link-*.json
+)
+shopt -u nullglob
+if (( ${#runtime_cache_files[@]} )); then
+  ui_error "Runtime cache files in dist/site/submissions"
+  ((validation_errors++))
+fi
+
+if [[ -f "${dist_root}/app/storage/.tokens/magic-link.json" ]]; then
+  ui_error "Runtime token store in dist/app/storage/.tokens/magic-link.json"
+  ((validation_errors++))
+fi
 
 if [[ ${validation_errors} -eq 0 ]]; then
   ui_success "Build validation passed"

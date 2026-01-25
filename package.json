@@ -3,6 +3,8 @@
   "private": true,
   "packageManager": "bun@1.1.6",
   "scripts": {
+    "dev": "cd app && php -S localhost:8000",
+    "build": "bash scripts/build.sh",
     "lint:js": "bunx eslint app/assets/js/*.js",
     "lint:js:fix": "bunx eslint --fix app/assets/js/*.js",
     "test": "bash scripts/test.sh",

@@ -17,6 +17,12 @@ workspace_root="$(cd "${script_dir}/.." && pwd)"
 dist_root="${workspace_root}/dist"
 worktree_root="${workspace_root}/.release-${release_branch}"
 
+if [[ "${source_branch}" != "dev" ]]; then
+  ui_error "Releases must be published from the dev branch."
+  ui_note "Usage: scripts/publish-release.sh <version-tag> dev main"
+  exit 1
+fi
+
 if [[ ! -d "${dist_root}" ]]; then
   ui_error "Missing dist directory. Run scripts/build.sh first."
   exit 1
