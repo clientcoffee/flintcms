@@ -34,7 +34,13 @@ if [[ "${current_branch}" != "${source_branch}" ]]; then
   exit 1
 fi
 
-ui_banner "Publish release ${version_tag}"
+ui_banner "    ________  _       __"
+ui_banner "   / ____/ / (_)___  / /_"
+ui_banner "  / /_  / / / / __ \/ __/"
+ui_banner " / __/ / /_/ / / / / /____'\ "
+ui_banner "/_/    \______/  \_________/"
+ui_note "Publish release ${version_tag}"
+ui_divider
 
 if git -C "${workspace_root}" worktree list | grep -q "${worktree_root}"; then
   ui_note "Worktree exists: ${worktree_root}"

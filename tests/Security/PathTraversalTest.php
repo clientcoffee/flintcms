@@ -10,72 +10,106 @@ use PHPUnit\Framework\TestCase;
  */
 class PathTraversalTest extends TestCase
 {
-    public function testBlocksDoubleDotInRequestPath(): void
+    private array $tempRoots = [];
+
+    protected function tearDown(): void
     {
-        $requestPath = '/site/uploads/../../config.ini';
-        $this->assertStringContainsString('..', $requestPath);
-        // App should block this at line 37
+        foreach ($this->tempRoots as $root) {
+            $this->recursiveRemoveDirectory($root);
+        }
+        $this->tempRoots = [];
     }
 
-    public function testBlocksEncodedPathTraversal(): void
+    public function testBlocksDoubleDotTraversal(): void
     {
-        $encoded = urldecode('%2e%2e%2fconfig.ini');
-        $this->assertStringContainsString('..', $encoded);
+        $base = $this->makeTempRoot();
+        mkdir($base . '/site/uploads', 0755, true);
+
+        // Classic ../ traversal should be rejected by secure path resolution.
+        $this->expectException(\RuntimeException::class);
+        resolve_secure_path($base . '/site/uploads/../../config.ini', $base . '/site/uploads', true);
     }
 
-    public function testBlocksDoubleEncodedTraversal(): void
+    public function testBlocksEncodedTraversalAfterDecode(): void
     {
-        $doubleEncoded = urldecode(urldecode('%252e%252e%252fconfig.ini'));
-        $this->assertStringContainsString('..', $doubleEncoded);
+        $base = $this->makeTempRoot();
+        mkdir($base . '/site/uploads', 0755, true);
+
+        // Encoded traversal sequences must be caught after decoding.
+        $decoded = urldecode('%2e%2e%2fconfig.ini');
+        $this->expectException(\RuntimeException::class);
+        resolve_secure_path($base . '/site/uploads/' . $decoded, $base . '/site/uploads', true);
     }
 
-    public function testRealpathValidatesUploadDirectory(): void
+    public function testBlocksDoubleEncodedTraversalAfterDecode(): void
     {
-        $testRoot = sys_get_temp_dir() . '/flint_path_test_' . uniqid();
-        mkdir($testRoot . '/site/uploads', 0755, true);
+        $base = $this->makeTempRoot();
+        mkdir($base . '/site/uploads', 0755, true);
 
-        // Valid path
-        $validPath = $testRoot . '/site/uploads/image.jpg';
-        touch($validPath);
-        $realPath = realpath($validPath);
-        $realUploadsDir = realpath($testRoot . '/site/uploads');
-
-        $this->assertStringStartsWith($realUploadsDir, $realPath);
-
-        // Cleanup
-        unlink($validPath);
-        rmdir($testRoot . '/site/uploads');
-        rmdir($testRoot . '/site');
-        rmdir($testRoot);
+        // Double-encoded traversal attempts should still be blocked.
+        $decoded = urldecode(urldecode('%252e%252e%252fconfig.ini'));
+        $this->expectException(\RuntimeException::class);
+        resolve_secure_path($base . '/site/uploads/' . $decoded, $base . '/site/uploads', true);
     }
 
-    public function testSymlinkNotFollowedOutsideUploads(): void
+    public function testAllowsValidUploadPathInsideBase(): void
     {
-        $testRoot = sys_get_temp_dir() . '/flint_symlink_test_' . uniqid();
-        mkdir($testRoot . '/site/uploads', 0755, true);
+        $base = $this->makeTempRoot();
+        mkdir($base . '/site/uploads', 0755, true);
 
-        // Create symlink to config.ini
-        $configPath = $testRoot . '/config.ini';
-        $symlinkPath = $testRoot . '/site/uploads/evil.ini';
+        // A safe path inside uploads should resolve without errors.
+        $filePath = $base . '/site/uploads/image.jpg';
+        $resolved = resolve_secure_path($filePath, $base . '/site/uploads', true);
+        $expected = normalize_path(realpath($base . '/site/uploads') . '/image.jpg');
+        $this->assertSame($expected, $resolved);
+    }
+
+    public function testSymlinkTraversalRejected(): void
+    {
+        $base = $this->makeTempRoot();
+        mkdir($base . '/site/uploads', 0755, true);
+
+        // Symlink hops should be rejected to prevent escaping the base directory.
+        $configPath = $base . '/config.ini';
         file_put_contents($configPath, 'secret');
 
-        if (symlink($configPath, $symlinkPath)) {
-            $realPath = realpath($symlinkPath);
-            $realUploadsDir = realpath($testRoot . '/site/uploads');
-
-            // realpath follows symlinks, so this should NOT start with uploads dir
-            $this->assertFalse(
-                str_starts_with($realPath, $realUploadsDir),
-                "Symlink should resolve outside uploads directory"
-            );
-
-            unlink($symlinkPath);
+        $symlinkPath = $base . '/site/uploads/evil.ini';
+        if (!symlink($configPath, $symlinkPath)) {
+            $this->markTestSkipped('Symlinks are not supported in this environment.');
         }
 
-        // Cleanup
-        unlink($configPath);
-        rmdir($testRoot . '/site/uploads');
-        rmdir($testRoot . '/site');
-        rmdir($testRoot);
+        $this->expectException(\RuntimeException::class);
+        resolve_secure_path($symlinkPath, $base . '/site/uploads', true);
+    }
+
+    private function makeTempRoot(): string
+    {
+        $root = sys_get_temp_dir() . '/flint_path_' . bin2hex(random_bytes(4));
+        $this->tempRoots[] = $root;
+        return $root;
+    }
+
+    private function recursiveRemoveDirectory(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        $items = scandir($dir);
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+            $path = $dir . '/' . $item;
+            if (is_link($path)) {
+                unlink($path);
+                continue;
+            }
+            if (is_dir($path)) {
+                $this->recursiveRemoveDirectory($path);
+            } else {
+                unlink($path);
+            }
+        }
+        rmdir($dir);
     }
 }
