@@ -15,7 +15,11 @@ require_cmd() {
   fi
 }
 
-ui_banner "Flint test suite"
+ui_banner "    ________  _       __"
+ui_banner "   / ____/ / (_)___  / /_"
+ui_banner "  / /_  / / / / __ \/ __/"
+ui_banner " / __/ / /_/ / / / / /____'\ "
+ui_banner "/_/    \______/  \_________/"
 ui_note "Running lint, analysis, and unit tests."
 
 require_cmd php
@@ -29,3 +33,4 @@ run_with_spinner "PHP unit tests (phpunit)" composer test
 run_with_spinner "JS lint (eslint)" bun run lint:js
 ui_divider
 ui_success "All checks passed."
+

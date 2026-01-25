@@ -44,8 +44,13 @@ clean_script="${workspace_root}/scripts/clean.sh"
 
 FLINT_VERBOSE="${VERBOSE}"
 
-ui_banner "Flint build"
-ui_note "Output: ${dist_root}"
+ui_banner "    ________  _       __"
+ui_banner "   / ____/ / (_)___  / /_"
+ui_banner "  / /_  / / / / __ \/ __/"
+ui_banner " / __/ / /_/ / / / / /____'\ "
+ui_banner "/_/    \______/  \_________/"
+ui_note "Flint build. Output: ${dist_root}"
+ui_divider
 
 if [[ -x "${clean_script}" ]]; then
   ui_step "Clean build inputs"

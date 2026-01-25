@@ -43,10 +43,6 @@ ui_step() {
   printf "%b\n" "${C_BLUE}->${C_RESET} $*"
 }
 
-ui_info() {
-  printf "%b\n" "${C_CYAN}..${C_RESET} $*"
-}
-
 ui_warn() {
   printf "%b\n" "${C_YELLOW}!!${C_RESET} $*"
 }

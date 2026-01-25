@@ -11,18 +11,13 @@ use Flint\App;
  */
 class AppTest extends TestCase
 {
-    private const TEST_ROOT_SUFFIX = '/flint_site_test';
-
     private string $testRoot;
     private App $app;
 
     protected function setUp(): void
     {
-        // Create test environment
-        $this->testRoot = sys_get_temp_dir() . self::TEST_ROOT_SUFFIX;
-        if (is_dir($this->testRoot)) {
-            $this->recursiveRemoveDirectory($this->testRoot);
-        }
+        // Create isolated test environment for each run to avoid collisions.
+        $this->testRoot = sys_get_temp_dir() . '/flint_site_test_' . bin2hex(random_bytes(4));
         mkdir($this->testRoot . '/app', 0755, true);
         mkdir($this->testRoot . '/site/pages', 0755, true);
         mkdir($this->testRoot . '/site/blocks', 0755, true);
@@ -153,6 +148,24 @@ PHP;
         $method = $reflection->getMethod('sanitizeFilename');
         $this->assertEquals('upload', $method->invoke($this->app, ''));
         $this->assertEquals('upload', $method->invoke($this->app, '!!!'));
+    }
+
+    public function testSanitizeFilenameTrimsToMaximumLength(): void
+    {
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('sanitizeFilename');
+        $input = str_repeat('a', 120);
+        $result = $method->invoke($this->app, $input);
+        $this->assertSame(80, strlen($result));
+        $this->assertSame(str_repeat('a', 80), $result);
+    }
+
+    public function testSanitizeFilenameStripsUnicodeCharacters(): void
+    {
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('sanitizeFilename');
+        $this->assertSame('caf', $method->invoke($this->app, 'café'));
+        $this->assertSame('nave', $method->invoke($this->app, 'naïve'));
     }
 
     /**
