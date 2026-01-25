@@ -561,7 +561,7 @@ class Parser
      * - Links [text](url)
      * - Inline code `code`
      * - Code blocks (```)
-     * - Unordered lists (including nested)
+     * - Lists (unordered + ordered, including nested)
      * - Blockquotes (> text)
      * - Images and video embeds ![alt](url)
      * - Tables (| col1 | col2 |)
@@ -587,9 +587,10 @@ class Parser
         $htmlOutputFragments = [];
 
         // Track current parser state (for multi-line blocks)
-        $isInList = false;
         $isInBlockquote = false;
-        $currentListDepth = 0;
+        $currentListDepth = -1;
+        /** @var array<int, string> $listStack */
+        $listStack = [];
 
         // Track position in line array
         $currentLineIndex = 0;
@@ -621,9 +622,15 @@ class Parser
             // Pattern: ```language
             if (preg_match('/^```(\w*)$/', $trimmedLine, $codeFenceMatch)) {
                 // Close any open blocks before starting code block
-                if ($isInList) {
-                    $htmlOutputFragments[] = "</ul>";
-                    $isInList = false;
+                if ($currentListDepth >= 0) {
+                    for ($depth = $currentListDepth; $depth >= 0; $depth--) {
+                        $listTypeToClose = array_pop($listStack);
+                        if ($listTypeToClose === null) {
+                            break;
+                        }
+                        $htmlOutputFragments[] = "</{$listTypeToClose}>";
+                    }
+                    $currentListDepth = -1;
                 }
                 if ($isInBlockquote) {
                     $htmlOutputFragments[] = "</blockquote>";
@@ -663,9 +670,15 @@ class Parser
             // Pattern: | col1 | col2 |
             if (preg_match('/^\|(.+)\|$/', $trimmedLine)) {
                 // Close list if open
-                if ($isInList) {
-                    $htmlOutputFragments[] = "</ul>";
-                    $isInList = false;
+                if ($currentListDepth >= 0) {
+                    for ($depth = $currentListDepth; $depth >= 0; $depth--) {
+                        $listTypeToClose = array_pop($listStack);
+                        if ($listTypeToClose === null) {
+                            break;
+                        }
+                        $htmlOutputFragments[] = "</{$listTypeToClose}>";
+                    }
+                    $currentListDepth = -1;
                 }
 
                 // Parse entire table block
@@ -679,9 +692,15 @@ class Parser
             // Pattern: ---, ***, ___
             if (preg_match('/^[-*_]{3,}$/', $trimmedLine)) {
                 // Close any open blocks
-                if ($isInList) {
-                    $htmlOutputFragments[] = "</ul>";
-                    $isInList = false;
+                if ($currentListDepth >= 0) {
+                    for ($depth = $currentListDepth; $depth >= 0; $depth--) {
+                        $listTypeToClose = array_pop($listStack);
+                        if ($listTypeToClose === null) {
+                            break;
+                        }
+                        $htmlOutputFragments[] = "</{$listTypeToClose}>";
+                    }
+                    $currentListDepth = -1;
                 }
                 if ($isInBlockquote) {
                     $htmlOutputFragments[] = "</blockquote>";
@@ -697,9 +716,15 @@ class Parser
             // Pattern: > This is a quote
             if (str_starts_with($trimmedLine, '> ')) {
                 // Close list if open
-                if ($isInList) {
-                    $htmlOutputFragments[] = "</ul>";
-                    $isInList = false;
+                if ($currentListDepth >= 0) {
+                    for ($depth = $currentListDepth; $depth >= 0; $depth--) {
+                        $listTypeToClose = array_pop($listStack);
+                        if ($listTypeToClose === null) {
+                            break;
+                        }
+                        $htmlOutputFragments[] = "</{$listTypeToClose}>";
+                    }
+                    $currentListDepth = -1;
                 }
 
                 // Open blockquote if not already open
@@ -720,9 +745,15 @@ class Parser
             // Pattern: ### Header Text
             if (preg_match('/^(#{1,6})\s+(.*)$/', $trimmedLine, $headerMatch)) {
                 // Close any open blocks
-                if ($isInList) {
-                    $htmlOutputFragments[] = "</ul>";
-                    $isInList = false;
+                if ($currentListDepth >= 0) {
+                    for ($depth = $currentListDepth; $depth >= 0; $depth--) {
+                        $listTypeToClose = array_pop($listStack);
+                        if ($listTypeToClose === null) {
+                            break;
+                        }
+                        $htmlOutputFragments[] = "</{$listTypeToClose}>";
+                    }
+                    $currentListDepth = -1;
                 }
                 if ($isInBlockquote) {
                     $htmlOutputFragments[] = "</blockquote>";
@@ -742,11 +773,19 @@ class Parser
                 continue;
             }
 
-            // UNORDERED LISTS (including nested)
+            // LISTS (unordered + ordered, including nested)
             // Pattern: - List item
             //          * Another item
             //            - Nested item (2 spaces = 1 level of nesting)
+            $listMatch = null;
+            $listType = '';
             if (preg_match('/^(\s*)([-*])\s+(.*)$/', $currentLineText, $listMatch)) {
+                $listType = 'ul';
+            } elseif (preg_match('/^(\s*)(\d+)\.\s+(.*)$/', $currentLineText, $listMatch)) {
+                $listType = 'ol';
+            }
+
+            if ($listType !== '') {
                 // Close blockquote if open
                 if ($isInBlockquote) {
                     $htmlOutputFragments[] = "</blockquote>";
@@ -757,32 +796,46 @@ class Parser
                 // 2 spaces = 1 level of nesting
                 $indentationSpaces = strlen($listMatch[1]);
                 $targetDepth = (int)($indentationSpaces / 2);
-                $listClass = ' class="list-disc pl-6"';
+                $listClass = $listType === 'ol' ? ' class="list-decimal pl-6"' : ' class="list-disc pl-6"';
 
                 // Open list if not already open
-                if (!$isInList) {
-                    $htmlOutputFragments[] = "<ul{$listClass}>";
-                    $isInList = true;
+                if ($currentListDepth < 0) {
+                    $htmlOutputFragments[] = "<{$listType}{$listClass}>";
+                    $listStack[] = $listType;
                     $currentListDepth = 0;
                 }
 
                 // Handle depth changes (nested lists)
                 if ($targetDepth > $currentListDepth) {
-                    // Going deeper - open new nested <ul> tags
-                    for ($depth = $currentListDepth; $depth < $targetDepth; $depth++) {
-                        $htmlOutputFragments[] = "<ul{$listClass}>";
+                    // Going deeper - open new nested list tags
+                    for ($depth = $currentListDepth + 1; $depth <= $targetDepth; $depth++) {
+                        $htmlOutputFragments[] = "<{$listType}{$listClass}>";
+                        $listStack[] = $listType;
                     }
                 }
 
                 if ($targetDepth < $currentListDepth) {
-                    // Going shallower - close nested </ul> tags
+                    // Going shallower - close nested lists
                     for ($depth = $currentListDepth; $depth > $targetDepth; $depth--) {
-                        $htmlOutputFragments[] = "</ul>";
+                        $listTypeToClose = array_pop($listStack);
+                        if ($listTypeToClose === null) {
+                            break;
+                        }
+                        $htmlOutputFragments[] = "</{$listTypeToClose}>";
                     }
+                    $currentListDepth = $targetDepth;
                 }
 
-                // Update current depth
-                $currentListDepth = $targetDepth;
+                if ($targetDepth > $currentListDepth) {
+                    $currentListDepth = $targetDepth;
+                }
+
+                if (isset($listStack[$currentListDepth]) && $listStack[$currentListDepth] !== $listType) {
+                    $htmlOutputFragments[] = "</{$listStack[$currentListDepth]}>";
+                    array_pop($listStack);
+                    $htmlOutputFragments[] = "<{$listType}{$listClass}>";
+                    $listStack[] = $listType;
+                }
 
                 // Process inline markdown in list item text
                 $listItemText = $listMatch[3];
@@ -795,14 +848,15 @@ class Parser
             }
 
             // Close list/blockquote if we hit a non-matching line
-            if ($isInList) {
-                // Close all nested lists
-                for ($depth = $currentListDepth; $depth > 0; $depth--) {
-                    $htmlOutputFragments[] = "</ul>";
+            if ($currentListDepth >= 0) {
+                for ($depth = $currentListDepth; $depth >= 0; $depth--) {
+                    $listTypeToClose = array_pop($listStack);
+                    if ($listTypeToClose === null) {
+                        break;
+                    }
+                    $htmlOutputFragments[] = "</{$listTypeToClose}>";
                 }
-                $htmlOutputFragments[] = "</ul>";
-                $isInList = false;
-                $currentListDepth = 0;
+                $currentListDepth = -1;
             }
             if ($isInBlockquote) {
                 $htmlOutputFragments[] = "</blockquote>";
@@ -827,12 +881,14 @@ class Parser
         }
 
         // Close any blocks still open at end of document
-        if ($isInList) {
-            // Close all nested lists
-            for ($depth = $currentListDepth; $depth > 0; $depth--) {
-                $htmlOutputFragments[] = "</ul>";
+        if ($currentListDepth >= 0) {
+            for ($depth = $currentListDepth; $depth >= 0; $depth--) {
+                $listTypeToClose = array_pop($listStack);
+                if ($listTypeToClose === null) {
+                    break;
+                }
+                $htmlOutputFragments[] = "</{$listTypeToClose}>";
             }
-            $htmlOutputFragments[] = "</ul>";
         }
         if ($isInBlockquote) {
             $htmlOutputFragments[] = "</blockquote>";
