@@ -5,9 +5,86 @@ on:
   push:
     branches: [develop]
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      php: ${{ steps.filter.outputs.php }}
+      js: ${{ steps.filter.outputs.js }}
+      build: ${{ steps.filter.outputs.build }}
+      changelog: ${{ steps.filter.outputs.changelog }}
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect file changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            php:
+              - 'app/**/*.php'
+              - 'site/**/*.php'
+              - 'tests/**/*.php'
+              - 'composer.json'
+              - 'composer.lock'
+              - 'phpunit.xml'
+              - 'phpcs.xml'
+            js:
+              - 'app/assets/js/**/*.js'
+              - 'package.json'
+              - 'bun.lockb'
+            build:
+              - 'app/**'
+              - 'site/**'
+              - 'scripts/**'
+              - 'composer.json'
+              - 'composer.lock'
+              - 'package.json'
+              - 'bun.lockb'
+            changelog:
+              - 'CHANGELOG.md'
+            code:
+              - 'app/**'
+              - 'site/**'
+              - 'scripts/**'
+              - 'tests/**'
+              - 'composer.json'
+              - 'composer.lock'
+              - 'package.json'
+              - 'bun.lockb'
+
+  pr-guard:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Enforce dev base branch
+        run: |
+          if [ "${{ github.base_ref }}" != "dev" ]; then
+            echo "PRs must target the dev branch." >&2
+            exit 1
+          fi
+
+      - name: Require changelog for code changes
+        run: |
+          if [ "${{ needs.changes.outputs.code }}" = "true" ] && [ "${{ needs.changes.outputs.changelog }}" != "true" ]; then
+            echo "CHANGELOG.md update required for code changes." >&2
+            exit 1
+          fi
+
+  lint-php:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,25 +92,185 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: PHP lint (phpcs)
+        run: composer lint:php
+
+  analyse-php:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: PHP static analysis (phpstan)
+        run: composer analyse
+
+  unit-php:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: PHP unit tests (phpunit)
+        run: composer test
+
+  js-lint:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.js == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: '1.1.6'
 
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lockb') }}
+
+      - name: Install Bun dependencies
+        run: bun install --frozen-lockfile
+
+      - name: JS lint (eslint)
+        run: bun run lint:js
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP with coverage
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: xdebug
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: ${{ runner.os }}-composer-coverage-${{ hashFiles('composer.lock') }}
+
       - name: Install Composer dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Install Bun dependencies
-        run: bun install
+      - name: Run coverage
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          vendor/bin/phpunit --coverage-text --coverage-clover build/coverage.xml | tee build/coverage.txt
+          line=$(grep -E "^Lines:" build/coverage.txt | awk '{print $2}' | tr -d '%')
+          if [ -z "${line}" ]; then
+            echo "Coverage line not found." >&2
+            exit 1
+          fi
+          threshold=20
+          awk -v value="${line}" -v min="${threshold}" 'BEGIN { exit !(value+0 >= min) }' || {
+            echo "Coverage ${line}% is below ${threshold}%" >&2
+            exit 1
+          }
 
-      - name: Run checks
-        run: bun run test
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: php-coverage
+          path: build/coverage.xml
 
-  build:
+  security:
     runs-on: ubuntu-latest
-    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: ${{ runner.os }}-composer-audit-${{ hashFiles('composer.lock') }}
+
+      - name: Composer audit
+        run: composer audit --no-interaction
+
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-smoke:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,6 +279,24 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
+          coverage: none
 
-      - name: Build distribution
-        run: ./scripts/build.sh
+      - name: Smoke build
+        run: ./scripts/build.sh --skip-checks
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint-php, analyse-php, unit-php, js-lint]
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Full build
+        run: ./scripts/build.sh --skip-checks
