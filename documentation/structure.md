@@ -4,7 +4,8 @@
 
 - `app/` – runtime code, installer, setup, admin UI, core components.
 - `content/` – content, themes, components, uploads; never overwritten by updates.
-- `docs/` and `documentation/` – guides.
+- `docs/` – maintainer and contributor guides.
+- `documentation/` – public CMS documentation.
 - `scripts/` – build/publish automation.
 - `tests/`, `vendor/` – dev tooling.
 - `dist/` – release output created by `scripts/build.sh`.

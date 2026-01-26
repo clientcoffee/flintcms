@@ -4,7 +4,7 @@
 
 - `app/core/` holds runtime classes (`App.php`, `Parser.php`, `Auth.php`, etc.).
 - `content/components/` supplies reusable MDX components; `content/themes/` contains layouts and theme-specific components.
-- `documentation/` (this folder) plus `docs/` host guides; `scripts/` implement build/publish workflows.
+- `documentation/` holds public CMS guides; `docs/` holds maintainer docs; `scripts/` implement build/publish workflows.
 
 ## typical flow
 
