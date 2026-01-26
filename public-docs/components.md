@@ -1,21 +1,70 @@
 # Components
 
-## classification
+## Component lookup order
 
-- **core components** live under `app/core/components/` and are loaded via `Components\*`.
-- **user components** live under `content/components/` and share the same namespace.
-- The parser (`app/core/Parser.php`) attempts core components first, then user components, then theme modules.
+Flint resolves components in this order:
 
-## composition rules
+1. Theme components in `site/themes/<theme>/` (`Modules\\ComponentName`)
+2. Site components in `site/components/` (`Components\\ComponentName`)
+3. Core components in `app/core/components/` (`Components\\ComponentName`)
 
-- Each component declares a static `render(array $props, string $content): string`.
-- Use `getAssets()` to register JS/CSS:
-  - `styles`/`scripts` entries inject `<link>`/`<script>` tags.
-  - `inline_styles`/`inline_scripts` allow shared inline blocks.
-- Components must return single-line HTML to avoid Markdown breaking.
+This allows themes to override site or core components for styling.
 
-## developing
+## Minimal component example
 
-1. Drop your file into `content/components/MyWidget.php`.
-2. Use `\Components\Block::render()` for reusable blocks, or `<MyWidget>` inline in Markdown.
-3. Reference assets via `/components/MyWidget/style.css` and mount them in `getAssets()`.
+`site/components/Callout.php`:
+
+```php
+<?php
+
+namespace Components;
+
+class Callout
+{
+    public static function render(array $props, string $content): string
+    {
+        $type = htmlspecialchars($props['type'] ?? 'info', ENT_QUOTES, 'UTF-8');
+        return "<div class=\"callout callout-{$type}\">{$content}</div>";
+    }
+
+    public static function getAssets(): array
+    {
+        return [
+            'styles' => ['/components/Callout/style.css'],
+        ];
+    }
+}
+```
+
+Optional config file: `site/components/Callout/config.php`
+
+```php
+<?php
+
+return [
+    'component' => [
+        'name' => 'Callout',
+        'enabled' => 'true',
+        'version' => '1.0.0',
+    ],
+];
+```
+
+## Asset registration
+
+Components can declare assets via `getAssets()`:
+
+- `styles` and `scripts` add external CSS/JS links.
+- `inline_styles` and `inline_scripts` inject inline blocks.
+
+Assets live under `/components/<ComponentName>/` and are served from `site/components/<ComponentName>/`.
+
+## Naming and namespaces
+
+- `site/components/MyWidget.php` should define `namespace Components; class MyWidget`.
+- Theme components live in `site/themes/<theme>/` and use `namespace Modules;`.
+
+## Enabling and settings
+
+Component metadata is stored in `site/components/<name>/config.php`.
+Set `component.enabled` to `'true'` or `'false'` to control loading.
