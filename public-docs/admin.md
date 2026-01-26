@@ -1,18 +1,30 @@
 # Administration
 
-## password reset
+## Content tab quick tour
 
-- There is no reset endpoint; edit `app/config.php` and replace `admin.password` with a new `password_hash()` value.
+- Open `/admin` and select **Content**.
+- The left list shows pages from `site/pages/`.
+- Selecting a page loads its markdown into the editor.
+- **Save** writes changes to disk; **Cancel** restores the last loaded content.
+
+## Parent folder selector
+
+- Use the folder icon in the Content header to pick a parent folder.
+- New pages are created in the selected folder.
+
+## Updates
+
+- Update checks run on admin page views and are cached for 24 hours.
+- Cache file: `app/.update-admin-check.json`.
+- Force a check by deleting the cache file and reloading `/admin`.
+- API endpoints: `/api/updates/check` and `/api/updates/apply`.
+
+## Backups
+
+- `/api/export` generates a backup archive of `site/` (including `site/config.php`).
+- Keep backups outside the web root and restore by replacing `site/` with the archive contents.
+
+## Password reset
+
+- There is no reset endpoint; edit `site/config.php` and replace `admin.password` with a new `password_hash()` value.
 - After editing, log out of any open sessions so cached cookies cannot reuse the old secret.
-- For automated deployments, inject the admin password during install by editing the setup form payload.
-
-## update checks
-
-- Update checks run on every admin page view but are throttled to once per 24 hours. The cache file is `app/.update-admin-check.json`.
-- Force a check by deleting that file and reloading the admin UI.
-- `/api/updates/check` and `/api/updates/apply` remain available for scripted workflows.
-
-## maintenance
-
-- Logout button appears in the footer when signed in.
-- `/api/export` bundles `content/` + `config.php` for backups (requires admin).
