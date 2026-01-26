@@ -1,17 +1,32 @@
 # Core Components
 
-## purpose
+## What core components are
 
-- Core components provide the primitives that the CMS exposes to Markdown and themes (`Block`, `Nav`, `Mermaid`, etc.).
-- They live in `app/core/components/` to ensure updates ship them atomically.
+Core components are the built-in building blocks shipped with Flint. Use them for common features before reaching for custom code.
 
-## anatomy
+## Core component list
 
-- Each class exposes static `render()` and optionally `getAssets()`.
-- Use `Parser::mergeAssets()` to collect styles/scripts that the layout outputs.
-- Components must sanitize their output (the parser wraps them in placeholders before Markdown).
+| Component | Purpose |
+| --- | --- |
+| Block | Render reusable markdown blocks. |
+| ContactForm | Render a contact form and handle submissions. |
+| Defense | Rate limiting, threat tracking, and request hardening. |
+| Sitemap | Render a nested list of public pages. |
 
-## extending
+## Where they live
 
-- Modify `app/core/components/` only when adding foundational behavior.
-- For user-level extensions, copy to `content/components/` and register assets there.
+- Core components: `app/core/components/`
+- Site components: `site/components/`
+- Theme components: `site/themes/<theme>/`
+
+## Override behavior
+
+Theme and site components override core components when they share a name.
+
+## Example usage
+
+```markdown
+<Block name="nav" />
+<Sitemap />
+<ContactForm fields="contact-form" />
+```
