@@ -80,7 +80,10 @@ class Block extends RenderComponent
     private static function blockDirectoryName(string $blockName): string
     {
         $parts = preg_split('/[\\s\\-_]+/', $blockName);
-        $parts = array_filter($parts, 'strlen');
+        $parts = array_filter(
+            $parts,
+            static fn (string $value): bool => $value !== ''
+        );
 
         if (empty($parts)) {
             return ucfirst($blockName);

@@ -35,7 +35,7 @@ abstract class ContentNavBase extends RenderComponent
     /**
      * Resolve current page context from the request path.
      *
-     * @return array{filePath:string,relativeFile:string,relativeDir:string,dirPath:string,slug:string,isIndex:bool}|null.
+     * @return array{filePath:string,relativeFile:string,relativeDir:string,dirPath:string,slug:string,isIndex:bool}|null
      */
     protected static function resolveCurrentContext(): ?array
     {
@@ -176,6 +176,10 @@ abstract class ContentNavBase extends RenderComponent
 
             // Derive a human label from title or filename.
             $label = trim((string)($meta['title'] ?? ''));
+            if ($label !== '') {
+                $label = strip_inline_markdown($label);
+            }
+
             if ($label === '') {
                 $label = self::labelFromRelative($relativeFile, slug_from_path($relativeFile));
             }

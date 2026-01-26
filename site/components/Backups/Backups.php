@@ -4,6 +4,7 @@ namespace Components\Backups;
 
 use Flint\BaseComponent;
 use Flint\HookManager;
+use Flint\Paths;
 
 /**
  * Backups Component.
@@ -24,11 +25,11 @@ class Backups extends BaseComponent
         self::$metadataDir = self::$app->root . '/site/submissions/backups';
 
         // Ensure metadata directory exists.
-        ensure_storage_dir(self::$metadataDir);
+        safe_mkdir(self::$metadataDir, Paths::$siteDir, 0755);
 
         // Ensure base uploads directory has .htaccess protection.
         $uploadsDir = self::$app->root . '/site/uploads';
-        ensure_storage_dir($uploadsDir);
+        safe_mkdir($uploadsDir, Paths::$siteDir, 0755);
 
         $htaccess = $uploadsDir . '/.htaccess';
         if (!file_exists($htaccess)) {
@@ -46,7 +47,7 @@ class Backups extends BaseComponent
     Deny from all
 </Files>
 HTACCESS;
-            file_put_contents($htaccess, $htaccessContent, LOCK_EX);
+            safe_write_file($htaccess, $htaccessContent, Paths::$uploadsDir, LOCK_EX);
         }
 
         // Cleanup expired backups on init.
@@ -81,16 +82,16 @@ HTACCESS;
     protected static function registerHooks(): void
     {
         // Hook for manual backup trigger.
-        self::register_hook('admin_panel_load', [self::class, 'onAdminLoad']);
+        self::registerHook('admin_panel_load', [self::class, 'onAdminLoad']);
 
         // Register custom routes for backup downloads.
-        self::register_hook('custom_routes', [self::class, 'handleCustomRoutes']);
+        self::registerHook('custom_routes', [self::class, 'handleCustomRoutes']);
 
         // Register custom API endpoints for backup management.
-        self::register_hook('custom_api_endpoints', [self::class, 'handleApiEndpoints']);
+        self::registerHook('custom_api_endpoints', [self::class, 'handleApiEndpoints']);
 
         // Register scheduled backup task.
-        self::register_hook('register_scheduled_tasks', [self::class, 'registerScheduledTasks']);
+        self::registerHook('register_scheduled_tasks', [self::class, 'registerScheduledTasks']);
     }
 
     /**
@@ -104,7 +105,7 @@ HTACCESS;
         }
 
         // Get backup schedule configuration.
-        $scheduleType = self::get_config('backups.schedule', 'manual');
+        $scheduleType = self::getConfig('backups.schedule', 'manual');
 
         // Don't register if schedule is manual (admin-triggered only).
         if ($scheduleType === 'manual') {
@@ -116,15 +117,15 @@ HTACCESS;
 
         // Add schedule-specific options.
         if ($scheduleType === 'daily') {
-            $schedule['time'] = self::get_config('backups.schedule_time', '03:00');
+            $schedule['time'] = self::getConfig('backups.schedule_time', '03:00');
         } elseif ($scheduleType === 'weekly') {
-            $schedule['time'] = self::get_config('backups.schedule_time', '03:00');
-            $schedule['day'] = (int)self::get_config('backups.schedule_day', 0); // 0 = Sunday.
+            $schedule['time'] = self::getConfig('backups.schedule_time', '03:00');
+            $schedule['day'] = (int)self::getConfig('backups.schedule_day', 0); // 0 = Sunday.
         } elseif ($scheduleType === 'monthly') {
-            $schedule['time'] = self::get_config('backups.schedule_time', '03:00');
-            $schedule['day'] = (int)self::get_config('backups.schedule_day', 1); // 1st of month.
+            $schedule['time'] = self::getConfig('backups.schedule_time', '03:00');
+            $schedule['day'] = (int)self::getConfig('backups.schedule_day', 1); // 1st of month.
         } elseif ($scheduleType === 'interval') {
-            $schedule['seconds'] = (int)self::get_config('backups.schedule_interval', 86400); // Default: 24 hours.
+            $schedule['seconds'] = (int)self::getConfig('backups.schedule_interval', 86400); // Default: 24 hours.
         }
 
         // Register task with scheduler.
@@ -206,7 +207,15 @@ HTACCESS;
         try {
             $timestamp = time();
             $backupId = self::generateBackupId();
-            $filename = "{$backupId}.tar.gz";
+            $archiveType = self::selectArchiveType();
+            if ($archiveType === 'none') {
+                return [
+                    'success' => false,
+                    'error' => 'No archive engine available for backups'
+                ];
+            }
+            $extension = $archiveType === 'tar' ? 'tar.gz' : 'zip';
+            $filename = "{$backupId}.{$extension}";
 
             // Get backup directory for current month (yyyymm).
             $backupDir = self::getBackupDir($timestamp);
@@ -219,11 +228,13 @@ HTACCESS;
             // Copy files to temp directory.
             self::stageBackupFiles($tempDir);
 
-            // Create tarball.
-            $success = self::createTarball($tempDir, $filepath);
+            // Create archive.
+            $success = $archiveType === 'tar'
+                ? self::createTarball($tempDir, $filepath)
+                : self::createZipArchive($tempDir, $filepath);
 
             // Remove temp directory.
-            self::removeDirectory($tempDir);
+            self::removeDirectory($tempDir, Paths::$uploadsDir);
 
             if (!$success) {
                 return [
@@ -234,7 +245,7 @@ HTACCESS;
 
             // Generate download token.
             $token = bin2hex(random_bytes(32));
-            $expiry = $timestamp + self::get_config('backups.link_expiration', 86400);
+            $expiry = $timestamp + self::getConfig('backups.link_expiration', 86400);
 
             // Store metadata.
             $metadata = [
@@ -268,7 +279,7 @@ HTACCESS;
                 'email_sent' => $emailSent
             ];
         } catch (\Exception $e) {
-            self::app_log("Backup failed: " . $e->getMessage(), 'error');
+            self::log("Backup failed: " . $e->getMessage(), 'error');
             return [
                 'success' => false,
                 'error' => $e->getMessage()
@@ -284,7 +295,7 @@ HTACCESS;
         $root = self::$app->root;
 
         // Copy site/config.php if enabled.
-        if (self::get_config('backups.include_config', true)) {
+        if (self::getConfig('backups.include_config', true)) {
             $configCandidates = [
                 $root . '/site/config.php',
                 $root . '/config.php',
@@ -302,74 +313,159 @@ HTACCESS;
                 $configDest = $tempDir . '/site/config.php';
                 $configDir = dirname($configDest);
                 if (!is_dir($configDir)) {
-                    mkdir($configDir, 0755, true);
+                    safe_mkdir($configDir, Paths::$siteDir, 0755);
                 }
-                copy($configSrc, $configDest);
+                safe_copy($configSrc, $configDest, Paths::$siteDir, Paths::$uploadsDir);
             }
         }
 
         // Copy content directory.
-        if (self::get_config('backups.include_content', true)) {
+        if (self::getConfig('backups.include_content', true)) {
             $contentSrc = $root . '/site';
             $contentDest = $tempDir . '/site';
 
             if (is_dir($contentSrc)) {
-                self::copyDirectory($contentSrc, $contentDest);
+                self::copyDirectory($contentSrc, $contentDest, Paths::$siteDir, Paths::$uploadsDir);
 
                 // Exclude uploads if configured.
-                if (!self::get_config('backups.include_uploads', true)) {
+                if (!self::getConfig('backups.include_uploads', true)) {
                     $uploadsDir = $contentDest . '/uploads';
                     if (is_dir($uploadsDir)) {
-                        self::removeDirectory($uploadsDir);
+                        self::removeDirectory($uploadsDir, Paths::$uploadsDir);
                     }
                 }
             }
         }
 
         // Copy themes if enabled.
-        if (self::get_config('backups.include_themes', false)) {
+        if (self::getConfig('backups.include_themes', false)) {
             $themesSrc = $root . '/site/themes';
             $themesDest = $tempDir . '/themes';
             if (is_dir($themesSrc)) {
-                self::copyDirectory($themesSrc, $themesDest);
+                self::copyDirectory($themesSrc, $themesDest, Paths::$siteDir, Paths::$uploadsDir);
             }
         }
     }
 
     /**
-     * Create tarball from directory.
+     * Select the archive format based on available PHP extensions.
+     */
+    private static function selectArchiveType(): string
+    {
+        if (class_exists('\\PharData') && (int)ini_get('phar.readonly') === 0) {
+            return 'tar';
+        }
+
+        if (class_exists('\\ZipArchive')) {
+            return 'zip';
+        }
+
+        return 'none';
+    }
+
+    /**
+     * Create tarball from directory using PharData.
      */
     private static function createTarball(string $sourceDir, string $outputFile): bool
     {
-        $cwd = getcwd();
-        chdir($sourceDir);
-
-        // Create tarball using tar command.
-        $command = sprintf(
-            'tar -czf %s . 2>&1',
-            escapeshellarg($outputFile)
-        );
-
-        exec($command, $output, $returnCode);
-
-        chdir($cwd);
-
-        if ($returnCode !== 0) {
-            self::app_log("Tarball creation failed: " . implode("\n", $output), 'error');
+        if (!class_exists('\\PharData')) {
+            self::log("Tarball creation failed: PharData not available", 'error');
             return false;
         }
 
-        return file_exists($outputFile);
+        if ((int)ini_get('phar.readonly') !== 0) {
+            self::log("Tarball creation failed: phar.readonly enabled", 'error');
+            return false;
+        }
+
+        try {
+            $outputFile = resolve_secure_path($outputFile, Paths::$uploadsDir, true);
+            $tarPath = preg_replace('/\\.gz$/', '', $outputFile);
+            if ($tarPath === null || $tarPath === '') {
+                throw new \RuntimeException('Invalid tar path');
+            }
+
+            if (file_exists($tarPath)) {
+                safe_unlink($tarPath, Paths::$uploadsDir);
+            }
+
+            $phar = new \PharData($tarPath);
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($sourceDir, \RecursiveDirectoryIterator::SKIP_DOTS)
+            );
+            foreach ($iterator as $item) {
+                if ($item->isLink()) {
+                    continue;
+                }
+                if ($item->isFile()) {
+                    $relative = ltrim(str_replace($sourceDir, '', $item->getPathname()), '/');
+                    $phar->addFile($item->getPathname(), $relative);
+                }
+            }
+
+            $phar->compress(\Phar::GZ);
+            unset($phar);
+
+            if (file_exists($tarPath)) {
+                safe_unlink($tarPath, Paths::$uploadsDir);
+            }
+
+            return file_exists($outputFile);
+        } catch (\Throwable $error) {
+            self::log("Tarball creation failed: " . $error->getMessage(), 'error');
+            return false;
+        }
+    }
+
+    /**
+     * Create ZIP archive from directory using ZipArchive.
+     */
+    private static function createZipArchive(string $sourceDir, string $outputFile): bool
+    {
+        if (!class_exists('\\ZipArchive')) {
+            self::log("Zip creation failed: ZipArchive not available", 'error');
+            return false;
+        }
+
+        try {
+            $outputFile = resolve_secure_path($outputFile, Paths::$uploadsDir, true);
+            $zip = new \ZipArchive();
+            if ($zip->open($outputFile, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+                throw new \RuntimeException('Unable to open ZIP output file');
+            }
+
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($sourceDir, \RecursiveDirectoryIterator::SKIP_DOTS)
+            );
+            foreach ($iterator as $item) {
+                if ($item->isLink() || !$item->isFile()) {
+                    continue;
+                }
+                $relative = ltrim(str_replace($sourceDir, '', $item->getPathname()), '/');
+                $zip->addFile($item->getPathname(), $relative);
+            }
+
+            $zip->close();
+            return file_exists($outputFile);
+        } catch (\Throwable $error) {
+            self::log("Zip creation failed: " . $error->getMessage(), 'error');
+            return false;
+        }
     }
 
     /**
      * Copy directory recursively.
      */
-    private static function copyDirectory(string $source, string $dest): void
-    {
-        if (!is_dir($dest)) {
-            mkdir($dest, 0755, true);
-        }
+    private static function copyDirectory(
+        string $source,
+        string $dest,
+        string|array $sourceBase,
+        string|array $destBase
+    ): void {
+        $source = resolve_secure_path($source, $sourceBase, false);
+        $dest = resolve_secure_path($dest, $destBase, true);
+
+        safe_mkdir($dest, $destBase, 0755);
 
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($source, \RecursiveDirectoryIterator::SKIP_DOTS),
@@ -379,12 +475,14 @@ HTACCESS;
         foreach ($iterator as $item) {
             $destPath = $dest . '/' . $iterator->getSubPathName();
 
+            if ($item->isLink()) {
+                continue;
+            }
+
             if ($item->isDir()) {
-                if (!is_dir($destPath)) {
-                    mkdir($destPath, 0755, true);
-                }
+                safe_mkdir($destPath, $destBase, 0755);
             } else {
-                copy($item, $destPath);
+                safe_copy((string)$item, $destPath, $sourceBase, $destBase);
             }
         }
     }
@@ -392,8 +490,9 @@ HTACCESS;
     /**
      * Remove directory recursively.
      */
-    private static function removeDirectory(string $dir): void
+    private static function removeDirectory(string $dir, string|array $allowedBase): void
     {
+        $dir = resolve_secure_path($dir, $allowedBase, false);
         if (!is_dir($dir)) {
             return;
         }
@@ -405,13 +504,13 @@ HTACCESS;
 
         foreach ($iterator as $item) {
             if ($item->isDir()) {
-                rmdir($item);
+                safe_rmdir((string)$item, $allowedBase);
             } else {
-                unlink($item);
+                safe_unlink((string)$item, $allowedBase);
             }
         }
 
-        rmdir($dir);
+        safe_rmdir($dir, $allowedBase);
     }
 
     /**
@@ -421,7 +520,7 @@ HTACCESS;
     {
         $adminEmail = self::$app->config['mail']['admin_email'] ?? '';
         if (!$adminEmail || !filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
-            self::app_log("Invalid admin email, cannot send backup link", 'error');
+            self::log("Invalid admin email, cannot send backup link", 'error');
             return false;
         }
 
@@ -476,9 +575,9 @@ EMAIL;
         $sent = mail($adminEmail, $subject, $body, $headers);
 
         if ($sent) {
-            self::app_log("Backup email sent to {$adminEmail}");
+            self::log("Backup email sent to {$adminEmail}");
         } else {
-            self::app_log("Failed to send backup email", 'error');
+            self::log("Failed to send backup email", 'error');
         }
 
         return $sent;
@@ -530,7 +629,7 @@ EMAIL;
 
         readfile($metadata['filepath']);
 
-        self::app_log("Backup downloaded: {$metadata['backup_id']}");
+        self::log("Backup downloaded: {$metadata['backup_id']}");
 
         return true;
     }
@@ -565,7 +664,7 @@ EMAIL;
 
             if ($metadata && $now > $metadata['expires']) {
                 self::deleteBackup($metadata['backup_id']);
-                self::app_log("Cleaned up expired backup: {$metadata['backup_id']}");
+                self::log("Cleaned up expired backup: {$metadata['backup_id']}");
             }
         }
     }
@@ -575,7 +674,7 @@ EMAIL;
      */
     private static function cleanupOldBackups(): void
     {
-        $maxBackups = self::get_config('backups.max_backups', 10);
+        $maxBackups = self::getConfig('backups.max_backups', 10);
         $files = glob(self::$metadataDir . '/backup-*.json');
 
         // Sort by creation time (newest first).
@@ -591,7 +690,7 @@ EMAIL;
                 $metadata = read_json_file($file);
                 if ($metadata) {
                     self::deleteBackup($metadata['backup_id']);
-                    self::app_log("Cleaned up old backup: {$metadata['backup_id']}");
+                    self::log("Cleaned up old backup: {$metadata['backup_id']}");
                 }
             }
         }
@@ -608,12 +707,12 @@ EMAIL;
 
         if (file_exists($metadataFile)) {
             $metadata = read_json_file($metadataFile);
-            unlink($metadataFile);
+            safe_unlink($metadataFile, Paths::$siteDir);
         }
 
         // Delete tarball using filepath from metadata.
         if ($metadata && isset($metadata['filepath']) && file_exists($metadata['filepath'])) {
-            unlink($metadata['filepath']);
+            safe_unlink($metadata['filepath'], Paths::$uploadsDir);
         } else {
             // Fallback: search uploads directory structure.
             $uploadsDir = self::$app->root . '/site/uploads';
@@ -621,7 +720,7 @@ EMAIL;
             $files = glob($pattern);
             foreach ($files as $file) {
                 if (is_file($file)) {
-                    unlink($file);
+                    safe_unlink($file, Paths::$uploadsDir);
                 }
             }
         }

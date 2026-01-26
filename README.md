@@ -49,7 +49,8 @@ Optional: use the build script when you want a production bundle.
 For a quick local build + serve loop:
 
 ```bash
-./scripts/build-and-serve.sh --skip-checks
+./scripts/build.sh --skip-checks
+cd dist/app && php -S localhost:8000
 ```
 
 ## Versioning
@@ -83,7 +84,8 @@ flint/
 
 - Read `docs/CLAUDE.md` first.
 - Use feature branches and keep PRs focused.
-- Run lint + tests before opening a PR.
+- Target `dev` for all PRs; `main` is build-only for public releases.
+- Run `bun run test` before opening a PR (use `bun run test:fix` to auto-fix).
 
 ## License
 
