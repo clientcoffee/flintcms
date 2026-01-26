@@ -1,18 +1,44 @@
 # Getting Started
 
-## first run
+## First run checklist
 
-- Point your browser at the site root; Flint auto-routes to `Flint\Setup` when `config.php` is missing.
-- Provide site name, theme, and admin email. The one-shot form writes `config.php` and creates default content.
-- Use the admin login (password hash from `config.php`) to reveal edit controls on every page.
+1. Start your local server (or point your web server at `app/`).
+2. Visit the site root and complete the setup form.
+3. Log into `/admin`.
+4. Open the Content tab and select a page to edit.
 
-## verifying behavior
+## Where content lives
 
-- Use `content/pages/index.md` and `content/pages/about.md` as live examples. Editing them (via admin inline editor) updates the rendered HTML immediately.
-- Components such as `<Nav />`, `<Mermaid />`, and `<Block />` appear in the default content; modify the markdown in `content/blocks` to see live results.
-- Check `/api/status` (while logged in) to confirm session info.
+- Pages: `site/pages/`
+- Blocks: `site/blocks/`
+- Uploads: `site/uploads/`
+- Themes: `site/themes/`
 
-## tips
+## Create your first page
 
-- Keep `app/config.php` out of version control; track `app/config.example.php` instead.
-- Use `scripts/build.sh` from the repo root whenever you need a fresh `dist/` release preview.
+1. Create `site/pages/hello.md`.
+2. Add frontmatter and body content:
+
+```markdown
+---
+title: Hello World
+description: My first Flint page
+---
+
+This is my first page.
+```
+
+3. Visit `/hello` in the browser.
+
+## Editing with the Admin
+
+- Open `/admin` and navigate to **Content**.
+- Select a page in the list to load it into the editor.
+- Use **Save** to write changes back to disk.
+- Draft pages can live alongside published pages in `site/pages/`.
+
+## Next steps
+
+- Content authoring: [content.md](content.md)
+- Theme customization: [themes.md](themes.md)
+- Hooks and helpers: [hooks.md](hooks.md)
