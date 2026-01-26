@@ -95,7 +95,7 @@ if (!function_exists('parse_key_value')) {
             }
 
             $parts = explode($delimiter, $line, 2);
-            $key = trim($parts[0] ?? '');
+            $key = trim($parts[0]);
             $value = trim($parts[1] ?? '');
 
             if ($key !== '' && $value !== '') {
@@ -500,10 +500,6 @@ if (!function_exists('get_config')) {
             } else {
                 $config = ['site' => ThemeContext::get('site', [])];
             }
-        }
-
-        if (!is_array($config)) {
-            return $default;
         }
 
         $segments = explode('.', $keyPath);

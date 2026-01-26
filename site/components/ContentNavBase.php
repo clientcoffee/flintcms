@@ -35,7 +35,7 @@ abstract class ContentNavBase extends RenderComponent
     /**
      * Resolve current page context from the request path.
      *
-     * @return array{filePath:string,relativeFile:string,relativeDir:string,dirPath:string,slug:string,isIndex:bool}|null.
+     * @return array{filePath:string,relativeFile:string,relativeDir:string,dirPath:string,slug:string,isIndex:bool}|null
      */
     protected static function resolveCurrentContext(): ?array
     {

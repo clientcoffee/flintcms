@@ -2110,7 +2110,7 @@ class App
 
         $coreKeys = [];
         foreach ($candidates as $key) {
-            if (!is_string($key) || $key === '') {
+            if ($key === '') {
                 continue;
             }
 
