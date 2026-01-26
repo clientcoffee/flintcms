@@ -62,7 +62,7 @@ cd dist/app && php -S localhost:8000
 ## Documentation
 
 Public CMS documentation (site owners + editors):
-- `documentation/README.md`
+- `public-docs/README.md`
 
 Developer and maintainer docs (contributors):
 - `docs/README.md`
@@ -77,7 +77,7 @@ flint/
 ├── site/               # Pages, blocks, components, themes
 ├── scripts/            # Build and release scripts
 ├── docs/               # Deep-dive documentation
-├── documentation/      # Public CMS docs
+├── public-docs/      # Public CMS docs
 ├── dist/               # Build output (generated)
 ├── CHANGELOG.md
 └── README.md

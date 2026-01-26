@@ -1,6 +1,6 @@
 # Flint Developer Documentation
 
-Internal guides for maintainers and contributors. Public CMS docs live in `documentation/`.
+Internal guides for maintainers and contributors. Public CMS docs live in `public-docs/`.
 
 ## Core Documentation
 
@@ -31,31 +31,7 @@ Release process and versioning.
 ### [UPDATES.md](UPDATES.md)
 Update system documentation.
 
-## Archive
-
-### [AUDIT.md](archive/AUDIT.md)
-Security audit notes.
-
-### [IMPROVEMENTS_SUMMARY.md](archive/IMPROVEMENTS_SUMMARY.md)
-Summary of improvements and changes.
-
-### [CONTINUATION_NOTES.md](archive/CONTINUATION_NOTES.md)
-Development continuation notes.
-
-### [SESSION_HANDOFF.md](archive/SESSION_HANDOFF.md)
-Session handoff documentation.
-
-### [MOVE_CHECKLIST.md](archive/MOVE_CHECKLIST.md)
-Migration checklist.
-
-### [LAYOUT_TYPES.md](archive/LAYOUT_TYPES.md)
-Layout types documentation.
-
-### [TESTING.md](TESTING.md)
-Testing documentation and checklists.
-
 ---
-
 ## Quick Links
 
 **For Contributors**: Start with [CLAUDE.md](CLAUDE.md)
