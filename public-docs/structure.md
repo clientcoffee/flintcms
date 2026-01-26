@@ -1,30 +1,43 @@
 # Directory Structure
 
-## top-level
+## Top-level
 
 - `app/` – runtime code, installer, setup, admin UI, core components.
-- `content/` – content, themes, components, uploads; never overwritten by updates.
+- `site/` – content, themes, components, uploads; never overwritten by updates.
 - `docs/` – maintainer and contributor guides.
 - `public-docs/` – public CMS documentation.
 - `scripts/` – build/publish automation.
 - `tests/`, `vendor/` – dev tooling.
-- `dist/` – release output created by `scripts/build.sh`.
+- `dist/` – build output created by `scripts/build.sh` (do not edit directly).
 
-## app subdirectories
+## Public vs internal docs
 
-- `core/` – `App.php`, `Parser.php`, `Auth.php`, `Admin.php`, `Setup.php`.
-- `core/components/` – essential components loaded before user widgets.
-- `public/` – empty in source but populated by public assets (mermaid, shared scripts).
+- `public-docs/` is for site owners, editors, and integrators.
+- `docs/` is for developers and maintainers.
 
-## content subdirectories
+## Safe to edit vs avoid
+
+Safe to edit:
+- `site/pages/`, `site/blocks/`, `site/themes/`, `site/components/`, `site/uploads/`
+
+Avoid editing:
+- `app/` (core runtime)
+- `dist/` (build output)
+
+## Site subdirectories
 
 - `pages/` – served content.
 - `blocks/` – `Block` component sources.
-- `themes/` – theme directories. Each theme contains `layout.php`, optional typed layouts, `view.php`, helpers, assets.
-- `components/` – optional components shipped with dist.
-- `uploads/` – user media; symlinked by `content` references.
+- `themes/` – theme directories (`layout.php`, `view.php`, helpers, assets).
+- `components/` – site components and component assets.
+- `uploads/` – user media.
 
-## release rules
+## Config location
 
-- `scripts/build.sh` copies `app/`/`content/` into `dist/`, excluding config, vendor, tests, docs, IDE files, `config.php`.
-- Keep `config.example.php` under version control; `config.php` remains site-specific and ignored.
+- Live config: `site/config.php`
+- Template: `site/config.example.php`
+
+## Release rules
+
+- `scripts/build.sh` copies `app/` and `site/` into `dist/`.
+- `dist/` excludes config, vendor, tests, docs, IDE files, and user uploads.
