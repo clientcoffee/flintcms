@@ -13,7 +13,7 @@
   <file>tests</file>
   <exclude-pattern>vendor/*</exclude-pattern>
   <exclude-pattern>dist/*</exclude-pattern>
-  <exclude-pattern>documentation/*</exclude-pattern>
+  <exclude-pattern>public-docs/*</exclude-pattern>
   <exclude-pattern>docs/*</exclude-pattern>
   <exclude-pattern>app/views/404-fallback.php</exclude-pattern>
 </ruleset>

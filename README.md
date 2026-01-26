@@ -61,11 +61,13 @@ cd dist/app && php -S localhost:8000
 
 ## Documentation
 
-- Developer guide: `docs/CLAUDE.md`
-- Build & deployment: `docs/BUILD.md`, `docs/DEPLOYMENT.md`
-- Updates system: `docs/UPDATES.md`
-- Testing: `docs/TESTING.md`
-- Project structure: `docs/STRUCTURE.md`
+Public CMS documentation (site owners + editors):
+- `public-docs/README.md`
+
+Developer and maintainer docs (contributors):
+- `docs/README.md`
+- `docs/CLAUDE.md`
+- `docs/BUILD.md`, `docs/DEPLOYMENT.md`, `docs/RELEASE.md`
 
 ## Project Structure
 
@@ -75,6 +77,7 @@ flint/
 ├── site/               # Pages, blocks, components, themes
 ├── scripts/            # Build and release scripts
 ├── docs/               # Deep-dive documentation
+├── public-docs/      # Public CMS docs
 ├── dist/               # Build output (generated)
 ├── CHANGELOG.md
 └── README.md

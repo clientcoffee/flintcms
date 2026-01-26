@@ -5,6 +5,8 @@
 
 This document serves as the comprehensive developer guide for Flint. Read this before contributing to the project.
 
+Public CMS documentation lives in `public-docs/README.md`.
+
 ---
 
 ## Table of Contents
@@ -124,7 +126,7 @@ Flint is built on these foundational principles:
 1. index.php
    ↓
 2. App::__construct()
-   - Load config.php
+   - Load site/config.php (with legacy fallbacks)
    - Enforce security measures
    - Initialize Scheduler
    - Initialize HookManager
@@ -185,27 +187,30 @@ Flint is built on these foundational principles:
 
 ```
 flint/
-├── app/                        # Core framework
+├── app/                        # Core framework (updated with releases)
 │   ├── core/                   # Core PHP services (App, Parser, HookManager, etc.)
 │   ├── assets/                 # Admin panel JS/CSS
 │   ├── storage/                # Logs, cache, backups
+│   ├── views/                  # Admin + error templates
 │   ├── index.php               # Runtime entry point
 │   └── index-dist.php          # Build-target bootstrap (copied to dist/)
-├── site/                       # Drop-in bundle (pages, blocks, components, themes, uploads)
+├── site/                       # Drop-in site bundle (never touched by updates)
 │   ├── pages/
 │   ├── blocks/
 │   ├── components/
 │   ├── themes/
 │   ├── uploads/
-│   └── submissions/
+│   ├── submissions/
+│   ├── config.example.php      # Copy to site/config.php during setup
+│   └── config.php              # Generated config (gitignored)
 ├── dist/                       # Generated distribution (build output)
+├── public-docs/                # Public-facing CMS documentation
+├── docs/                       # Maintainer docs
 ├── scripts/
 │   ├── build.sh
 │   └── migrate-content-to-site.sh
-├── config.example.php          # Template config (copy to config.php during setup)
-├── config.php                 # Generated config (ignored by git)
-├── docs/
-├── CLAUDE.md
+├── tests/
+├── CHANGELOG.md
 ├── README.md
 ```
 
@@ -268,11 +273,14 @@ bun add -d husky
    - Configure site settings
 
 5. **Enable components** (optional):
-   Edit `config.php`:
-   ```ini
-   [components]
-   Defense = true
-   Backups = false
+   Edit `site/config.php`:
+   ```php
+   return [
+       'components' => [
+           'Defense' => true,
+           'Backups' => false,
+       ],
+   ];
    ```
 
 ### Migrating from legacy bundles
@@ -287,20 +295,23 @@ The command syncs the former `pages`, `blocks`, `components`, `themes`, `uploads
 
 ### Configuration
 
-**Main config**: `config.php`
+**Main config**: `site/config.php`
 
-```ini
-[site]
-name = "My Site"
-tagline = "Welcome"
-theme = "motion"
-
-[mail]
-admin_email = "admin@example.com"
-
-[components]
-Defense = true
-Backups = false
+```php
+return [
+    'site' => [
+        'name' => 'My Site',
+        'tagline' => 'Welcome',
+        'theme' => 'motion',
+    ],
+    'mail' => [
+        'admin_email' => 'admin@example.com',
+    ],
+    'components' => [
+        'Defense' => true,
+        'Backups' => false,
+    ],
+];
 ```
 
 **Component config**: `site/components/{Name}/config.php`
@@ -403,7 +414,7 @@ if ($auth->login($password)) {
 $auth->logout();
 ```
 
-**Password Storage**: Bcrypt hash in `config.php`
+**Password Storage**: Bcrypt hash in `site/config.php`
 
 ### 4. Hook System (HookManager.php)
 
@@ -619,23 +630,29 @@ class EmailNotifier extends BaseComponent
 
 `site/components/EmailNotifier/config.php`
 
-```ini
-[component]
-name = "Email Notifier"
-version = "1.0.0"
-author = "Your Name"
-description = "Sends email notifications on form submissions"
-enabled = false
-priority = 100
+```php
+return [
+    'component' => [
+        'name' => 'Email Notifier',
+        'version' => '1.0.0',
+        'author' => 'Your Name',
+        'description' => 'Sends email notifications on form submissions',
+        'enabled' => false,
+        'priority' => 100,
+    ],
+];
 ```
 
 **4. Enable component**:
 
-In `config.php`:
+In `site/config.php`:
 
-```ini
-[components]
-EmailNotifier = true
+```php
+return [
+    'components' => [
+        'EmailNotifier' => true,
+    ],
+];
 ```
 
 ### BaseComponent Helpers
@@ -872,7 +889,7 @@ chmod 755 site/
 chmod 644 site/pages/*.md
 
 # Sensitive files: owner only
-chmod 600 config.php
+chmod 600 site/config.php
 ```
 
 **4. Rate Limiting**:
@@ -1392,7 +1409,7 @@ email:email:Email:true
 
 ### Pre-Deployment Checklist
 
-- [ ] Update version in `config.php`
+- [ ] Update version in `app/core/Version.php`
 - [ ] Test all forms work
 - [ ] Test admin login/logout
 - [ ] Verify Defense component enabled
@@ -1412,7 +1429,7 @@ find . -type d -exec chmod 755 {} \;
 find . -type f -exec chmod 644 {} \;
 
 # Protect config
-chmod 600 config.php
+chmod 600 site/config.php
 
 # Protect submissions
 chmod 750 site/submissions/
@@ -1435,24 +1452,26 @@ site/blocks/.htaccess               # Block direct access (optional)
 
 ### Environment-Specific Config
 
-**Development** (`config.php`):
+**Development** (`site/config.php`):
 
-```ini
-[site]
-environment = "development"
-
-[debug]
-display_errors = true
+```php
+return [
+    'system' => [
+        'environment' => 'development',
+        'show_errors' => true,
+    ],
+];
 ```
 
-**Production** (`config.php`):
+**Production** (`site/config.php`):
 
-```ini
-[site]
-environment = "production"
-
-[debug]
-display_errors = false
+```php
+return [
+    'system' => [
+        'environment' => 'production',
+        'show_errors' => false,
+    ],
+];
 ```
 
 ### Backup Strategy
@@ -1461,12 +1480,15 @@ display_errors = false
 
 Enable Backups component with daily schedule:
 
-```ini
-# site/components/Backups/config.php
-[backups]
-schedule = "daily"
-schedule_time = "03:00"
-max_backups = 10
+```php
+// site/components/Backups/config.php
+return [
+    'backups' => [
+        'schedule' => 'daily',
+        'schedule_time' => '03:00',
+        'max_backups' => 10,
+    ],
+];
 ```
 
 **Manual Backups**:
@@ -1618,7 +1640,7 @@ self::writeJsonFile($filepath, $eventData);
 
 ### Component Not Loading
 
-1. Check `config.php` - is it enabled?
+1. Check `site/config.php` - is it enabled?
 2. Check namespace matches directory name
 3. Check class name matches filename
 4. Look for PHP syntax errors: `php -l ComponentName.php`
@@ -1667,10 +1689,10 @@ self::writeJsonFile($filepath, $eventData);
 - Direct commits to `main` are not allowed.
 
 1. **Fork repository** (if external contributor)
-2. **Create feature branch from main**:
+2. **Create feature branch from dev**:
    ```bash
-   git checkout main
-   git pull origin main
+   git checkout dev
+   git pull origin dev
    git checkout -b feature/my-feature-name
    ```
 
@@ -1679,13 +1701,13 @@ self::writeJsonFile($filepath, $eventData);
    - Run phpcs and ESLint before each commit
    - Pre-commit hooks will enforce standards
 
-4. **Before creating PR - MERGE MAIN**:
+4. **Before creating PR - MERGE DEV**:
    ```bash
-   # CRITICAL: Always merge main before opening PR
-   git checkout main
-   git pull origin main
+   # CRITICAL: Always merge dev before opening PR
+   git checkout dev
+   git pull origin dev
    git checkout feature/my-feature-name
-   git merge main
+   git merge dev
    # Resolve conflicts if any
    git push origin feature/my-feature-name
    ```
@@ -1701,8 +1723,10 @@ self::writeJsonFile($filepath, $eventData);
    - Add inline comments for complex logic
 
 7. **Open Pull Request**:
+   - Target the `dev` branch
+   - Follow `.github/PULL_REQUEST_TEMPLATE.md`
    - Use descriptive title: "Add: User authentication system"
-   - Include detailed description:
+   - Include:
      - What changed
      - Why it changed
      - How to test
@@ -1777,34 +1801,76 @@ name: CI
 
 on:
   pull_request:
+    branches: [ dev ]
   push:
     branches: [ dev ]
 
 jobs:
-  test:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      php: ${{ steps.filter.outputs.php }}
+      js: ${{ steps.filter.outputs.js }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            php:
+              - 'app/**/*.php'
+              - 'site/**/*.php'
+              - 'tests/**/*.php'
+              - 'composer.json'
+              - 'composer.lock'
+              - 'phpunit.xml'
+              - 'phpcs.xml'
+            js:
+              - 'app/assets/js/**/*.js'
+              - 'package.json'
+              - 'bun.lockb'
+
+  lint-php:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
+    strategy:
+      matrix:
+        php: ['8.2', '8.3', '8.4']
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: ${{ matrix.php }}
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run phpcs
+        run: composer lint:php
+
+  js-lint:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.js == 'true'
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: '1.1.6'
 
-      - name: Install Composer dependencies
-        run: composer install --no-interaction --prefer-dist
-
       - name: Install Bun dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
-      - name: Run checks
-        run: bun run test
+      - name: Run ESLint
+        run: bun run lint:js
 ```
+
+Other CI jobs (`analyse-php`, `unit-php`, `coverage`) run on PHP changes and use the same PHP matrix.
 
 **All PRs MUST**:
 - Target the `dev` branch (CI blocks other base branches)

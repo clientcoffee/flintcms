@@ -38,7 +38,7 @@ composer build:check
 1. **Pre-Build Checks** (optional, enabled by default)
    - Runs test suite
    - Runs PHPStan static analysis
-   - Warns about issues but doesn't block
+   - Halts the build if checks report errors
 
 2. **File Copying**
    - Copies `app/` directory to `dist/`
@@ -60,7 +60,7 @@ Creates `dist/` directory containing:
 - All runtime PHP files
 - Themes and components
 - Content (pages, blocks, uploads)
-- `config.example.php` (not `config.php`)
+- `site/config.example.php` (not `site/config.php`)
 - `.build-info` metadata
 
 **Excluded from dist/**:
@@ -68,7 +68,7 @@ Creates `dist/` directory containing:
 - Dev dependencies (`composer.json`, `vendor/`)
 - Dev documentation (docs/)
 - IDE files (.claude/, .vscode/)
-- Config files (`config.php`)
+- Config files (`site/config.php`)
 
 ### Composer Scripts
 
@@ -86,7 +86,7 @@ Edit `.buildignore` to control excluded files:
 
 ```
 # Comments start with #
-config.php           # Exclude specific file
+site/config.php           # Exclude specific file
 tests/               # Exclude directory
 *.log               # Exclude pattern
 ```
@@ -138,6 +138,8 @@ WordPress-style split:
    scripts/publish-release.sh v0.2.0
    ```
 
+   The release script must run from `dev` and publishes `dist/` to `main`.
+
 ### GitHub Actions
 
 - **ci.yml** - Runs tests on pushes/PRs to dev
@@ -171,11 +173,12 @@ Built-in update system that:
 
 ### Update Modes
 
-Configure in `config.php`:
+Configure in `site/config.php`:
 
-```ini
-[updates]
-auto_update = ask           # Options: true, ask, false
+```php
+'updates' => [
+    'auto_update' => 'ask', // true, false, or 'ask'
+],
 ```
 
 Update checks run on admin page views and are throttled to once per 24 hours.
@@ -194,7 +197,7 @@ Update checks run on admin page views and are throttled to once per 24 hours.
 
 ❌ **Never Touched**:
 - `site/` directory (your content)
-- `config.php` (your configuration)
+- `site/config.php` (your configuration)
 - `site/uploads/` (your media)
 
 ### Update Process
@@ -246,7 +249,7 @@ POST /api/updates/apply
 Content-Type: application/json
 
 {
-  "download_url": "https://github.com/user/repo/archive/v0.2.0.zip"
+  "download_url": "https://codeload.github.com/user/repo/zip/refs/tags/v0.2.0"
 }
 ```
 
@@ -290,16 +293,16 @@ For updates to work:
 name: CI
 
 on:
-  push:
-    branches: [ main, dev ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ dev ]
+  push:
+    branches: [ dev ]
 
 jobs:
   php-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -312,7 +315,7 @@ jobs:
   js-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
@@ -393,7 +396,8 @@ mv app-backup-{timestamp} app
 
 **Clear update cache**:
 ```bash
-rm .update-cache.json
+rm app/.update-cache.json
+rm app/.update-admin-check.json
 ```
 
 ### Best Practices
@@ -403,7 +407,7 @@ rm .update-cache.json
 3. **Monitor logs** - Check PHP errors after updates
 4. **Use 'ask' mode** - Recommended for production
 5. **Read release notes** - Review changes before installing
-6. **Keep config updated** - Check `config.example.php` for new options
+6. **Keep config updated** - Check `site/config.example.php` for new options
 
 ---
 
@@ -431,7 +435,7 @@ rm .update-cache.json
    ```bash
    find . -type d -exec chmod 755 {} \;
    find . -type f -exec chmod 644 {} \;
-   chmod 600 app/config.php
+   chmod 600 site/config.php
    ```
 
 4. **Verify**:

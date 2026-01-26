@@ -15,11 +15,14 @@ Flint includes a built-in update system that checks for new releases from GitHub
 
 ## Update Modes
 
-Configure in `config.php` under `[updates]`:
+Configure in `site/config.php`:
 
-```ini
-[updates]
-auto_update = ask
+```php
+return [
+    'updates' => [
+        'auto_update' => 'ask',
+    ],
+];
 ```
 
 Update checks run on admin page views and are throttled to once per 24 hours.
@@ -59,7 +62,7 @@ public const CHANNEL = 'dev';  // dev, beta, or stable
 The `UpdateChecker` class:
 - Fetches latest release from GitHub API
 - Compares with current version
-- Caches results for 1 hour (reduces API calls)
+- Caches results and throttles admin checks to once per 24 hours
 - Returns update info if newer version available
 
 ### 3. Download & Apply
@@ -80,7 +83,7 @@ When applying an update:
 
 ❌ **Never Touched**:
 - `site/` directory (your pages, themes, components)
-- `config.php` (your configuration)
+- `site/config.php` (your configuration)
 - `site/uploads/` (your media files)
 
 ## Admin Interface
@@ -122,7 +125,7 @@ GET /api/updates/check
   "update": {
     "version": "0.2.0",
     "url": "https://github.com/user/repo/releases/tag/v0.2.0",
-    "download_url": "https://github.com/user/repo/archive/refs/tags/v0.2.0.zip",
+    "download_url": "https://codeload.github.com/user/repo/zip/refs/tags/v0.2.0",
     "release_notes": "## What's New...",
     "published_at": "2026-01-03T12:00:00Z"
   },
@@ -137,7 +140,7 @@ POST /api/updates/apply
 Content-Type: application/json
 
 {
-  "download_url": "https://github.com/user/repo/archive/v0.2.0.zip"
+  "download_url": "https://codeload.github.com/user/repo/zip/refs/tags/v0.2.0"
 }
 ```
 
@@ -173,22 +176,28 @@ GET /api/updates/version
 
 ## Configuration
 
-### config.php
+### site/config.php
 
-```ini
-[updates]
-# Update mode: true (auto), ask (prompt), false (manual only)
-auto_update = ask
-
-# Check for updates when admin logs in
+```php
+return [
+    'updates' => [
+        // Update mode: true (auto), 'ask' (prompt), false (manual only)
+        'auto_update' => 'ask',
+    ],
+];
 ```
+
+### Update Cache Files
+
+- `app/.update-cache.json` caches the latest release metadata.
+- `app/.update-admin-check.json` throttles admin checks to once per 24 hours.
 
 ### Setting GitHub Repository
 
 Edit `app/core/UpdateChecker.php`:
 
 ```php
-private const GITHUB_REPO = 'username/flint';
+private const UPDATE_REPO = 'clientcoffee/flintcms';
 ```
 
 Replace with your actual GitHub repository.

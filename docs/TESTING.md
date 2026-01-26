@@ -24,7 +24,7 @@ tests/
 # Install dependencies (dev only, not needed for runtime)
 composer install
 
-# Or install globally
+# Optional: global install for convenience (CI uses the local vendor binary)
 composer global require phpunit/phpunit
 ```
 
@@ -174,22 +174,40 @@ class AppTest extends TestCase
 
 ## Continuous Integration
 
-### GitHub Actions Example
+### GitHub Actions Example (Matches CI)
 
 ```yaml
-name: Tests
-on: [push, pull_request]
+name: CI
+
+on:
+  pull_request:
+    branches: [ dev ]
+  push:
+    branches: [ dev ]
+
 jobs:
-  test:
+  php-checks:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['8.2', '8.3', '8.4']
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-      - run: composer install
-      - run: composer test
+          php-version: ${{ matrix.php }}
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer lint:php
       - run: composer analyse
+      - run: composer test
+
+  js-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+      - run: bun install --frozen-lockfile
+      - run: bun run lint:js
 ```
 
 ## Coverage Goals

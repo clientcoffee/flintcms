@@ -16,6 +16,27 @@ The Scheduler provides a cron-like task scheduling system that runs entirely wit
 - **Failure Resilient**: Stale locks auto-expire, tasks retry on next check
 - **State Tracking**: Records last run time, status, errors for each task
 
+## Quick Start
+
+Register a daily task from a component:
+
+```php
+use Flint\BaseComponent;
+
+class Cleanup extends BaseComponent
+{
+    protected static function registerHooks(): void
+    {
+        self::registerScheduledTask('daily_cleanup', [
+            'type' => 'daily',
+            'time' => '03:00',
+        ], function (): void {
+            // Do cleanup work here.
+        });
+    }
+}
+```
+
 ## How It Works
 
 ### Execution Flow
@@ -37,6 +58,10 @@ The scheduler is designed to be extremely lightweight:
 - **File Operations**: Only reads/writes when tasks are due
 - **No Blocking**: Task execution happens in-process
 - **Smart Skipping**: Skips checks for static assets (CSS, JS, images)
+
+### Long-running tasks
+
+Keep tasks short. Long-running tasks block request processing because tasks run in-process.
 
 ## Schedule Types
 
@@ -168,7 +193,7 @@ public static function registerTasks(array $context): void
         return;
     }
 
-    // Read schedule from config.php
+    // Read schedule from site/config.php
     $scheduleType = self::getConfig('mycomponent.schedule', 'manual');
 
     // Only register if not manual
@@ -199,6 +224,17 @@ Each task's state is stored in `site/submissions/scheduler/state/{task_id}.json`
     "last_error": null
 }
 ```
+
+### Lock Files
+
+Lock files live in `site/submissions/scheduler/locks/{task_id}.lock`. Locks expire after 5 minutes, so stale files are safe to delete if a task gets stuck.
+
+### Resetting Scheduler State
+
+- Deleting a **lock** file only unblocks a stuck task.
+- Deleting a **state** file resets the task schedule (it will run as if it never ran before).
+
+These files are runtime data and should not be packaged in releases.
 
 ### Reading State
 

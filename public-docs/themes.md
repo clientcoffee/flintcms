@@ -16,21 +16,36 @@ The Motion theme is the default Flint theme. It pairs a clean layout with Tailwi
        // ...
    ];
    ```
-2. Edit the navigation block in `content/blocks/nav.md`.
+2. Edit the navigation block in `site/blocks/nav.md`.
 3. Update page frontmatter to control titles, descriptions, and layout types.
+
+
+## theme anatomy
+
+- `layout.php` — global HTML wrapper.
+- `view.php` — content wrapper and typography.
+- `helpers.php` — theme-specific helpers.
+- `config.php` — theme metadata and settings.
 
 ## file map
 
-- `content/themes/motion/layout.php` - Default page wrapper (header, nav, footer, assets).
-- `content/themes/motion/layout-post.php` - Layout used when frontmatter `type: post`.
-- `content/themes/motion/view.php` - Page content wrapper and Motion-specific typography.
-- `content/themes/motion/helpers.php` - Theme helpers (icon slug mapping).
-- `content/themes/motion/config.php` - Theme metadata and optional settings.
-- `content/themes/motion/404.php` - Custom 404 page.
-- `content/themes/motion/quotes.json` - Quotes consumed by the 404 page.
-- `content/themes/motion/tailwind.min.css` - Local Tailwind build used by layouts.
-- `content/themes/motion/style.css` - Optional additional styling (not linked by default).
-- `content/themes/motion/*.php` - Theme components in the `Modules` namespace.
+- `site/themes/motion/layout.php` - Default page wrapper (header, nav, footer, assets).
+- `site/themes/motion/layout-post.php` - Layout used when frontmatter `type: post`.
+- `site/themes/motion/view.php` - Page content wrapper and Motion-specific typography.
+- `site/themes/motion/helpers.php` - Theme helpers (icon slug mapping).
+- `site/themes/motion/config.php` - Theme metadata and optional settings.
+- `site/themes/motion/404.php` - Custom 404 page.
+- `site/themes/motion/quotes.json` - Quotes consumed by the 404 page.
+- `site/themes/motion/tailwind.min.css` - Local Tailwind build used by layouts.
+- `site/themes/motion/style.css` - Optional additional styling (not linked by default).
+- `site/themes/motion/*.php` - Theme components in the `Modules` namespace.
+
+
+## assets
+
+- Theme assets live in `site/themes/<theme>/`.
+- Use `theme_asset('tailwind.min.css')` to build URLs for theme files.
+- Component assets are injected automatically from `$componentAssets`.
 
 ## layout cascade
 
@@ -59,7 +74,7 @@ description: A longer article with a hero header and reading progress.
 - Builds the HTML shell and `<title>` tag from `site.name` and `page.meta.title`.
 - Injects the Tailwind stylesheet from `/themes/motion/tailwind.min.css`.
 - Renders component assets from `$componentAssets` (external styles, inline styles, and scripts).
-- Loads the navigation block from `content/blocks/nav.md`.
+- Loads the navigation block from `site/blocks/nav.md`.
 - Shows the admin link when `$isAdmin` is true.
 
 The layout receives these key variables:
@@ -69,7 +84,7 @@ The layout receives these key variables:
 - `$viewContent` - HTML produced by `view.php`.
 - `$componentAssets` - CSS/JS arrays gathered by the parser.
 - `$isAdmin` - admin status for showing controls.
-- `$themeConfig` - theme configuration from `content/themes/motion/config.php`.
+- `$themeConfig` - theme configuration from `site/themes/motion/config.php`.
 
 ## view.php behavior
 
@@ -78,7 +93,7 @@ The layout receives these key variables:
 - `title` - main page title.
 - `description` - short subtitle under the title.
 - `icon` - slug passed to `getEmojiFromSlug()` in `helpers.php`.
-- `banner` - image URL (relative paths are prefixed with `/content`).
+- `banner` - image URL (relative paths are prefixed with `/site`).
 
 Example frontmatter for the Motion view:
 
@@ -153,12 +168,12 @@ When implemented, the loader should:
 - Resolve the active theme, then fall back to `parent` for missing files.
 - Merge `settings` from parent -> child (child wins).
 - Load parent `helpers.php` first, then child `helpers.php`.
-- Allow child overrides for `layout.php`, `layout-*.php`, `view.php`, `404.php`, and any theme components in `content/themes/<child>/*.php`.
+- Allow child overrides for `layout.php`, `layout-*.php`, `view.php`, `404.php`, and any theme components in `site/themes/<child>/*.php`.
 
 ### directory layout (recommended)
 
 ```
-content/themes/
+site/themes/
   motion/
     layout.php
     view.php
@@ -176,9 +191,13 @@ content/themes/
 - Any new theme components or layout types you introduce.
 - Any config keys your templates expect to exist.
 
-## built-in Motion components
 
-Theme components live in `content/themes/motion/*.php` and use the `Modules` namespace. The parser resolves theme components before site or core components, so Motion can override default styling.
+## theme components
+
+Theme components live in `site/themes/<theme>/*.php` and use the `Modules` namespace.
+They are resolved before site or core components, so themes can override default styling.
+
+## built-in Motion components
 
 ### Hero
 
@@ -219,7 +238,7 @@ Supported `type` values: `info`, `success`, `warning`, `error`.
 <ContactForm fields="contact-form" store="true" />
 ```
 
-Default field block (edit `content/blocks/contact-form.md`):
+Default field block (edit `site/blocks/contact-form.md`):
 
 ```markdown
 <FormField type="text" name="name" label="Name" required="true" />
@@ -231,7 +250,7 @@ Default field block (edit `content/blocks/contact-form.md`):
 
 The header navigation is driven by a block file so you can update links without touching PHP:
 
-`content/blocks/nav.md`
+`site/blocks/nav.md`
 
 ```markdown
 <Nav mode="list" items="- [About](/about)
@@ -240,7 +259,7 @@ The header navigation is driven by a block file so you can update links without 
 
 ## 404 page and quotes
 
-The Motion 404 page reads `content/themes/motion/quotes.json` and displays a random quote. The file is a JSON array of strings:
+The Motion 404 page reads `site/themes/motion/quotes.json` and displays a random quote. The file is a JSON array of strings:
 
 ```json
 [
@@ -258,10 +277,10 @@ The Motion 404 page reads `content/themes/motion/quotes.json` and displays a ran
 
 ## extending Motion
 
-1. Duplicate the theme folder: `content/themes/motion` -> `content/themes/my-theme`.
-2. Update `content/themes/my-theme/config.php` with your name and settings.
+1. Duplicate the theme folder: `site/themes/motion` -> `site/themes/my-theme`.
+2. Update `site/themes/my-theme/config.php` with your name and settings.
 3. Add new layouts (for example, `layout-landing.php`) and use `type: landing` in frontmatter.
-4. Add new theme components in `content/themes/my-theme/` and use them in Markdown:
+4. Add new theme components in `site/themes/my-theme/` and use them in Markdown:
 
 ```php
 <?php
@@ -288,6 +307,6 @@ class Badge extends RenderComponent
 
 ## troubleshooting
 
-- **Icons not showing**: update `content/themes/motion/helpers.php` with the slug you want to support.
-- **Banner missing**: check that `banner` is set in frontmatter and the file lives under `content/uploads/`.
+- **Icons not showing**: update `site/themes/motion/helpers.php` with the slug you want to support.
+- **Banner missing**: check that `banner` is set in frontmatter and the file lives under `site/uploads/`.
 - **Layout not switching**: confirm the frontmatter `type` matches the layout filename (for example, `layout-post.php` requires `type: post`).
