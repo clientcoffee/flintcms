@@ -1,18 +1,27 @@
-# Backup & Reinstall
+# Backup & Restore
 
-## backups
+## What gets backed up
 
-- Use `/api/export` (POST, admin) to package `content/` + `config.php`.
-- Manually copy `content/`, `app/config.php`, and `content/uploads/` before major changes.
-- The installer also creates `app-backup-{timestamp}` during updates.
+- `site/` (pages, blocks, themes, components, uploads)
+- `site/config.php`
 
-## rebuild
+## Create a backup
 
-1. Upload the new `dist/` contents into place (overwrite `app/`).
-2. Reuse the exported tarball to restore `content/` and `config.php`.
-3. Run `composer dump-autoload` if Composer files changed.
+- Use the admin export endpoint: `/api/export` (POST, admin only).
+- Store the archive outside the web root.
 
-## reinstall
+## Restore steps
 
-- Delete `app/config.php` and revisit `/` to rerun the setup form (makes a new `config.php` without clobbering content).
-- If you want a fresh theme, replace `content/themes/motion` with the default from `dist/content/themes`.
+1. Extract the archive.
+2. Replace your `site/` directory with the backup.
+3. Ensure `site/config.php` is present and readable.
+
+## What not to back up
+
+- `dist/` (build output)
+- `vendor/` (dev-only dependencies)
+
+## Suggested cadence
+
+- Before updates or theme changes
+- Weekly for active sites
