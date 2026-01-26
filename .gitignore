@@ -47,7 +47,3 @@ site/submissions/
 # Components (except Defense which ships with dist)
 # site/components/*/
 # !site/components/Defense/
-
-# Docs
-docs/
-documentation/
