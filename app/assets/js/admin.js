@@ -1498,8 +1498,177 @@
     }
   };
 
+  const formatDirectoryLabel = (value) =>
+    value
+      .replace(/[-_]+/g, " ")
+      .replace(/\b\w/g, (match) => match.toUpperCase());
+
+  const renderFileItem = (item, onFileClick, options = {}) => {
+    const enableDragDrop = options.enableDragDrop === true;
+    const onMove = typeof options.onMove === "function" ? options.onMove : null;
+    const listItem = document.createElement("li");
+    const label = item.label || item.path;
+    const detailPath = item.file || item.path;
+    const status = item.status || "published";
+    const isHidden = status === "hidden";
+    const isDraft = status === "draft";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className =
+      "w-full text-left px-2 py-2 rounded-md transition-colors";
+    if (isHidden || isDraft) {
+      button.classList.add("text-gray-400", "hover:text-gray-500");
+    } else {
+      button.classList.add("text-gray-700", "hover:bg-indigo-50", "hover:text-indigo-700");
+    }
+
+    const labelRow = document.createElement("div");
+    labelRow.className = "flex flex-wrap items-center gap-2";
+
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "text-sm font-medium";
+    labelSpan.textContent = label;
+    labelRow.appendChild(labelSpan);
+
+    const pathSpan = document.createElement("span");
+    pathSpan.className = "text-xs text-gray-400";
+    pathSpan.textContent = `(${detailPath})`;
+    labelRow.appendChild(pathSpan);
+
+    button.appendChild(labelRow);
+    button.dataset.path = item.path;
+    button.addEventListener("click", () => onFileClick(item.path, label, button));
+
+    if (enableDragDrop && onMove) {
+      button.draggable = true;
+      button.addEventListener("dragstart", (event) => {
+        event.dataTransfer?.setData("text/plain", item.path || "");
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = "move";
+        }
+        button.classList.add("opacity-60");
+      });
+      button.addEventListener("dragend", () => {
+        button.classList.remove("opacity-60");
+      });
+    }
+
+    listItem.appendChild(button);
+    return listItem;
+  };
+
+  const flattenTreeFiles = (items, files = []) => {
+    items.forEach((item) => {
+      if (item.type === "file") {
+        files.push(item);
+        return;
+      }
+      if (Array.isArray(item.children)) {
+        flattenTreeFiles(item.children, files);
+      }
+    });
+    return files;
+  };
+
+  const buildUrlTree = (pages) => {
+    const root = { page: null, children: {} };
+    pages.forEach((page) => {
+      const rawPath = page.path || "";
+      const trimmed = rawPath.replace(/^\/+|\/+$/g, "");
+      const segments = trimmed === "" ? [] : trimmed.split("/");
+      let node = root;
+      segments.forEach((segment) => {
+        if (!node.children[segment]) {
+          node.children[segment] = { segment, page: null, children: {} };
+        }
+        node = node.children[segment];
+      });
+      if (segments.length === 0) {
+        root.page = page;
+      } else {
+        node.page = page;
+      }
+    });
+    return root;
+  };
+
+  const directoryFromIndexFile = (filePath) => {
+    if (!filePath) {
+      return "";
+    }
+    const normalized = filePath.replace(/\\/g, "/");
+    const match = normalized.match(/^(.*)\/index\.(md|mdx)$/i);
+    return match ? match[1] : "";
+  };
+
+  const buildUrlTreeList = (node, depth, onFileClick, options = {}) => {
+    const list = document.createElement("ul");
+    list.className =
+      depth === 0
+        ? "space-y-1 text-sm text-gray-700"
+        : "mt-2 space-y-1 border-l border-gray-200 pl-4";
+
+    if (depth === 0 && node.page) {
+      list.appendChild(renderFileItem(node.page, onFileClick, options));
+    }
+
+    const children = Object.values(node.children);
+    children.sort((a, b) => {
+      const labelA = a.page?.label || formatDirectoryLabel(a.segment || "");
+      const labelB = b.page?.label || formatDirectoryLabel(b.segment || "");
+      return labelA.localeCompare(labelB);
+    });
+
+    children.forEach((child) => {
+      const listItem = child.page
+        ? renderFileItem(child.page, onFileClick, options)
+        : document.createElement("li");
+
+      if (!child.page) {
+        const label = document.createElement("span");
+        label.className = "block text-sm font-semibold text-gray-600";
+        label.textContent = formatDirectoryLabel(child.segment || "");
+        listItem.appendChild(label);
+      }
+
+      if (child.page && options.enableDragDrop && typeof options.onMove === "function") {
+        const targetPath = directoryFromIndexFile(child.page.file || "");
+        if (targetPath !== "") {
+          listItem.dataset.dirPath = targetPath;
+          listItem.classList.add("rounded-md");
+          listItem.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            listItem.classList.add("bg-indigo-50");
+          });
+          listItem.addEventListener("dragleave", () => {
+            listItem.classList.remove("bg-indigo-50");
+          });
+          listItem.addEventListener("drop", (event) => {
+            event.preventDefault();
+            listItem.classList.remove("bg-indigo-50");
+            const sourcePath = event.dataTransfer?.getData("text/plain") || "";
+            if (sourcePath) {
+              options.onMove(sourcePath, targetPath);
+            }
+          });
+        }
+      }
+
+      if (Object.keys(child.children).length > 0) {
+        listItem.appendChild(buildUrlTreeList(child, depth + 1, onFileClick, options));
+      }
+
+      list.appendChild(listItem);
+    });
+
+    return list;
+  };
+
   // Build a nested tree list UI from API data.
-  const buildTreeList = (items, depth, onFileClick) => {
+  const buildTreeList = (items, depth, onFileClick, options = {}) => {
+    const enableDragDrop = options.enableDragDrop === true;
+    const onMove = typeof options.onMove === "function" ? options.onMove : null;
     const list = document.createElement("ul");
     list.className =
       depth === 0
@@ -1510,13 +1679,67 @@
       const listItem = document.createElement("li");
 
       if (item.type === "directory") {
-        const header = document.createElement("span");
-        header.className = "block text-sm font-semibold text-gray-600";
-        header.textContent = item.name;
-        listItem.appendChild(header);
+        const directoryPath = item.path ? `/${item.path}` : "/";
+        const children = Array.isArray(item.children) ? item.children : [];
+        const indexEntry = children.find(
+          (child) => child.type === "file" && child.path === directoryPath
+        );
+        const nonIndexChildren = children.filter((child) => child !== indexEntry);
 
-        if (Array.isArray(item.children) && item.children.length > 0) {
-          listItem.appendChild(buildTreeList(item.children, depth + 1, onFileClick));
+        if (indexEntry && nonIndexChildren.length === 0) {
+          list.appendChild(renderFileItem(indexEntry, onFileClick, options));
+          return;
+        }
+
+        const hasIndex = Boolean(indexEntry);
+        const labelRow = document.createElement(hasIndex ? "button" : "div");
+        labelRow.className = "flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-600";
+
+        if (hasIndex) {
+          labelRow.type = "button";
+          labelRow.classList.add("w-full", "text-left", "hover:text-indigo-700");
+          labelRow.addEventListener("click", () =>
+            onFileClick(indexEntry.path, indexEntry.label || indexEntry.path, labelRow)
+          );
+        }
+
+        const labelSpan = document.createElement("span");
+        labelSpan.textContent = formatDirectoryLabel(item.name || "");
+        labelRow.appendChild(labelSpan);
+
+        const pathSpan = document.createElement("span");
+        pathSpan.className = "text-xs text-gray-400 font-normal";
+        pathSpan.textContent = `(${directoryPath})`;
+        labelRow.appendChild(pathSpan);
+
+        listItem.appendChild(labelRow);
+
+        if (enableDragDrop && onMove) {
+          const targetPath = item.path || "";
+          listItem.dataset.dirPath = targetPath;
+          listItem.classList.add("rounded-md");
+
+          listItem.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            listItem.classList.add("bg-indigo-50");
+          });
+
+          listItem.addEventListener("dragleave", () => {
+            listItem.classList.remove("bg-indigo-50");
+          });
+
+          listItem.addEventListener("drop", (event) => {
+            event.preventDefault();
+            listItem.classList.remove("bg-indigo-50");
+            const sourcePath = event.dataTransfer?.getData("text/plain") || "";
+            if (sourcePath) {
+              onMove(sourcePath, targetPath);
+            }
+          });
+        }
+
+        if (nonIndexChildren.length > 0) {
+          listItem.appendChild(buildTreeList(nonIndexChildren, depth + 1, onFileClick, options));
         }
 
         list.appendChild(listItem);
@@ -1524,49 +1747,7 @@
       }
 
       if (item.type === "file") {
-        const label = item.label || item.path;
-        const status = item.status || "published";
-        const isHidden = status === "hidden";
-        const isDraft = status === "draft";
-
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className =
-          "w-full text-left px-2 py-2 rounded-md transition-colors";
-        if (isHidden || isDraft) {
-          button.classList.add("text-gray-400", "hover:text-gray-500");
-        } else {
-          button.classList.add("text-gray-700", "hover:bg-indigo-50", "hover:text-indigo-700");
-        }
-
-        const labelRow = document.createElement("div");
-        labelRow.className = "flex flex-wrap items-center gap-2";
-
-        const labelSpan = document.createElement("span");
-        labelSpan.className = "text-sm font-medium";
-        labelSpan.textContent = label;
-        labelRow.appendChild(labelSpan);
-
-        if (isHidden || isDraft) {
-          const icon = document.createElement("span");
-          icon.className = "text-gray-400";
-          icon.innerHTML = isHidden
-            ? `<svg class="inline-block" role="img" aria-label="Hidden" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0112 20c-5 0-9.27-3.11-11-8 1.04-2.79 2.8-5 5-6.28"></path><path d="M9.9 4.24A10.94 10.94 0 0112 4c5 0 9.27 3.11 11 8-0.55 1.47-1.32 2.78-2.25 3.88"></path><path d="M14.12 14.12a3 3 0 01-4.24-4.24"></path><path d="M1 1l22 22"></path></svg>`
-            : `<svg class="inline-block" role="img" aria-label="Draft" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>`;
-          labelRow.appendChild(icon);
-        }
-
-        const pathSpan = document.createElement("span");
-        pathSpan.className = "text-xs text-gray-400";
-        pathSpan.textContent = `(${item.path})`;
-        labelRow.appendChild(pathSpan);
-
-        button.appendChild(labelRow);
-        button.dataset.path = item.path;
-        button.addEventListener("click", () => onFileClick(item.path, label, button));
-
-        listItem.appendChild(button);
-        list.appendChild(listItem);
+        list.appendChild(renderFileItem(item, onFileClick, options));
       }
     });
 
@@ -1592,10 +1773,45 @@
         if (!Array.isArray(responseData.items) || responseData.items.length === 0) {
           editor.list.innerHTML = `<p class="text-xs text-gray-500">${editor.emptyText}</p>`;
         } else {
-          const list = buildTreeList(responseData.items, 0, (path, label, button) =>
-            openEditorItem(editor, path, label, button)
-          );
-          editor.list.appendChild(list);
+          if (editor.treeOptions?.treeMode === "url") {
+            const files = flattenTreeFiles(responseData.items);
+            const urlTree = buildUrlTree(files);
+            const list = buildUrlTreeList(urlTree, 0, (path, label, button) =>
+              openEditorItem(editor, path, label, button),
+              editor.treeOptions || {}
+            );
+            editor.list.appendChild(list);
+          } else {
+            const list = buildTreeList(
+              responseData.items,
+              0,
+              (path, label, button) => openEditorItem(editor, path, label, button),
+              editor.treeOptions || {}
+            );
+            editor.list.appendChild(list);
+          }
+          if (editor.treeOptions?.enableDragDrop && !editor.state.rootDropBound) {
+            editor.list.addEventListener("dragover", (event) => {
+              if (event.target.closest("[data-dir-path]")) {
+                return;
+              }
+              event.preventDefault();
+            });
+            editor.list.addEventListener("drop", (event) => {
+              if (event.target.closest("[data-dir-path]")) {
+                return;
+              }
+              event.preventDefault();
+              const sourcePath = event.dataTransfer?.getData("text/plain") || "";
+              if (sourcePath && typeof editor.treeOptions.onMove === "function") {
+                editor.treeOptions.onMove(sourcePath, "");
+              }
+            });
+            editor.state.rootDropBound = true;
+          }
+        }
+        if (typeof editor.onListLoaded === "function") {
+          editor.onListLoaded(responseData.items);
         }
         editor.state.loaded = true;
         return;
@@ -1614,6 +1830,13 @@
     }
 
     editor.state.activeButton = setActiveButton(button, editor.state.activeButton);
+    editor.state.activeLabel = label;
+    editor.state.isDraft = false;
+    editor.state.draft = null;
+    editor.state.returnState = null;
+    if (editor.saveButton) {
+      editor.saveButton.textContent = "Save";
+    }
     editor.title.textContent = label;
     editor.pathLabel.textContent = path;
     editor.pathLabel.classList.remove("hidden");
@@ -1633,9 +1856,70 @@
     }
   };
 
+  const parseDraftContent = (value) => {
+    const lines = value.split("\n");
+    const title = (lines.shift() || "").trim();
+    const body = lines.join("\n").replace(/^\n/, "");
+    return { title, body };
+  };
+
   // Persist editor content back to the API.
   const saveEditorContent = async (editor) => {
-    if (!editor.editorArea || !editor.state.currentPath) {
+    if (!editor.editorArea) {
+      return;
+    }
+
+    if (editor.state.isDraft) {
+      const { title, body } = parseDraftContent(editor.editorArea.value);
+      const parent = editor.state.parentPath || "";
+      if (!title) {
+        alert("Add a title before saving.");
+        return;
+      }
+
+      try {
+        const { data: responseData } = await postJson(editor.endpoints.create, {
+          title,
+          body,
+          parent
+        });
+
+        if (responseData.success) {
+          editor.state.isDraft = false;
+          editor.state.draft = null;
+          editor.state.returnState = null;
+          editor.state.currentPath = responseData.path || "";
+          editor.state.originalBody = responseData.content || editor.editorArea.value;
+          editor.state.activeLabel = title;
+          editor.state.activeButton = setActiveButton(null, editor.state.activeButton);
+          if (editor.pathLabel && responseData.path) {
+            editor.pathLabel.textContent = responseData.path;
+            editor.pathLabel.classList.remove("hidden");
+          }
+          if (editor.title) {
+            editor.title.textContent = title;
+          }
+          if (editor.saveButton) {
+            editor.saveButton.textContent = "Save";
+          }
+          if (responseData.content) {
+            editor.editorArea.value = responseData.content;
+          }
+          editor.state.loaded = false;
+          loadTreeList(editor, true);
+          alert(editor.saveSuccessText);
+          return;
+        }
+
+        alert(editor.saveErrorText);
+        return;
+      } catch (error) {
+        alert(editor.saveErrorText);
+        return;
+      }
+    }
+
+    if (!editor.state.currentPath) {
       return;
     }
 
@@ -1657,9 +1941,56 @@
     }
   };
 
-  // Revert editor changes to the last loaded version.
-  const cancelEditorContent = (editor) => {
+  const resetEditorState = (editor) => {
     if (!editor.editorArea) {
+      return;
+    }
+
+    editor.editorArea.value = editor.state.originalBody || "";
+    setEditorState(editor, false);
+    editor.state.currentPath = "";
+    editor.state.originalBody = "";
+    editor.state.activeLabel = "";
+    editor.state.isDraft = false;
+    editor.state.draft = null;
+    editor.state.returnState = null;
+    editor.pathLabel?.classList.add("hidden");
+    if (editor.title && editor.defaultTitle) {
+      editor.title.textContent = editor.defaultTitle;
+    }
+    if (editor.saveButton) {
+      editor.saveButton.textContent = "Save";
+    }
+    editor.state.activeButton = setActiveButton(null, editor.state.activeButton);
+  };
+
+  const updateDraftFromInput = (editor) => {
+    if (!editor.editorArea || !editor.state.isDraft || !editor.state.draft) {
+      return;
+    }
+
+    const value = editor.editorArea.value;
+    const { title, body } = parseDraftContent(value);
+    editor.state.draft.title = title;
+    editor.state.draft.body = body;
+    editor.state.draft.hasTyped = value.trim() !== "";
+    editor.state.draft.mode = value.includes("\n") ? "body" : "title";
+    if (editor.title) {
+      editor.title.textContent = title !== "" ? title : "New page";
+    }
+  };
+
+  // Revert editor changes to the last loaded version.
+  const cancelEditorContent = (editor, restoreCallback) => {
+    if (!editor.editorArea) {
+      return;
+    }
+
+    if (editor.state.isDraft && editor.state.draft && !editor.state.draft.hasTyped) {
+      resetEditorState(editor);
+      if (typeof restoreCallback === "function") {
+        restoreCallback();
+      }
       return;
     }
 
@@ -1667,9 +1998,16 @@
     setEditorState(editor, false);
     editor.state.currentPath = "";
     editor.state.originalBody = "";
+    editor.state.activeLabel = "";
+    editor.state.isDraft = false;
+    editor.state.draft = null;
+    editor.state.returnState = null;
     editor.pathLabel?.classList.add("hidden");
     if (editor.title && editor.defaultTitle) {
       editor.title.textContent = editor.defaultTitle;
+    }
+    if (editor.saveButton) {
+      editor.saveButton.textContent = "Save";
     }
     editor.state.activeButton = setActiveButton(null, editor.state.activeButton);
   };
@@ -1681,15 +2019,32 @@
     }
 
     if (editor.cancelButton) {
-      editor.cancelButton.addEventListener("click", () => cancelEditorContent(editor));
+      editor.cancelButton.addEventListener("click", () =>
+        cancelEditorContent(editor, editor.restoreDraft)
+      );
     }
 
     if (editor.editorArea) {
       editor.editorArea.addEventListener("keydown", (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+          event.preventDefault();
+          saveEditorContent(editor);
+          return;
+        }
+
         if (event.key === "Escape") {
-          cancelEditorContent(editor);
+          cancelEditorContent(editor, editor.restoreDraft);
+          return;
+        }
+
+        if (editor.state.isDraft && editor.state.draft && event.key === "Enter") {
+          if (editor.state.draft.mode === "title") {
+            editor.state.draft.mode = "body";
+          }
         }
       });
+
+      editor.editorArea.addEventListener("input", () => updateDraftFromInput(editor));
     }
 
     if (editor.refreshButton) {
@@ -1702,6 +2057,10 @@
 
   // Initialize content and block editors.
   const initEditors = () => {
+    const parentButton = query("#content-parent-btn");
+    const parentMenu = query("#content-parent-menu");
+    const parentSelect = query("#content-parent-select");
+
     const contentEditor = {
       list: query("#content-list"),
       editorArea: query("#content-editor-area"),
@@ -1710,12 +2069,16 @@
       cancelButton: query("#content-cancel-btn"),
       title: query("#content-editor-title"),
       pathLabel: query("#content-editor-path"),
-      refreshButton: query("#refresh-content-btn"),
+      parentButton,
+      parentMenu,
+      parentSelect,
       defaultTitle: "Select a page",
       endpoints: {
         list: "/api/site/list",
         load: "/api/site",
-        save: "/api/save"
+        save: "/api/save",
+        create: "/api/site/create",
+        move: "/api/site/move"
       },
       emptyText: "No content found.",
       errorText: "Failed to load content.",
@@ -1727,7 +2090,13 @@
         currentPath: "",
         originalBody: "",
         activeButton: null,
-        isEditing: false
+        activeLabel: "",
+        isEditing: false,
+        isDraft: false,
+        draft: null,
+        returnState: null,
+        parentPath: "",
+        rootDropBound: false
       }
     };
 
@@ -1756,20 +2125,207 @@
         currentPath: "",
         originalBody: "",
         activeButton: null,
+        activeLabel: "",
         isEditing: false
       }
     };
+
+    const getActiveTabName = () => {
+      const activeLink = query(".admin-nav-link.active");
+      return activeLink?.dataset.tab || "";
+    };
+
+    const captureViewState = () => ({
+      activeTab: getActiveTabName(),
+      contentPath: contentEditor.state.currentPath,
+      contentLabel: contentEditor.state.activeLabel,
+      blockPath: blockEditor.state.currentPath,
+      blockLabel: blockEditor.state.activeLabel
+    });
+
+    const restoreViewState = (state) => {
+      if (!state) {
+        return;
+      }
+
+      if (state.activeTab) {
+        openTab(state.activeTab);
+      }
+
+      if (state.activeTab === "content" && state.contentPath) {
+        setTimeout(() => {
+          openEditorItem(contentEditor, state.contentPath, state.contentLabel || state.contentPath, null);
+        }, 0);
+      }
+
+      if (state.activeTab === "blocks" && state.blockPath) {
+        setTimeout(() => {
+          openEditorItem(blockEditor, state.blockPath, state.blockLabel || state.blockPath, null);
+        }, 0);
+      }
+    };
+
+    const setParentMenuOpen = (isOpen) => {
+      if (!parentMenu || !parentButton) {
+        return;
+      }
+      parentMenu.classList.toggle("hidden", !isOpen);
+      parentButton.classList.toggle("text-indigo-600", isOpen);
+      parentButton.classList.toggle("bg-indigo-50", isOpen);
+    };
+
+    const buildParentOptions = (items) => {
+      const options = [{ value: "", label: "/ (Root)" }];
+      const walk = (nodes, depth) => {
+        nodes.forEach((item) => {
+          if (item.type !== "directory") {
+            return;
+          }
+          const prefix = depth > 0 ? `${"— ".repeat(depth)}` : "";
+          options.push({
+            value: item.path || "",
+            label: `${prefix}${item.name}/`
+          });
+          if (Array.isArray(item.children) && item.children.length > 0) {
+            walk(item.children, depth + 1);
+          }
+        });
+      };
+      walk(items, 0);
+      return options;
+    };
+
+    const populateParentSelect = (items) => {
+      if (!parentSelect) {
+        return;
+      }
+      const options = buildParentOptions(items);
+      parentSelect.innerHTML = "";
+      options.forEach((option) => {
+        const element = document.createElement("option");
+        element.value = option.value;
+        element.textContent = option.label;
+        parentSelect.appendChild(element);
+      });
+      if (contentEditor.state.parentPath) {
+        parentSelect.value = contentEditor.state.parentPath;
+      } else {
+        contentEditor.state.parentPath = parentSelect.value || "";
+      }
+    };
+
+    const moveContentItem = async (sourcePath, destinationPath) => {
+      if (!sourcePath || sourcePath === destinationPath) {
+        return;
+      }
+      try {
+        const { data: responseData } = await postJson(contentEditor.endpoints.move, {
+          source: sourcePath,
+          destination: destinationPath
+        });
+        if (responseData.success) {
+          if (contentEditor.state.currentPath === sourcePath && responseData.path) {
+            contentEditor.state.currentPath = responseData.path;
+            if (contentEditor.pathLabel) {
+              contentEditor.pathLabel.textContent = responseData.path;
+              contentEditor.pathLabel.classList.remove("hidden");
+            }
+          }
+          contentEditor.state.loaded = false;
+          loadTreeList(contentEditor, true);
+          return;
+        }
+        alert(responseData.error || "Failed to move file.");
+      } catch (error) {
+        alert("Failed to move file.");
+      }
+    };
+
+    const startNewContentDraft = () => {
+      const returnState = captureViewState();
+      contentEditor.state.returnState = returnState;
+
+      openTab("content");
+      contentEditor.state.isDraft = true;
+      contentEditor.state.draft = {
+        hasTyped: false,
+        mode: "title",
+        title: "",
+        body: ""
+      };
+      contentEditor.state.currentPath = "";
+      contentEditor.state.originalBody = "";
+      contentEditor.state.activeLabel = "";
+      contentEditor.state.activeButton = setActiveButton(null, contentEditor.state.activeButton);
+      contentEditor.state.parentPath = parentSelect?.value || "";
+
+      setEditorState(contentEditor, true);
+      if (contentEditor.title) {
+        contentEditor.title.textContent = "New page";
+      }
+      if (contentEditor.pathLabel) {
+        contentEditor.pathLabel.classList.add("hidden");
+      }
+      if (contentEditor.saveButton) {
+        contentEditor.saveButton.textContent = "Create";
+      }
+      if (contentEditor.editorArea) {
+        contentEditor.editorArea.value = "";
+        contentEditor.editorArea.focus();
+      }
+      if (!contentEditor.state.loaded) {
+        loadTreeList(contentEditor);
+      }
+    };
+
+    contentEditor.restoreDraft = () => restoreViewState(contentEditor.state.returnState);
+    contentEditor.treeOptions = {
+      treeMode: "url",
+      enableDragDrop: true,
+      onMove: moveContentItem
+    };
+    contentEditor.onListLoaded = (items) => populateParentSelect(items);
+
+    if (parentButton && parentMenu) {
+      parentButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const isOpen = !parentMenu.classList.contains("hidden");
+        setParentMenuOpen(!isOpen);
+      });
+
+      document.addEventListener("click", () => {
+        setParentMenuOpen(false);
+      });
+    }
+
+    if (parentMenu) {
+      parentMenu.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+    }
+
+    if (parentSelect) {
+      parentSelect.addEventListener("change", () => {
+        contentEditor.state.parentPath = parentSelect.value || "";
+      });
+    }
 
     initEditor(contentEditor);
     initEditor(blockEditor);
 
     document.addEventListener("keydown", (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        startNewContentDraft();
+        return;
+      }
+
       if (event.key !== "Escape") {
         return;
       }
 
       if (contentEditor.state.isEditing) {
-        cancelEditorContent(contentEditor);
+        cancelEditorContent(contentEditor, contentEditor.restoreDraft);
         return;
       }
 

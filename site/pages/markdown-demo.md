@@ -12,24 +12,28 @@ Use **bold**, _italic_, and `inline code` to emphasize content.
 
 ## Lists
 
+Here's an unordered list:
+
 - Dash bullet item (uses `-`)
 * Asterisk bullet item (uses `*`)
   * Nested lists (uses `*`)
 
+And here's an ordered list:
+
 1. Ordered item one
 2. Ordered item two
-   1. Nested ordered item
-   2. Another nested ordered item
+  1. Nested ordered item
+  2. Another nested ordered item
 3. Ordered item three
 4. Ordered item four
 5. Ordered item five
-   1. Nested ordered item
-      1. Deep nested ordered item
-      2. Another deep nested ordered item
-   2. Second nested ordered item
+  1. Nested ordered item
+    1. Deep nested ordered item
+    2. Another deep nested ordered item
+  2. Second nested ordered item
 6. Ordered item six
-   - Nested unordered item
-   - Another nested unordered item
+  - Nested unordered item
+  - Another nested unordered item
 
 ## Quote
 

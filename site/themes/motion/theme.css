@@ -154,7 +154,7 @@ button,
   padding: 0.25rem 0;
   color: rgb(55, 53, 47);
   list-style-position: outside;
-  margin-left: 1.5rem;
+  margin-left: 1rem;
 }
 
 .motion-content ul {
@@ -390,45 +390,36 @@ button,
 }
 
 .sitemap {
-  list-style: none;
+  list-style: disc;
   margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.5rem;
+  padding-left: 1.25rem;
 }
 
-.sitemap__group {
-  margin-bottom: 0.4rem;
+.sitemap ul {
+  list-style: disc;
+  margin: 0.35rem 0 0.6rem 1rem;
+  padding-left: 1rem;
 }
 
-.sitemap__group-label {
+.sitemap__item,
+.sitemap__item--group {
+  display: list-item;
+  margin: 0.35rem 0;
+}
+
+.sitemap__item--group .sitemap__label {
   font-weight: 600;
   color: rgb(55, 53, 47);
-  display: inline-block;
-  margin-bottom: 0.4rem;
-}
-
-.sitemap__group-list {
-  list-style: none;
-  margin: 0 0 0.8rem 0.8rem;
-  padding: 0;
-  display: grid;
-  gap: 0.4rem;
 }
 
 .sitemap__item {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  color: rgb(55, 53, 47);
 }
 
 .sitemap__link {
   color: rgb(55, 53, 47);
   text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
+  display: inline;
 }
 
 .sitemap__link:hover {
