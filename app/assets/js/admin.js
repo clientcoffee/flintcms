@@ -1776,8 +1776,10 @@
           if (editor.treeOptions?.treeMode === "url") {
             const files = flattenTreeFiles(responseData.items);
             const urlTree = buildUrlTree(files);
-            const list = buildUrlTreeList(urlTree, 0, (path, label, button) =>
-              openEditorItem(editor, path, label, button),
+            const list = buildUrlTreeList(
+              urlTree,
+              0,
+              (path, label, button) => openEditorItem(editor, path, label, button),
               editor.treeOptions || {}
             );
             editor.list.appendChild(list);

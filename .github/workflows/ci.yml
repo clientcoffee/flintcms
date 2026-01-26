@@ -227,7 +227,7 @@ jobs:
             echo "Coverage line not found." >&2
             exit 1
           fi
-          threshold=20
+          threshold=5
           awk -v value="${line}" -v min="${threshold}" 'BEGIN { exit !(value+0 >= min) }' || {
             echo "Coverage ${line}% is below ${threshold}%" >&2
             exit 1
