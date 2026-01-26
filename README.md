@@ -24,6 +24,25 @@ Website: https://flintcms.com
 
 ## Quick Start
 
+<!-- install:start -->
+### One-line install
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/clientcoffee/flintcms/dev/scripts/install.sh)" -- -v 0.2.3 -d flint -s 2817181c0213596a7e89b94082f9d49aff4be9554132878860f9709347b0437a
+```
+
+SHA256 (v0.2.3 release tarball): `2817181c0213596a7e89b94082f9d49aff4be9554132878860f9709347b0437a`
+
+Manual verification (macOS/Linux):
+
+```bash
+curl -fsSL https://codeload.github.com/clientcoffee/flintcms/tar.gz/refs/tags/v0.2.3 -o flintcms-v0.2.3.tar.gz
+printf '%s  %s
+' '2817181c0213596a7e89b94082f9d49aff4be9554132878860f9709347b0437a' flintcms-v0.2.3.tar.gz | shasum -a 256 -c -
+```
+<!-- install:end -->
+
+
 1. **Clone**
    ```bash
    git clone https://github.com/clientcoffee/flintcms.git flint
