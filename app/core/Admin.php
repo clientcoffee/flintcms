@@ -9,15 +9,11 @@ namespace Flint;
  */
 class Admin
 {
-    private App $app;
     private bool $isAdmin;
-    private string $currentPath;
 
-    public function __construct(App $app, bool $isAdmin, string $currentPath)
+    public function __construct(bool $isAdmin)
     {
-        $this->app = $app;
         $this->isAdmin = $isAdmin;
-        $this->currentPath = $currentPath;
     }
 
     /**
@@ -158,7 +154,7 @@ class Admin
     logoutButton?.addEventListener('click', async () => {
         try {
             await fetch('/api/logout');
-            window.location.reload();
+            window.location.href = '/';
         } catch (error) {
             console.error('Logout error:', error);
         }

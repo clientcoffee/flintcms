@@ -154,15 +154,64 @@ button,
   padding: 0.25rem 0;
   color: rgb(55, 53, 47);
   list-style-position: outside;
-  margin-left: 1.5rem;
+  margin-left: 0;
+}
+
+.motion-content ul,
+.motion-content ol {
+  margin: 0.5rem 0 1rem 0;
 }
 
 .motion-content ul {
-  margin: 0.5rem 0 1rem 0;
+  list-style-type: disc;
+  padding-left: 0.9rem;
+}
+
+.motion-content ol {
+  list-style-type: decimal;
+  padding-left: 1.1rem;
+}
+
+.motion-content ul ul,
+.motion-content ul ol,
+.motion-content ol ul,
+.motion-content ol ol {
+  margin: 0.35rem 0;
+  padding-left: 0.9rem;
+}
+
+.motion-content ol ol {
+  padding-left: 1rem;
 }
 
 .motion-content li::marker {
   color: rgba(55, 53, 47, 0.4);
+}
+
+.motion-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.95em;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(55, 53, 47, 0.12);
+  border-radius: 6px;
+  padding: 0.15rem 0.35rem;
+}
+
+.motion-content pre {
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(55, 53, 47, 0.12);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.motion-content pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
 }
 
 .motion-embed {
@@ -390,41 +439,36 @@ button,
 }
 
 .sitemap {
-  list-style: none;
+  list-style: disc;
   margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.5rem;
+  padding-left: 1.25rem;
 }
 
-.sitemap__group {
-  margin-bottom: 0.4rem;
+.sitemap ul {
+  list-style: disc;
+  margin: 0.35rem 0 0.6rem 1rem;
+  padding-left: 1rem;
 }
 
-.sitemap__group-label {
+.sitemap__item,
+.sitemap__item--group {
+  display: list-item;
+  margin: 0.35rem 0;
+}
+
+.sitemap__item--group .sitemap__label {
   font-weight: 600;
   color: rgb(55, 53, 47);
-  display: inline-block;
-  margin-bottom: 0.4rem;
-}
-
-.sitemap__group-list {
-  list-style: none;
-  margin: 0 0 0.8rem 0.8rem;
-  padding: 0;
-  display: grid;
-  gap: 0.4rem;
 }
 
 .sitemap__item {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  color: rgb(55, 53, 47);
 }
 
 .sitemap__link {
   color: rgb(55, 53, 47);
   text-decoration: none;
+  display: inline;
 }
 
 .sitemap__link:hover {
@@ -440,4 +484,9 @@ button,
 
 .sitemap__icon {
   color: rgba(100, 116, 139, 0.9);
+}
+
+.sitemap__path {
+  color: rgba(100, 116, 139, 0.9);
+  font-size: 0.85rem;
 }

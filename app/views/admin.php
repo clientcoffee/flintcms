@@ -4,14 +4,14 @@
 /** @var string $version */
 /** @var string $channel */
 
-$title = 'Admin Panel';
+$title = 'Flint';
 $bodyClass = 'bg-[#FAFAFA] text-gray-800 antialiased';
 
 ob_start();
 ?>
 <div class="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md border-b border-gray-200/60 z-50">
     <div class="px-6 py-3 flex justify-between items-center">
-        <h1 class="text-lg font-semibold text-gray-900">Admin Panel</h1>
+        <h1 class="text-lg font-semibold text-gray-900">Flint</h1>
         <a href="/" class="text-sm text-gray-600 hover:text-gray-900">&lt;- Back to Site</a>
     </div>
 </div>
@@ -29,7 +29,7 @@ ob_start();
             <a href="#notifications" class="admin-nav-link block px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-tab="notifications">Notifications</a>
             <a href="#submissions" class="admin-nav-link block px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-tab="submissions">Submissions</a>
             <a href="#components" class="admin-nav-link block px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-tab="components">Components</a>
-            <a href="/api/logout" class="block px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50">Logout</a>
+            <a href="/logout" class="block px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50">Logout</a>
         </nav>
     </aside>
 
@@ -142,18 +142,36 @@ ob_start();
                 </div>
                 <div class="bg-white border border-gray-200 rounded-2xl p-6">
                     <h3 class="text-lg font-semibold text-gray-900 mb-2">Blocked Hosts</h3>
-                    <p class="text-sm text-gray-500 mb-4">Clear IP blocks if you accidentally banned a visitor.</p>
+                    <p class="text-sm text-gray-500 mb-4">Review recently blocked IPs and clear the list if needed.</p>
+                    <div class="relative">
+                        <ul id="blocked-hosts-list" class="space-y-2"></ul>
+                        <div id="blocked-hosts-fade" class="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white to-transparent hidden"></div>
+                    </div>
+                    <button type="button" id="blocked-hosts-toggle" class="mt-3 text-sm text-indigo-600 hover:text-indigo-700 font-medium hidden">More</button>
                     <button type="button" id="clear-blocklist-btn" class="px-4 py-2 bg-red-50 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-100">Clear Blocked Hosts</button>
                 </div>
             </div>
 
             <div id="content-tab" class="admin-tab hidden">
                 <h2 class="text-2xl font-bold text-gray-900 mb-6">Content</h2>
-                <div class="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <div class="grid gap-6 md:grid-cols-[280px_minmax(0,1fr)]">
                     <div class="bg-white border border-gray-200 rounded-2xl p-4">
                         <div class="flex items-center justify-between mb-3">
                             <p class="text-sm font-semibold text-gray-900">Pages</p>
-                            <button type="button" id="refresh-content-btn" class="text-xs text-indigo-600 hover:text-indigo-700 font-medium">Refresh</button>
+                            <div class="relative">
+                                <button type="button" id="content-parent-btn" class="inline-flex items-center justify-center w-8 h-8 rounded-md text-gray-500 hover:text-indigo-600 hover:bg-indigo-50" aria-label="Choose parent folder">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
+                                    </svg>
+                                </button>
+                                <div id="content-parent-menu" class="hidden absolute right-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-lg p-3 z-10">
+                                    <p class="text-xs font-semibold text-gray-600 mb-2">New page parent</p>
+                                    <select id="content-parent-select" class="w-full rounded-md border border-gray-200 px-2 py-1 text-sm">
+                                        <option value="">Loading...</option>
+                                    </select>
+                                    <p class="text-xs text-gray-500 mt-2">New pages will be created in this folder.</p>
+                                </div>
+                            </div>
                         </div>
                         <div id="content-list" class="space-y-1 text-sm text-gray-700"></div>
                     </div>
@@ -165,7 +183,7 @@ ob_start();
                             </div>
                         </div>
                         <div id="content-editor-placeholder" class="text-sm text-gray-500">Choose a page from the list to edit its markdown.</div>
-                        <textarea id="content-editor-area" class="hidden w-full min-h-[380px] rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200" spellcheck="false"></textarea>
+                        <textarea id="content-editor-area" class="hidden w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200" style="aspect-ratio: 16 / 9; min-height: 320px;" spellcheck="false"></textarea>
                         <div class="flex gap-3 pt-4 border-t border-gray-200 mt-4">
                             <button type="button" id="content-save-btn" class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50" disabled>Save</button>
                             <button type="button" id="content-cancel-btn" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50" disabled>Cancel</button>
@@ -176,7 +194,7 @@ ob_start();
 
             <div id="blocks-tab" class="admin-tab hidden">
                 <h2 class="text-2xl font-bold text-gray-900 mb-6">Blocks</h2>
-                <div class="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <div class="grid gap-6 md:grid-cols-[280px_minmax(0,1fr)]">
                     <div class="bg-white border border-gray-200 rounded-2xl p-4">
                         <div class="flex items-center justify-between mb-3">
                             <p class="text-sm font-semibold text-gray-900">Blocks</p>
@@ -192,7 +210,7 @@ ob_start();
                             </div>
                         </div>
                         <div id="block-editor-placeholder" class="text-sm text-gray-500">Choose a block to edit its markdown.</div>
-                        <textarea id="block-editor-area" class="hidden w-full min-h-[380px] rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200" spellcheck="false"></textarea>
+                        <textarea id="block-editor-area" class="hidden w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200" style="aspect-ratio: 16 / 9; min-height: 320px;" spellcheck="false"></textarea>
                         <div class="flex gap-3 pt-4 border-t border-gray-200 mt-4">
                             <button type="button" id="block-save-btn" class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50" disabled>Save</button>
                             <button type="button" id="block-cancel-btn" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50" disabled>Cancel</button>

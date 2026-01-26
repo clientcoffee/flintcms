@@ -18,16 +18,19 @@ class Sitemap extends RenderComponent
             return '';
         }
 
+        $parser = new \Flint\Parser($app);
+
         // Determine admin state for hidden/draft visibility.
         $auth = new Auth($app);
         $isAdmin = $auth->isAdmin();
         $pagesDir = $app->root . '/site/pages';
 
-        // Build a recursive tree of pages.
-        $items = self::buildTree($pagesDir, '', $isAdmin);
-        if (empty($items)) {
+        // Build a tree of pages based on URL structure.
+        $pages = self::collectPages($pagesDir, '', $isAdmin, $parser);
+        if (empty($pages)) {
             return '';
         }
+        $tree = self::buildUrlTree($pages);
 
         // Collect list attributes for the wrapper.
         $attrs = [
@@ -41,7 +44,7 @@ class Sitemap extends RenderComponent
         ob_start();
         ?>
         <ul <?= html_attrs($attrs) ?>>
-            <?= self::renderItems($items, $isAdmin) ?>
+            <?= self::renderItems($tree['children'] ?? [], $isAdmin, $tree['page'] ?? null) ?>
         </ul>
         <?php
 
@@ -49,9 +52,13 @@ class Sitemap extends RenderComponent
         return trim((string)ob_get_clean());
     }
 
-    private static function buildTree(string $baseDir, string $relativeDir, bool $includePrivate): array
-    {
-        // Walk the pages directory and build a mixed tree.
+    private static function collectPages(
+        string $baseDir,
+        string $relativeDir,
+        bool $includePrivate,
+        \Flint\Parser $parser
+    ): array {
+        // Walk the pages directory and build a flat list of pages.
         if (!is_dir($baseDir)) {
             return [];
         }
@@ -62,7 +69,6 @@ class Sitemap extends RenderComponent
             return [];
         }
 
-        $directories = [];
         $files = [];
 
         foreach ($entries as $entry) {
@@ -73,16 +79,9 @@ class Sitemap extends RenderComponent
 
             $fullPath = $directory . '/' . $entry;
             if (is_dir($fullPath)) {
-                // Recurse into subdirectories and keep non-empty branches.
                 $childRelative = ltrim($relativeDir . '/' . $entry, '/');
-                $children = self::buildTree($baseDir, $childRelative, $includePrivate);
-                if (!empty($children)) {
-                    $directories[] = [
-                        'type' => 'directory',
-                        'label' => $entry,
-                        'children' => $children
-                    ];
-                }
+                $children = self::collectPages($baseDir, $childRelative, $includePrivate, $parser);
+                $files = array_merge($files, $children);
                 continue;
             }
 
@@ -102,6 +101,14 @@ class Sitemap extends RenderComponent
 
             // Use frontmatter title when available.
             $label = trim((string)($meta['title'] ?? ''));
+            if ($label !== '') {
+                $label = strip_inline_markdown($label);
+            }
+
+            if ($label !== '') {
+                $label = self::stripInlineLabel($label, $parser);
+            }
+
             if ($label === '') {
                 $label = self::labelFromRelative($relativeFile, $slug);
             }
@@ -110,82 +117,151 @@ class Sitemap extends RenderComponent
                 'type' => 'file',
                 'label' => $label,
                 'path' => $slug,
-                'status' => $status
+                'status' => $status,
             ];
         }
 
-        // Sort directories and files alphabetically by label.
-        usort($directories, fn($a, $b) => strcmp($a['label'], $b['label']));
-        usort($files, fn($a, $b) => strcmp($a['label'], $b['label']));
-
-        return array_merge($directories, $files);
+        return $files;
     }
 
-    private static function renderItems(array $items, bool $isAdmin): string
+    private static function buildUrlTree(array $pages): array
+    {
+        /** @var array{page: ?array, children: array<string, array{segment:string,page:?array,children:array}>} $root */
+        $root = [
+            'page' => null,
+            'children' => []
+        ];
+
+        foreach ($pages as $page) {
+            $rawPath = (string)($page['path'] ?? '');
+            $trimmed = trim($rawPath, '/');
+            $segments = $trimmed === '' ? [] : explode('/', $trimmed);
+
+            /** @var array{page: ?array, children: array<string, array{segment:string,page:?array,children:array}>} $node */
+            $node = &$root;
+            foreach ($segments as $segment) {
+                if (!isset($node['children'][$segment])) {
+                    $node['children'][$segment] = [
+                        'segment' => $segment,
+                        'page' => null,
+                        'children' => []
+                    ];
+                }
+                $node = &$node['children'][$segment];
+            }
+
+            if ($segments === []) {
+                $root['page'] = $page;
+            } else {
+                $node['page'] = $page;
+            }
+        }
+
+        return $root;
+    }
+
+    private static function renderItems(array $nodes, bool $isAdmin, ?array $rootPage): string
     {
         // Render the tree recursively as nested lists.
         ob_start();
-        foreach ($items as $item) {
-            if ($item['type'] === 'directory') {
-                ?>
-                <li class="sitemap__group">
-                    <span class="sitemap__group-label"><?= esc_html($item['label']) ?></span>
-                    <ul class="sitemap__group-list">
-                        <?= self::renderItems($item['children'], $isAdmin) ?>
-                    </ul>
-                </li>
-                <?php
-                continue;
-            }
+        $children = array_values($nodes);
+        usort($children, fn($a, $b) => strcmp(self::nodeLabel($a), self::nodeLabel($b)));
 
-            $status = $item['status'] ?? 'published';
-            $isHidden = $status === 'hidden';
-            $isDraft = $status === 'draft';
-            $statusClass = '';
-
-            if ($isAdmin && ($isHidden || $isDraft)) {
-                $statusClass = $isHidden ? ' sitemap__item--hidden' : ' sitemap__item--draft';
-            }
+        if ($rootPage) {
+            $statusClass = self::pageStatusClass($rootPage, $isAdmin);
+            $label = (string)($rootPage['label'] ?? '');
+            $path = (string)($rootPage['path'] ?? '#');
             ?>
             <li class="sitemap__item<?= $statusClass ?>">
-                <a class="sitemap__link" href="<?= esc_html($item['path']) ?>">
-                    <?= esc_html($item['label']) ?>
+                <a class="sitemap__link" href="<?= esc_html($path) ?>">
+                    <span class="sitemap__label"><?= esc_html($label) ?></span>
                 </a>
-                <?php if ($isAdmin && $isHidden) : ?>
-                    <?= self::statusIcon('hidden', 'Hidden') ?>
-                <?php elseif ($isAdmin && $isDraft) : ?>
-                    <?= self::statusIcon('draft', 'Draft') ?>
-                <?php endif; ?>
             </li>
             <?php
         }
 
+        foreach ($children as $node) {
+            $page = $node['page'] ?? null;
+            $childNodes = $node['children'] ?? [];
+            if ($page) {
+                $statusClass = self::pageStatusClass($page, $isAdmin);
+                $label = (string)($page['label'] ?? '');
+                $path = (string)($page['path'] ?? '#');
+                ?>
+                <li class="sitemap__item<?= $statusClass ?>">
+                    <a class="sitemap__link" href="<?= esc_html($path) ?>">
+                        <span class="sitemap__label"><?= esc_html($label) ?></span>
+                    </a>
+                    <?php if (!empty($childNodes)) : ?>
+                        <ul>
+                            <?= self::renderItems($childNodes, $isAdmin, null) ?>
+                        </ul>
+                    <?php endif; ?>
+                </li>
+                <?php
+            } else {
+                ?>
+                <li class="sitemap__item sitemap__item--group">
+                    <span class="sitemap__label"><?= esc_html(self::nodeLabel($node)) ?></span>
+                    <?php if (!empty($childNodes)) : ?>
+                        <ul>
+                            <?= self::renderItems($childNodes, $isAdmin, null) ?>
+                        </ul>
+                    <?php endif; ?>
+                </li>
+                <?php
+            }
+        }
+
         return trim((string)ob_get_clean());
     }
 
-    private static function statusIcon(string $type, string $label): string
+    private static function pageStatusClass(array $page, bool $isAdmin): string
     {
-        // Provide a minimal inline SVG for status states.
-        $path = '';
-        if ($type === 'hidden') {
-            $path = '<path d="M17.94 17.94A10.94 10.94 0 0112 20c-5 0-9.27-3.11-11-8 1.04-2.79 2.8-5 5-6.28"></path>'
-                . '<path d="M9.9 4.24A10.94 10.94 0 0112 4c5 0 9.27 3.11 11 8-0.55 1.47-1.32 2.78-2.25 3.88"></path>'
-                . '<path d="M14.12 14.12a3 3 0 01-4.24-4.24"></path>'
-                . '<path d="M1 1l22 22"></path>';
-        } else {
-            $path = '<path d="M12 20h9"></path>'
-                . '<path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"></path>';
+        $status = $page['status'] ?? 'published';
+        $isHidden = $status === 'hidden';
+        $isDraft = $status === 'draft';
+
+        if ($isAdmin && $isHidden) {
+            return ' sitemap__item--hidden';
         }
 
-        ob_start();
-        ?>
-        <svg class="sitemap__icon" role="img" aria-label="<?= esc_html($label) ?>" viewBox="0 0 24 24" width="14" height="14"
-            fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <?= $path ?>
-        </svg>
-        <?php
+        if ($isAdmin && $isDraft) {
+            return ' sitemap__item--draft';
+        }
 
-        return trim((string)ob_get_clean());
+        return '';
+    }
+
+    private static function nodeLabel(array $node): string
+    {
+        if (!empty($node['page']['label'])) {
+            return (string)$node['page']['label'];
+        }
+
+        $segment = (string)($node['segment'] ?? '');
+        if ($segment === '') {
+            return '';
+        }
+
+        $segment = str_replace(['-', '_'], ' ', $segment);
+        return ucwords($segment);
+    }
+
+    private static function stripInlineLabel(string $label, \Flint\Parser $parser): string
+    {
+        $label = trim($label);
+        if ($label === '') {
+            return '';
+        }
+
+        $rendered = $parser->renderInlineMarkdown($label);
+        $plain = trim(strip_tags($rendered));
+        if ($plain === '') {
+            return '';
+        }
+
+        return html_entity_decode($plain, ENT_QUOTES, 'UTF-8');
     }
 
     private static function labelFromRelative(string $relativeFile, string $slug): string

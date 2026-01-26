@@ -11,14 +11,12 @@ namespace Flint;
  */
 class Scheduler
 {
-    private App $app;
     private string $lockDir;
     private string $stateDir;
     private array $tasks = [];
 
     public function __construct(App $app)
     {
-        $this->app = $app;
         $this->lockDir = $app->root . '/site/submissions/scheduler/locks';
         $this->stateDir = $app->root . '/site/submissions/scheduler/state';
 

@@ -90,9 +90,9 @@ PHP;
      */
     protected static function registerHooks(): void
     {
-        self::register_hook('request_start', [self::class, 'onRequestStart']);
-        self::register_hook('form_token_generate', [self::class, 'onFormTokenGenerate']);
-        self::register_hook('form_validate', [self::class, 'onFormValidate']);
+        self::registerHook('request_start', [self::class, 'onRequestStart']);
+        self::registerHook('form_token_generate', [self::class, 'onFormTokenGenerate']);
+        self::registerHook('form_validate', [self::class, 'onFormValidate']);
     }
 
     /**
@@ -165,7 +165,7 @@ PHP;
      */
     private static function engage(string $requestPath, string $context = 'scan'): void
     {
-        $mode = self::get_config('defense.mode', self::MODE_PASSIVE);
+        $mode = self::getConfig('defense.mode', self::MODE_PASSIVE);
 
         // Log the engagement.
         self::logEngagement($requestPath, $context, $mode);
@@ -235,7 +235,7 @@ PHP;
         $nonce = bin2hex(random_bytes(16));
 
         // Wallet address from config (Monero address format).
-        $walletAddress = self::get_config(
+        $walletAddress = self::getConfig(
             'defense.wallet',
             '4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge'
         );
@@ -1009,7 +1009,7 @@ HTML;
         // Save.
         file_put_contents($requestFile, json_encode($requests), LOCK_EX);
 
-        $threshold = self::get_config('defense.rapid_request_threshold', 10);
+        $threshold = self::getConfig('defense.rapid_request_threshold', 10);
         return count($requests[$key]) > $threshold;
     }
 
