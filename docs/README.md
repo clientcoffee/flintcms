@@ -1,6 +1,6 @@
-# Flint Documentation
+# Flint Developer Documentation
 
-Project documentation and development guides.
+Internal guides for maintainers and contributors. Public CMS docs live in `documentation/`.
 
 ## Core Documentation
 
@@ -17,6 +17,9 @@ Project documentation and development guides.
 ### [STRUCTURE.md](STRUCTURE.md)
 Project structure and directory organization.
 
+### [DEVELOPMENT.md](DEVELOPMENT.md)
+Contributor workflow, branching, and release prep.
+
 ### [BUILD.md](BUILD.md)
 Build process and distribution.
 
@@ -28,28 +31,28 @@ Release process and versioning.
 ### [UPDATES.md](UPDATES.md)
 Update system documentation.
 
-## Historical Documentation
+## Archive
 
-### [AUDIT.md](AUDIT.md)
+### [AUDIT.md](archive/AUDIT.md)
 Security audit notes.
 
-### [IMPROVEMENTS_SUMMARY.md](IMPROVEMENTS_SUMMARY.md)
+### [IMPROVEMENTS_SUMMARY.md](archive/IMPROVEMENTS_SUMMARY.md)
 Summary of improvements and changes.
+
+### [CONTINUATION_NOTES.md](archive/CONTINUATION_NOTES.md)
+Development continuation notes.
+
+### [SESSION_HANDOFF.md](archive/SESSION_HANDOFF.md)
+Session handoff documentation.
+
+### [MOVE_CHECKLIST.md](archive/MOVE_CHECKLIST.md)
+Migration checklist.
+
+### [LAYOUT_TYPES.md](archive/LAYOUT_TYPES.md)
+Layout types documentation.
 
 ### [TESTING.md](TESTING.md)
 Testing documentation and checklists.
-
-### [CONTINUATION_NOTES.md](CONTINUATION_NOTES.md)
-Development continuation notes.
-
-### [SESSION_HANDOFF.md](SESSION_HANDOFF.md)
-Session handoff documentation.
-
-### [MOVE_CHECKLIST.md](MOVE_CHECKLIST.md)
-Migration checklist.
-
-### [LAYOUT_TYPES.md](LAYOUT_TYPES.md)
-Layout types documentation.
 
 ---
 
