@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.2.3] - 2026-01-26
 ### Added
 - Add admin content creation flow with title-first editing and keyboard shortcuts.
 - Add admin content parent selector dropdown and drag-and-drop file moves.

@@ -12,7 +12,7 @@ class Version
      * Current Flint version.
      * Follows semantic versioning: MAJOR.MINOR.PATCH
      */
-    public const VERSION = '0.2.2';
+    public const VERSION = '0.2.3';
 
     /**
      * Release channel: stable, beta, dev
