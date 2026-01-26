@@ -10,6 +10,11 @@ Implemented **8 critical security fixes** based on comprehensive security audit.
 
 ---
 
+## Since the Audit (2026-01-04)
+
+- Added regression coverage in `tests/Security/` (ZipSlip, path traversal).
+- Keep these tests green to prevent reintroducing critical file handling bugs.
+
 ## ✅ IMPLEMENTED FIXES
 
 ### 1. Session Cookie Security (CRITICAL) ✅

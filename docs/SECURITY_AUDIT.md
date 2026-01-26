@@ -3,6 +3,8 @@
 **Auditor:** Claude Sonnet 4.5
 **Scope:** All core files (app/core/*)
 
+> **Historical note:** This audit captures findings as of 2026-01-04. Line numbers and code references may have drifted since then. Re-audit against current code before releases.
+
 ---
 
 ## Executive Summary
@@ -15,6 +17,11 @@ This comprehensive security audit identifies vulnerabilities across authenticati
 **Low Priority Issues:** 4
 
 ---
+
+## Current Status Summary
+
+- Many critical and high issues from this audit have been addressed. See `docs/SECURITY_IMPROVEMENTS.md` for the applied fixes list.
+- Re-run the audit when preparing releases to confirm no regressions.
 
 ## 1. AUTHENTICATION & AUTHORIZATION
 
@@ -155,7 +162,7 @@ if (mb_strlen($name) > $maxNameLength) {
 #### 🟡 MEDIUM: Error Messages May Leak Sensitive Info
 **File:** App.php (various error responses)
 **Issue:** Some errors expose file paths
-**Example:** `App.php:31` - "Configuration file (config.php) missing"
+**Example:** `App.php:31` - "Configuration file (site/config.php) missing"
 **Fix:** Generic error messages in production, detailed in logs
 
 ---

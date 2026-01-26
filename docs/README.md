@@ -1,6 +1,6 @@
 # Flint Developer Documentation
 
-Internal guides for maintainers and contributors. Public CMS docs live in `public-docs/`.
+Internal guides for maintainers and contributors. Public CMS docs live in `public-docs/README.md`.
 
 ## Core Documentation
 
@@ -23,6 +23,9 @@ Contributor workflow, branching, and release prep.
 ### [BUILD.md](BUILD.md)
 Build process and distribution.
 
+### [PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md)
+Required PR format and checklists.
+
 ## Release Management
 
 ### [RELEASE.md](RELEASE.md)
@@ -34,8 +37,8 @@ Update system documentation.
 ---
 ## Quick Links
 
-**For Contributors**: Start with [CLAUDE.md](CLAUDE.md)
+**For Contributors**: Start with [CLAUDE.md](CLAUDE.md), then [DEVELOPMENT.md](DEVELOPMENT.md)
 
-**For Deployment**: See [BUILD.md](BUILD.md) and [RELEASE.md](RELEASE.md)
+**For Deployment**: See [BUILD.md](BUILD.md) → [DEPLOYMENT.md](DEPLOYMENT.md) → [RELEASE.md](RELEASE.md)
 
 **For Architecture**: See [STRUCTURE.md](STRUCTURE.md)

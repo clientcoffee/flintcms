@@ -2,116 +2,98 @@
 
 ## Overview
 
-Flint uses a clear separation between **core CMS files** (which get updated) and **user content** (which is safe from updates).
+Flint keeps **core CMS files** and **site content** separate. Updates only replace core files so your content, themes, and configuration stay safe.
 
 ## Directory Layout
 
 ```
 /flint/
-├── app/                      # Core CMS (updated with new releases)
-│   ├── core/                 # Core PHP classes
-│   │   ├── App.php          # Main application
-│   │   ├── Parser.php       # MDX-Lite parser
-│   │   ├── Auth.php         # Authentication
-│   │   ├── Admin.php        # Admin interface
-│   │   └── Setup.php        # Initial setup
-│   ├── core/components/      # Core components ONLY
-│   │   ├── Nav.php          # Navigation component (core)
-│   │   └── Block/           # Block inclusion component (core)
-│   ├── index.php             # Application entry point
-│   ├── public/               # Public assets
-│   └── README.md             # App documentation
-│
-├── site/                  # Your content (SAFE from updates)
-│   ├── pages/               # Your pages (.md, .mdx files)
-│   │   ├── index.md
-│   │   ├── about.md
-│   │   └── ...
-│   ├── blocks/              # Reusable content blocks
-│   │   ├── nav.md
-│   │   ├── contact-form.md
-│   │   └── ...
-│   ├── uploads/             # User-uploaded media
-│   │   └── YYYY-MM/        # Organized by year-month
-│   ├── components/          # Your custom components + shipped non-core
-│   │   ├── FormField/      # Shipped with CMS (non-core)
-│   │   ├── Accordion.php   # Shipped example
-│   │   ├── Mermaid/        # Shipped example
-│   │   └── ...             # Your custom components
-│   └── themes/              # Your themes
-│       └── motion/         # Default shipped theme
-│
-├── config.php                # Your configuration (SAFE from updates)
-├── config.example.php        # Example configuration
-├── composer.json             # Development dependencies
-├── phpunit.xml               # Test configuration
-└── tests/                    # Test suite
+├── app/                        # Core CMS (updated with releases)
+│   ├── core/                   # Core PHP classes (App, Parser, Auth, etc.)
+│   ├── assets/                 # Admin JS/CSS assets
+│   ├── storage/                # Logs, cache, backups
+│   ├── views/                  # Admin + error templates
+│   ├── index.php               # Runtime entry point
+│   └── index-dist.php          # Build-target entry point
+├── site/                       # Your site bundle (never touched by updates)
+│   ├── pages/                  # Markdown pages
+│   ├── blocks/                 # Reusable content blocks
+│   ├── components/             # Site components (shipped + custom)
+│   ├── themes/                 # Themes
+│   ├── uploads/                # User uploads
+│   ├── submissions/            # Runtime submissions/logs
+│   ├── config.example.php      # Copy to site/config.php
+│   └── index.php               # Site entry (guards direct access)
+├── dist/                       # Build output (app/ + site/)
+├── public-docs/                # Public CMS documentation
+├── docs/                       # Maintainer + contributor docs
+├── scripts/                    # Build/release tooling
+├── tests/                      # PHPUnit tests
+├── composer.json
+├── package.json
+└── CHANGELOG.md
 ```
+
+`site/config.php` is generated during setup and is not committed to git.
 
 ## Component Classification
 
-### Core Components (in `app/core/components/`)
+### Core Runtime (in `app/core/`)
 
-These components are **required** for CMS functionality and must exist:
+Core logic lives in `app/core/` (App, Parser, HookManager, Scheduler, etc.). These files are updated with releases.
 
-- **Nav.php** - Navigation rendering
-- **Block/** - Block inclusion system
+### Site Components (in `site/components/`)
 
-Core components are updated with CMS releases.
+Site components are **shipped scaffolding** plus anything you add. They are **not** updated by the auto-update system, so treat them as part of your site.
 
-### Non-Core Components (in `site/components/`)
+Component enablement lives in each component's config file:
 
-These components are **optional** and safe from updates:
-
-- **FormField/** - Ships with CMS for contact forms
-- **Accordion.php** - Shipped example component
-- **CTACard.php** - Shipped example component
-- **Lightbox.php** - Shipped example component
-- **Mermaid/** - Shipped diagram component
-- **ProgressBar.php** - Shipped example component
-- **SocialLinks.php** - Shipped example component
-- **TeamMemberCard.php** - Shipped example component
-
-Plus any custom components you create.
+```php
+// site/components/MyComponent/config.php
+return [
+    'component' => [
+        'enabled' => true,
+        'priority' => 100,
+    ],
+];
+```
 
 ## Update Safety
 
-### Files Updated During CMS Updates
+### Updated by the auto-update system
 
-- `app/` directory (entire contents)
-- `config.example.php` (reference only)
-- `BUILD.md`, `TESTING.md`, etc. (documentation)
+- `app/` (core CMS files only)
 
-### Files NEVER Touched by Updates
+### Never touched by updates
 
-- `site/` directory (all contents)
-- `config.php` (your actual configuration)
+- `site/` directory (pages, themes, components, uploads)
+- `site/config.php` (your configuration)
 - `tests/` (if you add custom tests)
 
 ## Autoloading
 
-The autoloader maps namespaces to directories:
+The runtime autoloader maps namespaces like this:
 
 ```php
-'Flint\\'       => app/core/                  // Core classes
-'Components\\' => app/core/components/       // Core components
-'Modules\\'    => site/themes/            // Theme components
+'Flint\\'      => app/core/
+'Components\\' => site/components/
+'\Modules\\'  => site/themes/
 ```
 
-User components in `site/components/` are loaded dynamically by the Parser.
+Site components in `site/components/` are loaded dynamically when enabled.
 
 ## Web Server Configuration
 
 ### Development
 
-Point your web server or PHP built-in server to the `app/` directory:
+Point your web server (or PHP built-in server) to `app/`:
 
 ```bash
 cd app
 php -S localhost:8000
 ```
 
-The `app/index.php` will automatically find `site/` and `config.php` in the parent directory.
+`app/index.php` resolves the site bundle and config from `../site/`. It will fall back to legacy `config.php` locations if present.
 
 ### Production
 
@@ -125,33 +107,28 @@ DocumentRoot /var/www/flint/app
 ln -s /var/www/flint/app/index.php /var/www/public/index.php
 ```
 
-The app will automatically resolve paths to `../site/` and `../config.php`.
-
 ## Creating Custom Components
 
-Place custom components in `site/components/`:
+Place components in `site/components/`:
 
-```php
-<?php
-// site/components/MyComponent.php
-namespace Components;
-
-class MyComponent {
-    public static function render(array $props, string $content): string {
-        return "<div class='my-component'>{$content}</div>";
-    }
-}
+```
+site/components/MyComponent/
+├── MyComponent.php
+└── config.php
 ```
 
-Or keep it minimal (still use the Components namespace):
 ```php
 <?php
-// site/components/SimpleComponent.php
-namespace Components;
+// site/components/MyComponent/MyComponent.php
+namespace Components\MyComponent;
 
-class SimpleComponent {
-    public static function render(array $props, string $content): string {
-        return "<div>{$content}</div>";
+use Flint\RenderComponent;
+
+class MyComponent extends RenderComponent
+{
+    public static function render(array $props, string $content): string
+    {
+        return "<div class='my-component'>{$content}</div>";
     }
 }
 ```
@@ -171,10 +148,14 @@ site/themes/mytheme/
 └── assets/              # Optional: Theme assets
 ```
 
-Update `config.php` to use your theme:
-```ini
-[site]
-theme = mytheme
+Update `site/config.php` to use your theme:
+
+```php
+return [
+    'site' => [
+        'theme' => 'mytheme',
+    ],
+];
 ```
 
 ## Build Process
@@ -183,57 +164,34 @@ The build system creates `dist/` with both `app/` and `site/`:
 
 ```
 dist/
-├── app/                    # Core CMS
-├── site/                # User content (no uploads/ to save space)
-└── config.example.php      # Config template
+├── app/                     # Core CMS
+└── site/                    # Site bundle (includes config.example.php)
 ```
 
-See `BUILD.md` for details.
-
-## Migration from Old Structure
-
-If you have an old Flint installation:
-
-1. **Move your files**:
-   ```bash
-   mv app/site/pages site/pages
-   mv app/site/blocks site/blocks
-   mv app/site/uploads site/uploads
-   mv app/themes/mytheme site/themes/mytheme
-   mv app/config.php config.php
-   ```
-
-2. **Update custom components** - Move from `app/core/components/` to `site/components/`
-
-3. **Update references** - Content/theme paths remain the same (`/site/pages/`, `/themes/`, etc.)
-
-4. **Test** - Everything should work without code changes
+See `docs/BUILD.md` for details.
 
 ## Best Practices
 
-1. **Never edit files in `app/`** - Your changes will be lost on updates
+1. **Never edit `app/` in production** - Updates overwrite it
 2. **Keep themes in `site/themes/`** - Safe from updates
 3. **Keep custom components in `site/components/`** - Safe from updates
-4. **Version control `site/` and `config.php`** - Your unique site content
-5. **Don't version control `site/uploads/`** - Large media files
-6. **Backup `config.php`** - Contains passwords and settings
+4. **Version control `site/` (minus uploads)** - Your unique site content
+5. **Do not commit `site/config.php`** - Contains passwords and settings
+6. **Back up `site/config.php`** - Critical for restores
 
 ## Upgrading Flint
 
 To upgrade to a new version:
 
-1. Backup your `site/` directory and `config.php`
-2. Replace the `app/` directory with new version
-3. Check `config.example.php` for new configuration options
+1. Backup your `site/` directory and `site/config.php`
+2. Replace the `app/` directory with the new version (or use the update system)
+3. Check `site/config.example.php` for new configuration options
 4. Test your site
-5. Your themes, components, and content remain unchanged
 
 ## Summary
 
 ```
-app/      = Core CMS (update this)
-site/  = Your site (never touched by updates)
-config.php = Your config (never touched by updates)
+app/           = Core CMS (updated)
+site/          = Your site bundle (never touched by updates)
+site/config.php = Your config (never touched by updates)
 ```
-
-This structure ensures clean updates while protecting your customizations.

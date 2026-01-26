@@ -52,7 +52,7 @@ Build creates `dist/` directory containing:
 - All runtime PHP files
 - Themes and components
 - Content (pages, blocks, uploads)
-- `config.example.php` (not `config.php`)
+- `site/config.example.php` (not `site/config.php`)
 - `.build-info` metadata
 
 Excluded from `dist/`:
@@ -60,7 +60,7 @@ Excluded from `dist/`:
 - Dev dependencies (`composer.json`, `phpunit.xml`, `vendor/`)
 - Dev documentation (CLAUDE.md, TESTING.md, etc.)
 - IDE files (.claude/, .vscode/, etc.)
-- Config files (`config.php`)
+- Config files (`site/config.php`)
 
 ## Composer Scripts
 
@@ -99,7 +99,7 @@ Edit `.buildignore` to control which files are excluded from builds.
 Format:
 ```
 # Comments start with #
-config.php           # Exclude specific file
+site/config.php      # Exclude specific file
 tests/               # Exclude directory
 *.log               # Exclude pattern
 ```
@@ -196,3 +196,7 @@ Each build generates:
 - `dist/.build-info` - Build metadata (date, commit, source)
 
 The `.build-info` file helps track deployed versions in production.
+
+## Runtime cache cleanup
+
+The build script removes runtime cache files (for example, magic link or scheduler cache artifacts) so releases ship clean output.
