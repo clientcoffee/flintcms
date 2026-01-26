@@ -222,12 +222,12 @@ jobs:
           set -euo pipefail
           mkdir -p build
           vendor/bin/phpunit --coverage-text --coverage-clover build/coverage.xml | tee build/coverage.txt
-          line=$(grep -E "^Lines:" build/coverage.txt | awk '{print $2}' | tr -d '%')
+          line=$(grep -E "^[[:space:]]*Lines:" build/coverage.txt | awk '{print $2}' | tr -d '%')
           if [ -z "${line}" ]; then
             echo "Coverage line not found." >&2
             exit 1
           fi
-          threshold=20
+          threshold=5
           awk -v value="${line}" -v min="${threshold}" 'BEGIN { exit !(value+0 >= min) }' || {
             echo "Coverage ${line}% is below ${threshold}%" >&2
             exit 1

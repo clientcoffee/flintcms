@@ -983,6 +983,151 @@ class App
             return;
         }
 
+        // Create new content file (admin only).
+        if ($requestPath === '/api/site/create' && $requestMethod === 'POST') {
+            $payload = $this->readJsonPayload();
+            if ($payload === null) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid JSON body']);
+                return;
+            }
+
+            $title = trim((string)($payload['title'] ?? ''));
+            $body = (string)($payload['body'] ?? '');
+            $parent = trim((string)($payload['parent'] ?? ''), '/');
+
+            if ($title === '') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Title required']);
+                return;
+            }
+
+            if ($parent !== '' && !$this->isSafePathSegment($parent)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid parent path']);
+                return;
+            }
+
+            $slug = $this->slugify($title);
+            if ($slug === '') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Title must include letters or numbers']);
+                return;
+            }
+
+            $targetDir = $parent === '' ? Paths::$pagesDir : Paths::$pagesDir . '/' . $parent;
+            if (!is_dir($targetDir)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Parent directory not found']);
+                return;
+            }
+
+            $targetPath = $targetDir . '/' . $slug . '.md';
+            try {
+                $validatedPath = $this->validateSecurePath($targetPath, Paths::$pagesDir);
+            } catch (\Exception $e) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid file path']);
+                return;
+            }
+
+            if (file_exists($validatedPath)) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => 'File already exists']);
+                return;
+            }
+
+            $safeTitle = addcslashes($title, "\"\\");
+            $frontmatter = "---\n" . 'title: "' . $safeTitle . "\"\n---\n\n";
+            $contentBody = $frontmatter . ltrim($body, "\n");
+
+            if (file_put_contents($validatedPath, $contentBody) === false) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Failed to create file']);
+                return;
+            }
+
+            $relativeFile = ltrim(($parent === '' ? '' : $parent . '/') . $slug . '.md', '/');
+            $path = $this->contentSlugFromRelative($relativeFile);
+
+            echo json_encode([
+                'success' => true,
+                'path' => $path,
+                'file' => $relativeFile,
+                'content' => $contentBody,
+            ]);
+            return;
+        }
+
+        // Move content file between directories (admin only).
+        if ($requestPath === '/api/site/move' && $requestMethod === 'POST') {
+            $payload = $this->readJsonPayload();
+            if ($payload === null) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid JSON body']);
+                return;
+            }
+
+            $sourcePath = trim((string)($payload['source'] ?? ''));
+            $destination = trim((string)($payload['destination'] ?? ''), '/');
+
+            if ($sourcePath === '') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Source required']);
+                return;
+            }
+
+            if ($destination !== '' && !$this->isSafePathSegment($destination)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid destination path']);
+                return;
+            }
+
+            $resolvedSource = $this->resolveContentFile($sourcePath);
+            if (!$resolvedSource || !file_exists($resolvedSource)) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Source file not found']);
+                return;
+            }
+
+            $targetDir = $destination === '' ? Paths::$pagesDir : Paths::$pagesDir . '/' . $destination;
+            if (!is_dir($targetDir)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Destination directory not found']);
+                return;
+            }
+
+            $fileName = basename($resolvedSource);
+            $targetPath = $targetDir . '/' . $fileName;
+
+            if ($resolvedSource === $targetPath) {
+                $relativeFile = ltrim(($destination === '' ? '' : $destination . '/') . $fileName, '/');
+                echo json_encode([
+                    'success' => true,
+                    'path' => $this->contentSlugFromRelative($relativeFile),
+                ]);
+                return;
+            }
+
+            if (file_exists($targetPath)) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => 'Destination already exists']);
+                return;
+            }
+
+            if (!safe_rename($resolvedSource, $targetPath, Paths::$pagesDir, Paths::$pagesDir)) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Failed to move file']);
+                return;
+            }
+
+            $relativeFile = ltrim(($destination === '' ? '' : $destination . '/') . $fileName, '/');
+            $path = $this->contentSlugFromRelative($relativeFile);
+
+            echo json_encode(['success' => true, 'path' => $path]);
+            return;
+        }
+
         // List block files (admin only).
         if ($requestPath === '/api/blocks/list' && $requestMethod === 'GET') {
             $items = $this->listBlockTree();
@@ -1673,6 +1818,7 @@ class App
                     $directories[] = [
                         'type' => 'directory',
                         'name' => $entry,
+                        'path' => $childRelative,
                         'children' => $children
                     ];
                 }
@@ -1699,6 +1845,7 @@ class App
                     'type' => 'file',
                     'label' => $label,
                     'path' => $slug,
+                    'file' => $relativeFile,
                     'status' => $status,
                 ];
             } else {
@@ -1963,7 +2110,7 @@ class App
 
         $coreKeys = [];
         foreach ($candidates as $key) {
-            if (!is_string($key) || $key === '') {
+            if ($key === '') {
                 continue;
             }
 
