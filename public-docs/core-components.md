@@ -2,7 +2,7 @@
 
 ## What core components are
 
-Core components are the built-in building blocks shipped with Flint. Use them for common features before reaching for custom code.
+Core components are the minimal building blocks shipped directly with Flint so a default install works out of the box. Optional components live in the `flint-components` registry and can be installed later.
 
 ## Core component list
 
@@ -10,18 +10,18 @@ Core components are the built-in building blocks shipped with Flint. Use them fo
 | --- | --- |
 | Block | Render reusable markdown blocks. |
 | ContactForm | Render a contact form and handle submissions. |
-| Defense | Rate limiting, threat tracking, and request hardening. |
+| Nav | Render navigation output for themes. |
 | Sitemap | Render a nested list of public pages. |
 
 ## Where they live
 
-- Core components: `app/core/components/`
-- Site components: `site/components/`
+- Core (shipped) components: `site/components/`
+- Optional components: install into `site/components/`
 - Theme components: `site/themes/<theme>/`
 
 ## Override behavior
 
-Theme and site components override core components when they share a name.
+Theme components override site components when they share a name.
 
 ## Example usage
 

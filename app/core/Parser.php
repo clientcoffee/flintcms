@@ -312,13 +312,25 @@ class Parser
             if (!$resolvedComponentClass) {
                 $siteComponentClassName = "\\Components\\{$componentName}";
                 $siteComponentDirectory = $this->application->root . '/site/components';
+                $componentDisabled = false;
 
                 // Try to find component file in site components directory
                 $siteComponentFilePath = $this->getComponentPath($siteComponentDirectory, $componentName);
 
                 if ($siteComponentFilePath !== null) {
-                    // Found component file in site directory, load it
-                    require_once $siteComponentFilePath;
+                    if (!$this->isSiteComponentEnabled($siteComponentFilePath)) {
+                        $componentDisabled = true;
+                    } else {
+                        // Found component file in site directory, load it
+                        require_once $siteComponentFilePath;
+                    }
+                }
+
+                if ($componentDisabled) {
+                    $uniquePlaceholder = "___COMPONENT_" . $this->componentPlaceholderCounter . "___";
+                    $this->componentHtmlCache[$uniquePlaceholder] = '';
+                    $this->componentPlaceholderCounter++;
+                    return $uniquePlaceholder;
                 }
 
                 // Check if site component is now available and has render method
@@ -398,6 +410,27 @@ class Parser
 
         // Component file not found in this directory
         return null;
+    }
+
+    /**
+     * Check if a site component is enabled via config.php when present.
+     */
+    private function isSiteComponentEnabled(string $componentPath): bool
+    {
+        $componentDir = dirname($componentPath);
+        $configPath = $componentDir . '/config.php';
+
+        if (!is_file($configPath)) {
+            return true;
+        }
+
+        $config = require $configPath;
+        $enabledValue = $config['component']['enabled'] ?? true;
+        if (is_bool($enabledValue)) {
+            return $enabledValue;
+        }
+
+        return filter_var($enabledValue, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**

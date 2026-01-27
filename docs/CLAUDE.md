@@ -376,7 +376,6 @@ capitalized tag names like `<Hero>` and `<Alert>`. Template placeholders like
 **Component Resolution Order**:
 1. Theme components: `site/themes/{theme}/{Component}.php` (namespace: `\Modules\`)
 2. Site components: `site/components/{Name}/{Name}.php` (namespace: `\Components\`)
-3. Core components: `app/core/components/{Name}.php` (namespace: `\Components\`)
 
 **Example**:
 

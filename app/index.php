@@ -83,12 +83,8 @@ try {
         }
     }
 
-    // Check for installation config.php (site location preferred, fall back to legacy locations)
-    if (
-        !file_exists($rootDir . '/site/config.php') &&
-        !file_exists($rootDir . '/config.php') &&
-        !file_exists($appDir . '/config.php')
-    ) {
+    // Check for installation config.php (site location).
+    if (!file_exists($rootDir . '/site/config.php')) {
         \Flint\Setup::render();
         exit;
     }
@@ -101,12 +97,6 @@ try {
     // Determine if we should show detailed errors based on config
     $showDetailedErrors = false;
     $configPath = $rootDir . '/site/config.php';
-    if (!file_exists($configPath) && file_exists($rootDir . '/config.php')) {
-        $configPath = $rootDir . '/config.php';
-    }
-    if (!file_exists($configPath) && file_exists($appDir . '/config.php')) {
-        $configPath = $appDir . '/config.php';
-    }
 
     if (file_exists($configPath)) {
         try {

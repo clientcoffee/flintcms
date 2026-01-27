@@ -10,9 +10,9 @@ Website: https://flintcms.com
 
 - **Flat-file core**: Markdown content + PHP config. No database required.
 - **Theme + components**: Drop-in themes, reusable blocks, and hookable components.
-- **Security-first**: Defense component for rate limits and threat tracking.
+- **Security-first**: Defense component for rate limits and threat tracking (installable).
 - **Admin panel**: Built-in UI for content management and settings.
-- **Backups + scheduler**: Automated backups and scheduled tasks.
+- **Backups + scheduler**: Automated backups and scheduled tasks (installable component).
 - **Zero runtime deps**: PHP 8.2+ is enough to run in production.
 
 ## Why Flint

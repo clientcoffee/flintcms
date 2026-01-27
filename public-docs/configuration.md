@@ -25,6 +25,18 @@ return [
 - `site/config.example.php` is a template; copy it to start.
 - Do not commit `site/config.php` to version control.
 
+## Component registries
+
+Optional components are served from registry manifests. Configure them in `site/config.php`:
+
+```php
+'components' => [
+    'registries' => [
+        'https://raw.githubusercontent.com/clientcoffee/flint-components/main/manifest.json',
+    ],
+],
+```
+
 ## Updates settings
 
 `updates.auto_update` controls how updates are applied:

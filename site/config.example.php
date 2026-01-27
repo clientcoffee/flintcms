@@ -35,6 +35,12 @@ return [
         // Example: password_hash('your-password', PASSWORD_DEFAULT)
         'password' => '$2y$10$example.hash.replace.with.real.hashed.password',
     ],
+    'components' => [
+        // Registry manifests for optional components.
+        'registries' => [
+            'https://raw.githubusercontent.com/clientcoffee/flint-components/main/manifest.json',
+        ],
+    ],
     'updates' => [
         // Auto-update behavior: true = auto-install, false = notify only, 'ask' = prompt before installing
         'auto_update' => 'ask',

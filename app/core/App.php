@@ -8,6 +8,7 @@ namespace Flint;
  */
 class App
 {
+    private const DEFAULT_COMPONENT_REGISTRY = 'https://raw.githubusercontent.com/clientcoffee/flint-components/main/manifest.json';
     public readonly array $config;
     public readonly string $root;
     public readonly string $appDir;
@@ -28,11 +29,11 @@ class App
         // Initialize global path constants for use throughout the application.
         Paths::init($rootDir, $appDir);
 
-        // Load the configuration file from the site bundle (fallback to legacy locations)
-        $configPath = $this->resolveConfigPath();
+        // Load the configuration file from the site bundle.
+        $configPath = Paths::$configFile;
 
         if (!file_exists($configPath)) {
-            throw new \Exception("Configuration file (config.php) missing. Run setup to generate it.");
+            throw new \Exception("Configuration file (site/config.php) missing. Run setup to generate it.");
         }
 
         $config = require $configPath;
@@ -95,29 +96,6 @@ class App
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host = $this->resolveSiteDomain();
         return $scheme . '://' . $host;
-    }
-
-    /**
-     * Resolve the active configuration file path, falling back to legacy locations.
-     */
-    private function resolveConfigPath(): string
-    {
-        $primary = Paths::$configFile;
-        if (file_exists($primary)) {
-            return $primary;
-        }
-
-        $legacyRoot = $this->root . '/config.php';
-        if (file_exists($legacyRoot)) {
-            return $legacyRoot;
-        }
-
-        $legacyApp = $this->appDir . '/config.php';
-        if (file_exists($legacyApp)) {
-            return $legacyApp;
-        }
-
-        return $primary;
     }
 
     /**
@@ -222,12 +200,10 @@ class App
             }
         }
 
-        // Serve static files from /uploads/ (preferred) and /site/uploads/ (legacy).
-        if (str_starts_with($requestPath, '/uploads/') || str_starts_with($requestPath, '/site/uploads/')) {
+        // Serve static files from /uploads/.
+        if (str_starts_with($requestPath, '/uploads/')) {
             // Allow direct access to user-uploaded media.
-            $uploadFilePath = str_starts_with($requestPath, '/uploads/')
-                ? $this->root . '/site' . $requestPath
-                : $this->root . $requestPath;
+            $uploadFilePath = $this->root . '/site' . $requestPath;
 
             // Security: Validate path stays within uploads directory.
             $realUploadPath = realpath($uploadFilePath);
@@ -459,12 +435,6 @@ class App
         // Generic form submission (public endpoint, no auth required).
         if ($requestPath === '/api/form' && $requestMethod === 'POST') {
             $this->handleFormSubmission();
-            return;
-        }
-
-        // Contact form submission (public endpoint, no auth required) - DEPRECATED.
-        if ($requestPath === '/api/contact' && $requestMethod === 'POST') {
-            $this->handleContactForm();
             return;
         }
 
@@ -912,14 +882,14 @@ class App
             return;
         }
 
-        // Browse available components from API (admin only).
+        // Browse available components from registries (admin only).
         if ($requestPath === '/api/components/browse' && $requestMethod === 'GET') {
             $available = $this->browseAvailableComponents();
             echo json_encode(['success' => true, 'components' => $available]);
             return;
         }
 
-        // Install component from GitHub (admin only).
+        // Install component from registry (admin only).
         if ($requestPath === '/api/components/install' && $requestMethod === 'POST') {
             if (!$this->validateCsrfToken()) {
                 http_response_code(403);
@@ -927,13 +897,15 @@ class App
                 return;
             }
             $payload = $this->readJsonPayload();
-            $repo = $payload['repo'] ?? '';
-            $result = $this->installComponent($repo);
+            $name = $payload['name'] ?? '';
+            $downloadUrl = $payload['download_url'] ?? '';
+            $checksum = $payload['sha256'] ?? '';
+            $result = $this->installComponent($name, $downloadUrl, $checksum);
             echo json_encode($result);
             return;
         }
 
-        // Update component from GitHub (admin only).
+        // Update component from registry (admin only).
         if ($requestPath === '/api/components/update' && $requestMethod === 'POST') {
             if (!$this->validateCsrfToken()) {
                 http_response_code(403);
@@ -2731,140 +2703,6 @@ class App
     }
 
     /**
-     * Handle the public contact form submission.
-     */
-    private function handleContactForm(): void
-    {
-        // Provide a JSON response for contact submissions.
-        header('Content-Type: application/json');
-
-        // Rate limiting check.
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
-        }
-        $lastSubmissionTimestamp = $_SESSION['last_contact_submission'] ?? 0;
-        $secondsSinceLastSubmission = time() - $lastSubmissionTimestamp;
-
-        if ($secondsSinceLastSubmission < 60) {
-            // Throttle repeat submissions to reduce abuse.
-            echo json_encode([
-                'success' => false,
-                'message' => 'Please wait before submitting again.'
-            ]);
-            return;
-        }
-
-        // Get and validate input.
-        $payload = $this->readJsonPayload();
-        if ($payload === null) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Invalid JSON body']);
-            return;
-        }
-
-        $senderName = trim((string)($payload['name'] ?? ''));
-        $senderEmail = trim((string)($payload['email'] ?? ''));
-        $messageBody = trim((string)($payload['message'] ?? ''));
-
-        // Validation.
-        $validationErrors = [];
-
-        if ($senderName === '' || strlen($senderName) < 2) {
-            $validationErrors[] = 'Name must be at least 2 characters';
-        }
-
-        if (strlen($senderName) > 100) {
-            $validationErrors[] = 'Name is too long';
-        }
-
-        if (!filter_var($senderEmail, FILTER_VALIDATE_EMAIL)) {
-            $validationErrors[] = 'Invalid email address';
-        }
-
-        if ($messageBody === '' || strlen($messageBody) < 10) {
-            $validationErrors[] = 'Message must be at least 10 characters';
-        }
-
-        if (strlen($messageBody) > 5000) {
-            $validationErrors[] = 'Message is too long';
-        }
-
-        // Check for spam patterns.
-        if (preg_match('/<a\s+href/i', $messageBody) || preg_match('/\[url=/i', $messageBody)) {
-            $validationErrors[] = 'Invalid message content';
-        }
-
-        if (!empty($validationErrors)) {
-            // Return all validation errors as a single response message.
-            echo json_encode([
-                'success' => false,
-                'message' => implode(', ', $validationErrors)
-            ]);
-            return;
-        }
-
-        // Trigger form_validate hook (components can perform validation).
-        $defenseResult = HookManager::trigger('form_validate', [
-            'form_type' => 'contact',
-            'data' => $payload
-        ]);
-
-        // If validation result is returned and indicates failure, handle it.
-        if (is_array($defenseResult)) {
-            if (isset($defenseResult['should_engage']) && $defenseResult['should_engage']) {
-                // A component wants to engage defenses - trigger request_start again.
-                HookManager::trigger('request_start', [
-                    'path' => $_SERVER['REQUEST_URI'] ?? '/api/contact',
-                    'method' => 'POST',
-                    'ip' => $this->getClientIp(),
-                    'context' => 'form_abuse'
-                ]);
-            }
-
-            if (isset($defenseResult['valid']) && !$defenseResult['valid']) {
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'Submission failed security validation. ' . implode(', ', $defenseResult['errors'] ?? [])
-                ]);
-                return;
-            }
-        }
-
-        // Sanitize inputs.
-        $safeSenderName = htmlspecialchars($senderName, ENT_QUOTES, 'UTF-8');
-        $safeSenderEmail = htmlspecialchars($senderEmail, ENT_QUOTES, 'UTF-8');
-        $safeMessageBody = htmlspecialchars($messageBody, ENT_QUOTES, 'UTF-8');
-
-        // Store submission (opt-out via store="false").
-        $shouldStore = !isset($payload['store']) || $payload['store'] !== 'false';
-        if ($shouldStore) {
-            $this->storeSubmission([
-                'name' => $safeSenderName,
-                'email' => $safeSenderEmail,
-                'message' => $safeMessageBody,
-                'submitted_at' => time(),
-                'submitted_from' => $payload['from'] ?? $_SERVER['HTTP_REFERER'] ?? '',
-                'ip_address' => $this->getClientIp(),
-            ]);
-        }
-
-        // Send email.
-        $emailSent = $this->sendContactEmail($safeSenderName, $safeSenderEmail, $safeMessageBody);
-
-        if ($emailSent) {
-            $_SESSION['last_contact_submission'] = time();
-            echo json_encode(['success' => true]);
-            return;
-        }
-
-        // Surface a generic failure response when mail dispatch fails.
-        echo json_encode([
-            'success' => false,
-            'message' => 'Failed to send email. Please try again later.'
-        ]);
-    }
-
-    /**
      * Handle generic form submission from Form component
      *
      * All forms POST to /api/form and automatically email the admin.
@@ -3073,74 +2911,6 @@ class App
         return mail($adminEmail, $subject, $emailBody, $headers);
     }
 
-    /**
-     * Compose and send the contact form email.
-     */
-    private function sendContactEmail(string $senderName, string $senderEmail, string $messageBody): bool
-    {
-        // Load email template.
-        $templatePath = \Components\Block::resolveMarkdownBlockPath($this->root, 'contact-email');
-
-        if ($templatePath === null || !file_exists($templatePath)) {
-            error_log("Contact email template not found");
-            return false;
-        }
-
-        $templateContents = file_get_contents($templatePath);
-        if ($templateContents === false) {
-            error_log("Failed to read contact email template: {$templatePath}");
-            return false;
-        }
-
-        // Parse frontmatter for subject.
-        $subjectLine = 'New Contact Form Submission';
-        if (preg_match('/^---\s*\n(.*?)\n---\s*\n(.*)$/s', $templateContents, $frontmatterMatch)) {
-            if (preg_match('/subject:\s*(.+)$/m', $frontmatterMatch[1], $subjectMatch)) {
-                $subjectLine = trim($subjectMatch[1]);
-            }
-            $templateContents = $frontmatterMatch[2];
-        }
-
-        // Replace template variables.
-        $messageText = str_replace(
-            ['{{name}}', '{{email}}', '{{message}}', '{{date}}'],
-            [$senderName, $senderEmail, $messageBody, date('F j, Y g:i A')],
-            $templateContents
-        );
-
-        // Convert markdown to plain text for email.
-        $messageText = strip_tags($messageText);
-
-        // Get admin email from config.
-        $adminEmail = $this->config['mail']['admin_email'] ?? '';
-        if ($adminEmail === '' || $adminEmail === 'admin@example.com') {
-            error_log("Admin email not configured");
-            return false;
-        }
-
-        $safeReplyEmail = str_replace(["\r", "\n"], '', $senderEmail);
-        if ($safeReplyEmail === '') {
-            error_log("Invalid reply-to email");
-            return false;
-        }
-
-        // Email headers.
-        $headers = [
-            'From: ' . $safeReplyEmail,
-            'Reply-To: ' . $safeReplyEmail,
-            'X-Mailer: Flint',
-            'Content-Type: text/plain; charset=UTF-8'
-        ];
-
-        // Send email.
-        $success = mail($adminEmail, $subjectLine, $messageText, implode("\r\n", $headers));
-
-        if (!$success) {
-            error_log("Failed to send contact form email to {$adminEmail}");
-        }
-
-        return $success;
-    }
 
     /**
      * Read and decode a JSON request body.
@@ -3924,9 +3694,21 @@ class App
     {
         $componentsDir = $this->root . '/site/components';
         $components = [];
+        $registryMap = [];
 
         if (!is_dir($componentsDir)) {
             return $components;
+        }
+
+        foreach ($this->browseAvailableComponents() as $component) {
+            $registryName = strtolower((string)($component['name'] ?? ''));
+            $registrySlug = strtolower((string)($component['slug'] ?? ''));
+            if ($registryName !== '') {
+                $registryMap[$registryName] = $component;
+            }
+            if ($registrySlug !== '') {
+                $registryMap[$registrySlug] = $component;
+            }
         }
 
         $directories = glob($componentsDir . '/*', GLOB_ONLYDIR);
@@ -3940,16 +3722,46 @@ class App
             }
 
             $config = require $configPath;
-            $enabled = ($config['component']['enabled'] ?? 'false') === 'true';
+            $enabledValue = $config['component']['enabled'] ?? false;
+            $enabled = is_bool($enabledValue)
+                ? $enabledValue
+                : filter_var($enabledValue, FILTER_VALIDATE_BOOLEAN);
+
+            $downloadUrl = '';
+            $sha256 = '';
+            if (isset($config['component']['source']) && is_array($config['component']['source'])) {
+                $downloadUrl = (string)($config['component']['source']['download_url'] ?? '');
+                $sha256 = (string)($config['component']['source']['sha256'] ?? '');
+            }
+            if (isset($config['component']['download_url'])) {
+                $downloadUrl = (string)$config['component']['download_url'];
+            }
+            if (isset($config['component']['sha256'])) {
+                $sha256 = (string)$config['component']['sha256'];
+            }
+
+            $registryKey = strtolower((string)($config['component']['slug'] ?? $name));
+            if (isset($registryMap[$registryKey])) {
+                $registryEntry = $registryMap[$registryKey];
+                $downloadUrl = (string)($registryEntry['download_url'] ?? $downloadUrl);
+                $sha256 = (string)($registryEntry['sha256'] ?? $sha256);
+                $latestVersion = (string)($registryEntry['version'] ?? '');
+            } else {
+                $latestVersion = '';
+            }
 
             $components[] = [
                 'name' => $name,
+                'slug' => $config['component']['slug'] ?? $name,
                 'displayName' => $config['component']['name'] ?? $name,
                 'version' => $config['component']['version'] ?? '1.0.0',
+                'latest_version' => $latestVersion,
                 'author' => $config['component']['author'] ?? 'Unknown',
                 'description' => $config['component']['description'] ?? '',
                 'enabled' => $enabled,
-                'repo' => $config['component']['repo'] ?? ''
+                'type' => $config['component']['type'] ?? 'render',
+                'download_url' => $downloadUrl,
+                'sha256' => $sha256,
             ];
         }
 
@@ -3957,16 +3769,68 @@ class App
     }
 
     /**
-     * Browse available components from Flint components API.
+     * Browse available components from configured registries.
      *
      * @return array List of available components
      */
     private function browseAvailableComponents(): array
     {
-        // Hypothetical Flint components repository API
-        $apiUrl = 'https://components.flintcms.com/api/components';
+        $components = [];
+        $seen = [];
 
-        $ch = curl_init($apiUrl);
+        foreach ($this->getComponentRegistryUrls() as $registryUrl) {
+            foreach ($this->fetchComponentRegistry($registryUrl) as $component) {
+                $normalized = $this->normalizeRegistryComponent($component);
+                if ($normalized === null) {
+                    continue;
+                }
+
+                $key = strtolower($normalized['slug'] ?: $normalized['name']);
+                if (isset($seen[$key])) {
+                    continue;
+                }
+
+                $seen[$key] = true;
+                $components[] = $normalized;
+            }
+        }
+
+        return $components;
+    }
+
+    /**
+     * Resolve the component registry URLs from config.
+     *
+     * @return array
+     */
+    private function getComponentRegistryUrls(): array
+    {
+        $registries = $this->config['components']['registries'] ?? [];
+        if (is_string($registries)) {
+            $registries = [$registries];
+        }
+
+        $normalized = array_values(array_filter(array_map(function ($url) {
+            if (!is_string($url)) {
+                return null;
+            }
+            $url = trim($url);
+            return $url !== '' ? $url : null;
+        }, $registries)));
+
+        if ($normalized === []) {
+            return [self::DEFAULT_COMPONENT_REGISTRY];
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    /**
+     * Fetch a registry JSON payload.
+     */
+    private function fetchComponentRegistry(string $registryUrl): array
+    {
+        $ch = curl_init($registryUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         curl_setopt($ch, CURLOPT_USERAGENT, 'Flint/' . \Flint\Version::VERSION);
@@ -3975,71 +3839,95 @@ class App
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($httpCode !== 200 || $response === false) {
-            // Return sample components as fallback
-            return $this->getSampleComponents();
+        if ($httpCode != 200 || $response === false) {
+            return [];
         }
 
         $data = json_decode($response, true);
-        return $data['components'] ?? $this->getSampleComponents();
+        if (!is_array($data)) {
+            return [];
+        }
+
+        $components = $data['components'] ?? [];
+        return is_array($components) ? $components : [];
     }
 
     /**
-     * Get sample components for demonstration.
-     *
-     * @return array Sample components
+     * Normalize a registry entry into the admin payload shape.
      */
-    private function getSampleComponents(): array
+    private function normalizeRegistryComponent(array $component): ?array
     {
+        $name = trim((string)($component['name'] ?? ''));
+        if ($name === '') {
+            return null;
+        }
+
+        $slug = trim((string)($component['slug'] ?? ''));
+        if ($slug === '') {
+            $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $name));
+        }
+
+        $downloadUrl = trim((string)($component['download_url'] ?? ''));
+        if ($downloadUrl === '') {
+            return null;
+        }
+
         return [
-            [
-                'name' => 'Analytics',
-                'displayName' => 'Analytics Tracker',
-                'version' => '1.0.0',
-                'author' => 'Flint',
-                'description' => 'Track page views and visitor analytics',
-                'repo' => 'flintcms/component-analytics',
-                'downloads' => 1234,
-                'stars' => 45
-            ],
-            [
-                'name' => 'Search',
-                'displayName' => 'Full-Text Search',
-                'version' => '1.2.0',
-                'author' => 'Flint',
-                'description' => 'Add full-text search to your site',
-                'repo' => 'flintcms/component-search',
-                'downloads' => 2156,
-                'stars' => 89
-            ],
-            [
-                'name' => 'Comments',
-                'displayName' => 'Comment System',
-                'version' => '1.1.0',
-                'author' => 'Community',
-                'description' => 'Add commenting functionality to pages',
-                'repo' => 'flintcms/component-comments',
-                'downloads' => 891,
-                'stars' => 34
-            ]
+            'name' => $name,
+            'slug' => $slug,
+            'displayName' => $component['displayName'] ?? $name,
+            'version' => (string)($component['version'] ?? ''),
+            'author' => (string)($component['author'] ?? 'Unknown'),
+            'description' => (string)($component['description'] ?? ''),
+            'type' => (string)($component['type'] ?? 'render'),
+            'requires' => (string)($component['requires'] ?? ''),
+            'download_url' => $downloadUrl,
+            'sha256' => (string)($component['sha256'] ?? ''),
+            'homepage' => (string)($component['homepage'] ?? ''),
         ];
     }
 
     /**
-     * Install a component from a GitHub repository.
-     *
-     * @param string $repo GitHub repository (username/repo format)
-     * @return array Result with success status and message
+     * Find a registry component entry by name or slug.
      */
-    private function installComponent(string $repo): array
+    private function findRegistryComponent(string $name): ?array
     {
-        if (empty($repo)) {
-            return ['success' => false, 'error' => 'Repository name required'];
+        $needle = strtolower($name);
+        foreach ($this->browseAvailableComponents() as $component) {
+            $componentName = strtolower((string)($component['name'] ?? ''));
+            $componentSlug = strtolower((string)($component['slug'] ?? ''));
+            if ($needle === $componentName || $needle === $componentSlug) {
+                return $component;
+            }
         }
 
-        // Validate repo format
-        if (!preg_match('/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/', $repo)) {
-            return ['success' => false, 'error' => 'Invalid repository format'];
+        return null;
+    }
+
+    /**
+     * Install a component from a registry package.
+     */
+    private function installComponent(string $name, string $downloadUrl, string $checksum = ''): array
+    {
+        $name = trim($name);
+        $downloadUrl = trim($downloadUrl);
+        $checksum = trim($checksum);
+
+        if ($name === '') {
+            return ['success' => false, 'error' => 'Component name required'];
+        }
+
+        if (!preg_match('/^[A-Za-z0-9_-]+$/', $name)) {
+            return ['success' => false, 'error' => 'Invalid component name'];
+        }
+
+        if ($downloadUrl === '' || !filter_var($downloadUrl, FILTER_VALIDATE_URL)) {
+            return ['success' => false, 'error' => 'Invalid download URL'];
+        }
+
+        $scheme = parse_url($downloadUrl, PHP_URL_SCHEME);
+        if ($scheme !== 'https') {
+            return ['success' => false, 'error' => 'Download URL must be HTTPS'];
         }
 
         $componentsDir = $this->root . '/site/components';
@@ -4047,125 +3935,167 @@ class App
             mkdir($componentsDir, 0755, true);
         }
 
-        // Download latest release as ZIP from GitHub
-        $zipUrl = "https://github.com/{$repo}/archive/refs/heads/main.zip";
-        $tempZip = sys_get_temp_dir() . '/' . uniqid('component_') . '.zip';
+        $targetDir = $componentsDir . '/' . $name;
+        if (is_dir($targetDir)) {
+            return ['success' => false, 'error' => 'Component already installed'];
+        }
 
-        $ch = curl_init($zipUrl);
+        $tempZip = sys_get_temp_dir() . '/' . uniqid('component_', true) . '.zip';
+        $tempDir = sys_get_temp_dir() . '/' . uniqid('component_extract_', true);
+
         $fp = fopen($tempZip, 'w');
+        if ($fp === false) {
+            return ['success' => false, 'error' => 'Unable to create temporary file'];
+        }
+
+        $ch = curl_init($downloadUrl);
         curl_setopt($ch, CURLOPT_FILE, $fp);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        fclose($fp);
-
         $success = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+        fclose($fp);
 
         if (!$success || $httpCode !== 200) {
             @unlink($tempZip);
             return ['success' => false, 'error' => 'Failed to download component'];
         }
 
-        // Extract ZIP
-        $zip = new \ZipArchive();
-        if ($zip->open($tempZip) !== true) {
-            @unlink($tempZip);
-            return ['success' => false, 'error' => 'Failed to extract component'];
-        }
-
-        // Find component name from config.php in the ZIP
-        $componentName = null;
-        for ($i = 0; $i < $zip->numFiles; $i++) {
-            $filename = $zip->getNameIndex($i);
-            if (str_ends_with($filename, '/config.php')) {
-                // Extract config.php and evaluate it safely
-                $configContent = $zip->getFromIndex($i);
-                $tempConfigPath = sys_get_temp_dir() . '/temp-config-' . uniqid() . '.php';
-                file_put_contents($tempConfigPath, $configContent);
-                $config = require $tempConfigPath;
-                @unlink($tempConfigPath);
-                $componentName = $config['component']['name'] ?? null;
-                break;
+        if ($checksum !== '') {
+            $hash = hash_file('sha256', $tempZip);
+            if (!hash_equals(strtolower($checksum), strtolower($hash))) {
+                @unlink($tempZip);
+                return ['success' => false, 'error' => 'Component checksum mismatch'];
             }
         }
 
-        if (!$componentName) {
-            $zip->close();
+        $zip = new \ZipArchive();
+        if ($zip->open($tempZip) != true) {
             @unlink($tempZip);
-            return ['success' => false, 'error' => 'Invalid component: config file not found'];
+            return ['success' => false, 'error' => 'Failed to read component archive'];
         }
 
-        // Extract to components directory
-        $extractPath = $componentsDir . '/' . $componentName;
-
-        // SECURITY: Validate extraction path to prevent symlink attacks
-        try {
-            $validatedExtractPath = $this->validateSecurePath($extractPath, Paths::$siteComponentsDir);
-        } catch (\Exception $e) {
+        if (!mkdir($tempDir, 0755, true) && !is_dir($tempDir)) {
             $zip->close();
+            @unlink($tempZip);
+            return ['success' => false, 'error' => 'Unable to extract component'];
+        }
+
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $entry = $zip->getNameIndex($i);
+            if ($entry === false) {
+                continue;
+            }
+
+            if (strpos($entry, '..') !== false || strpos($entry, './') == 0 || $entry[0] == '/') {
+                $zip->close();
+                $this->recursiveRemoveDirectory($tempDir);
+                @unlink($tempZip);
+                return ['success' => false, 'error' => 'Invalid file path in component archive'];
+            }
+
+            if (!$zip->extractTo($tempDir, $entry)) {
+                $zip->close();
+                $this->recursiveRemoveDirectory($tempDir);
+                @unlink($tempZip);
+                return ['success' => false, 'error' => 'Failed to extract component'];
+            }
+        }
+        $zip->close();
+
+        $entries = array_values(array_diff(scandir($tempDir), ['.', '..']));
+        $directories = array_values(array_filter($entries, function ($entry) use ($tempDir) {
+            return is_dir($tempDir . '/' . $entry);
+        }));
+
+        $componentRoot = null;
+        if (count($directories) === 1) {
+            $componentRoot = $directories[0];
+        } elseif (is_dir($tempDir . '/' . $name)) {
+            $componentRoot = $name;
+        }
+
+        if ($componentRoot === null) {
+            $this->recursiveRemoveDirectory($tempDir);
+            @unlink($tempZip);
+            return ['success' => false, 'error' => 'Component archive missing root folder'];
+        }
+
+        if ($componentRoot != $name) {
+            $this->recursiveRemoveDirectory($tempDir);
+            @unlink($tempZip);
+            return ['success' => false, 'error' => 'Component folder name mismatch'];
+        }
+
+        $sourceDir = $tempDir . '/' . $componentRoot;
+
+        try {
+            $validatedTarget = $this->validateSecurePath($targetDir, Paths::$siteComponentsDir);
+        } catch (\Exception $e) {
+            $this->recursiveRemoveDirectory($tempDir);
             @unlink($tempZip);
             return ['success' => false, 'error' => 'Invalid component path'];
         }
 
-        if (is_dir($validatedExtractPath)) {
-            $zip->close();
-            @unlink($tempZip);
-            return ['success' => false, 'error' => 'Component already installed'];
+        $moved = @rename($sourceDir, $validatedTarget);
+        if (!$moved) {
+            $this->recursiveCopy($sourceDir, $validatedTarget);
+            $this->recursiveRemoveDirectory($sourceDir);
         }
 
-        // Extract all files (strip the first directory level from GitHub archive)
-        $zip->extractTo(sys_get_temp_dir());
-        $tempDir = sys_get_temp_dir() . '/' . basename($repo) . '-main';
-
-        if (is_dir($tempDir)) {
-            rename($tempDir, $validatedExtractPath);
-        }
-
-        $zip->close();
+        $this->recursiveRemoveDirectory($tempDir);
         @unlink($tempZip);
 
         return ['success' => true, 'message' => 'Component installed successfully'];
     }
 
-    /**
-     * Update a component from its GitHub repository.
-     *
-     * @param string $name Component name
-     * @return array Result with success status and message
-     */
     private function updateComponent(string $name): array
     {
         $componentDir = $this->root . '/site/components/' . $name;
         $configPath = $componentDir . '/config.php';
 
-        if (!is_dir($componentDir) || !file_exists($configPath)) {
+        if (!is_dir($componentDir)) {
             return ['success' => false, 'error' => 'Component not found'];
         }
 
-        $config = require $configPath;
-        $repo = $config['component']['repo'] ?? '';
-
-        if (empty($repo)) {
-            return ['success' => false, 'error' => 'Repository information not found'];
+        $registryComponent = $this->findRegistryComponent($name);
+        if ($registryComponent === null) {
+            return ['success' => false, 'error' => 'Component not found in registry'];
         }
 
-        // Backup current component
-        $backupDir = $componentDir . '_backup_' . time();
-        rename($componentDir, $backupDir);
+        $downloadUrl = $registryComponent['download_url'] ?? '';
+        $checksum = $registryComponent['sha256'] ?? '';
+        $latestVersion = $registryComponent['version'] ?? '';
 
-        // Try to install updated version
-        $result = $this->installComponent($repo);
+        $installedVersion = '';
+        if (file_exists($configPath)) {
+            $config = require $configPath;
+            $installedVersion = (string)($config['component']['version'] ?? '');
+        }
+
+        if ($installedVersion !== '' && $latestVersion !== '' && version_compare($installedVersion, $latestVersion, '>=')) {
+            return ['success' => false, 'error' => 'Component is already up to date'];
+        }
+
+        // Backup current component.
+        $backupDir = $componentDir . '_backup_' . time();
+        if (!rename($componentDir, $backupDir)) {
+            return ['success' => false, 'error' => 'Failed to backup component'];
+        }
+
+        // Try to install updated version.
+        $result = $this->installComponent($name, $downloadUrl, $checksum);
 
         if (!$result['success']) {
-            // Restore backup on failure
+            // Restore backup on failure.
             if (is_dir($backupDir)) {
                 rename($backupDir, $componentDir);
             }
             return $result;
         }
 
-        // Remove backup on success
+        // Remove backup on success.
         $this->deleteDirectory($backupDir);
 
         return ['success' => true, 'message' => 'Component updated successfully'];

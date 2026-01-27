@@ -1211,7 +1211,7 @@
         const toggleClasses = isEnabled
           ? "bg-gray-100 text-gray-700"
           : "bg-indigo-600 text-white";
-        const updateButton = component.repo
+        const updateButton = component.download_url
           ? `<button type="button" data-action="update-component" data-component="${componentName}" class="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Update</button>`
           : "";
 
@@ -1257,23 +1257,25 @@
         const version = escapeHtml(component.version || "");
         const author = escapeHtml(component.author || "");
         const description = escapeHtml(component.description || "");
-        const repo = escapeHtml(component.repo || "");
-        const downloads = Number(component.downloads) || 0;
-        const stars = Number(component.stars) || 0;
+        const name = escapeHtml(component.name || "");
+        const slug = escapeHtml(component.slug || "");
+        const type = escapeHtml(component.type || "render");
+        const requires = escapeHtml(component.requires || "");
+        const downloadUrl = escapeHtml(component.download_url || "");
+        const checksum = escapeHtml(component.sha256 || "");
+        const hasDownload = downloadUrl !== "";
 
         return `
           <div class="bg-white border border-gray-200 rounded-lg p-4">
             <div class="flex justify-between items-start mb-2">
               <div>
                 <h4 class="font-semibold text-gray-900">${displayName}</h4>
-                <p class="text-xs text-gray-500">v${version} by ${author}</p>
-              </div>
-              <div class="text-xs text-gray-500">
-                ⬇ ${downloads} | ★ ${stars}
+                <p class="text-xs text-gray-500">v${version} by ${author} • ${type}</p>
               </div>
             </div>
             <p class="text-sm text-gray-600 mb-3">${description}</p>
-            <button type="button" data-action="install-component" data-repo="${repo}" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+            ${requires ? `<p class="text-xs text-gray-500 mb-3">Requires ${requires}</p>` : ""}
+            <button type="button" data-action="install-component" data-name="${name || slug}" data-download="${downloadUrl}" data-sha="${checksum}" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60" ${hasDownload ? "" : "disabled"}>
               Install
             </button>
           </div>
@@ -1329,20 +1331,25 @@
   };
 
   // Install a component from a remote repo.
-  const installComponent = async (repo) => {
-    const repoName = String(repo || "").trim();
-    if (!repoName) {
-      alert("Invalid component repository.");
+  const installComponent = async (payload) => {
+    const componentName = String(payload?.name || "").trim();
+    const downloadUrl = String(payload?.downloadUrl || "").trim();
+    const checksum = String(payload?.checksum || "").trim();
+
+    if (!componentName || !downloadUrl) {
+      alert("Invalid component package.");
       return;
     }
 
-    if (!confirm(`Install component from ${repoName}?`)) {
+    if (!confirm(`Install ${componentName} component?`)) {
       return;
     }
 
     try {
       const { data: responseData } = await postJson("/api/components/install", {
-        repo: repoName
+        name: componentName,
+        download_url: downloadUrl,
+        sha256: checksum
       });
 
       if (responseData.success) {
@@ -1490,9 +1497,11 @@
           return;
         }
 
-        const repo = button.dataset.repo || "";
-        if (repo) {
-          installComponent(repo);
+        const name = button.dataset.name || "";
+        const downloadUrl = button.dataset.download || "";
+        const checksum = button.dataset.sha || "";
+        if (name && downloadUrl) {
+          installComponent({ name, downloadUrl, checksum });
         }
       });
     }
