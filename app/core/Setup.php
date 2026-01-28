@@ -41,21 +41,9 @@ class Setup
         $appDir = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
         $rootDir = realpath($appDir . '/..') ?: dirname($appDir);
         $configPath = $rootDir . '/site/config.php';
-        $legacyConfigPaths = [
-            $rootDir . '/config.php',
-            $appDir . '/config.php',
-        ];
 
         // Refuse to overwrite an existing install.
-        $legacyConfigExists = false;
-        foreach ($legacyConfigPaths as $legacyConfigPath) {
-            if (file_exists($legacyConfigPath)) {
-                $legacyConfigExists = true;
-                break;
-            }
-        }
-
-        if (file_exists($configPath) || $legacyConfigExists) {
+        if (file_exists($configPath)) {
             return [
                 'success' => false,
                 'message' => 'Config already exists. Setup will not overwrite an existing install.',
@@ -121,6 +109,11 @@ class Setup
                 'environment' => $environment,
                 'show_errors' => false,
             ],
+            'components' => [
+                'registries' => [
+                    'https://raw.githubusercontent.com/clientcoffee/flint-components/main/manifest.json',
+                ],
+            ],
             'updates' => [
                 'auto_update' => 'ask',
             ],
@@ -132,13 +125,6 @@ class Setup
                 'message' => 'Error writing config file. Please check permissions.',
                 'form' => $formData,
             ];
-        }
-
-        // Remove any legacy config files inside app/ or app/core/ to avoid confusion.
-        foreach (array_merge($legacyConfigPaths, [$appDir . '/core/config.php']) as $legacyConfig) {
-            if (file_exists($legacyConfig)) {
-                @unlink($legacyConfig);
-            }
         }
 
         $tokenEntry = MagicLink::buildConfigEntry(

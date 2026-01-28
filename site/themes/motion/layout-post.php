@@ -80,15 +80,8 @@ $footerAssets = ob_get_clean();
 
 // Optional post navigation (previous/next siblings).
 $neighborNavHtml = '';
-$componentsDir = isset(\Flint\Paths::$siteComponentsDir) ? \Flint\Paths::$siteComponentsDir : '';
-if ($componentsDir !== '' && is_dir($componentsDir)) {
-    $neighborComponentPath = $componentsDir . '/NeighborNav.php';
-    if (is_file($neighborComponentPath)) {
-        require_once $neighborComponentPath;
-        if (class_exists(\Components\NeighborNav::class)) {
-            $neighborNavHtml = \Components\NeighborNav::render([], '');
-        }
-    }
+if (class_exists(\Components\NeighborNav::class)) {
+    $neighborNavHtml = \Components\NeighborNav::render([], '');
 }
 $hasNeighborNav = $neighborNavHtml !== '';
 ?>

@@ -6,13 +6,32 @@ Flint resolves components in this order:
 
 1. Theme components in `site/themes/<theme>/` (`Modules\\ComponentName`)
 2. Site components in `site/components/` (`Components\\ComponentName`)
-3. Core components in `app/core/components/` (`Components\\ComponentName`)
 
-This allows themes to override site or core components for styling.
+This allows themes to override site components for styling.
+
+## Component registry (optional)
+
+Optional components live in the `flint-components` registry. The admin UI reads a JSON manifest and installs ZIP packages into `site/components/`.
+
+Default registry:
+- `https://raw.githubusercontent.com/clientcoffee/flint-components/main/manifest.json`
+
+You can add custom registries in `site/config.php`:
+
+```php
+return [
+    'components' => [
+        'registries' => [
+            'https://raw.githubusercontent.com/clientcoffee/flint-components/main/manifest.json',
+            // 'https://example.com/my-registry.json',
+        ],
+    ],
+];
+```
 
 ## Minimal component example
 
-`site/components/Callout.php`:
+`site/components/Callout/Callout.php`:
 
 ```php
 <?php
@@ -44,8 +63,12 @@ Optional config file: `site/components/Callout/config.php`
 return [
     'component' => [
         'name' => 'Callout',
-        'enabled' => 'true',
+        'slug' => 'callout',
         'version' => '1.0.0',
+        'author' => 'Your Name',
+        'description' => 'Callout box component.',
+        'type' => 'render',
+        'enabled' => true,
     ],
 ];
 ```
@@ -61,10 +84,10 @@ Assets live under `/components/<ComponentName>/` and are served from `site/compo
 
 ## Naming and namespaces
 
-- `site/components/MyWidget.php` should define `namespace Components; class MyWidget`.
+- `site/components/MyWidget/MyWidget.php` should define `namespace Components; class MyWidget`.
 - Theme components live in `site/themes/<theme>/` and use `namespace Modules;`.
 
 ## Enabling and settings
 
 Component metadata is stored in `site/components/<name>/config.php`.
-Set `component.enabled` to `'true'` or `'false'` to control loading.
+Set `component.enabled` to `true` or `false` to control loading.

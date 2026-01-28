@@ -4,7 +4,7 @@ The Motion theme is the default Flint theme. It pairs a clean layout with Tailwi
 
 ## quick start
 
-1. Set the theme in `app/config.php`:
+1. Set the theme in `site/config.php`:
    ```php
    <?php
 
@@ -79,7 +79,7 @@ description: A longer article with a hero header and reading progress.
 
 The layout receives these key variables:
 
-- `$site` - site settings from `app/config.php`.
+- `$site` - site settings from `site/config.php`.
 - `$page` - parsed frontmatter and content payload.
 - `$viewContent` - HTML produced by `view.php`.
 - `$componentAssets` - CSS/JS arrays gathered by the parser.
@@ -136,9 +136,9 @@ return [
 
 Note: the default layout does not auto-apply these settings. Wire them into your templates if you want to use them.
 
-## child themes (planned)
+## extending motion
 
-Flint already exposes a `parent` key in theme config. This is the intended hook for child themes that inherit from a base theme, but the inheritance loader is not wired up yet. Use the structure below so Claude (or a future implementation) can add the merge logic without changing your theme layout.
+You extend Motion by activating a theme that declares Motion as its parent. Set `theme` to your child theme and add `parent => 'motion'` in the child theme config.
 
 ### child theme config
 
@@ -161,14 +161,22 @@ return [
 ];
 ```
 
-### intended inheritance behavior
+### activate the child theme
 
-When implemented, the loader should:
+```php
+return [
+    'site' => [
+        'theme' => 'motion-child',
+    ],
+];
+```
 
-- Resolve the active theme, then fall back to `parent` for missing files.
-- Merge `settings` from parent -> child (child wins).
-- Load parent `helpers.php` first, then child `helpers.php`.
-- Allow child overrides for `layout.php`, `layout-*.php`, `view.php`, `404.php`, and any theme components in `site/themes/<child>/*.php`.
+### inheritance behavior
+
+- Flint resolves the active theme, then falls back to `parent` for missing files.
+- `settings` are merged parent → child (child wins).
+- Parent `helpers.php` loads before child `helpers.php`.
+- Child themes can override `layout.php`, `layout-*.php`, `view.php`, `404.php`, and any theme components in `site/themes/<child>/*.php`.
 
 ### directory layout (recommended)
 
@@ -232,7 +240,7 @@ Supported `type` values: `info`, `success`, `warning`, `error`.
 
 ### ContactForm
 
-`ContactForm` pulls its fields from a content block and posts to `/api/contact`.
+`ContactForm` pulls its fields from a content block and posts to `/api/form`.
 
 ```markdown
 <ContactForm fields="contact-form" store="true" />
