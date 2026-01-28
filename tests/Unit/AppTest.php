@@ -51,6 +51,18 @@ return array (
     'cache_enabled' => false,
     'show_errors' => true,
     'debug' => false,
+    'micro_cache' => true,
+    'micro_cache_ttl' => 10,
+    'minify_html' => true,
+    'fast_public' => true,
+    'asset_cache' => true,
+    'asset_cache_ttl' => 31536000,
+    'uploads_cache' => false,
+    'lazy_images' => true,
+    'render_cache' => true,
+    'sitemap_cache' => true,
+    'tree_cache' => true,
+    'inline_cache' => true,
   ),
   'updates' => 
   array (
@@ -65,6 +77,11 @@ PHP;
     protected function tearDown(): void
     {
         $this->recursiveRemoveDirectory($this->testRoot);
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION = [];
+            session_write_close();
+        }
     }
 
     private function resetPaths(): void
@@ -301,6 +318,160 @@ PHP;
         $this->assertSame('/var/lib/php/sessions', $method->invoke($this->app, '5;/var/lib/php/sessions'));
         $this->assertSame('/tmp', $method->invoke($this->app, '/tmp'));
         $this->assertNull($method->invoke($this->app, ''));
+    }
+
+    public function testMicroCacheEligibilitySkipsQueryAndCookies(): void
+    {
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('isMicroCacheEligible');
+
+        $originalQuery = $_SERVER['QUERY_STRING'] ?? null;
+        $originalCookies = $_COOKIE;
+
+        $_SERVER['QUERY_STRING'] = '';
+        $_COOKIE = [];
+        $this->assertTrue($method->invoke($this->app, '/about', 'GET'));
+
+        $_SERVER['QUERY_STRING'] = 'q=1';
+        $this->assertFalse($method->invoke($this->app, '/about', 'GET'));
+
+        $_SERVER['QUERY_STRING'] = '';
+        $_COOKIE['PHPSESSID'] = 'test';
+        $this->assertFalse($method->invoke($this->app, '/about', 'GET'));
+
+        $_COOKIE = [];
+        $this->assertFalse($method->invoke($this->app, '/api/test', 'GET'));
+
+        if ($originalQuery === null) {
+            unset($_SERVER['QUERY_STRING']);
+        } else {
+            $_SERVER['QUERY_STRING'] = $originalQuery;
+        }
+        $_COOKIE = $originalCookies;
+    }
+
+    public function testPublicVisitorDetection(): void
+    {
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('isPublicVisitor');
+
+        $originalCookies = $_COOKIE;
+        $_COOKIE = [];
+        $this->assertTrue($method->invoke($this->app, '/about', 'GET'));
+        $this->assertFalse($method->invoke($this->app, '/api/status', 'GET'));
+
+        $_COOKIE['PHPSESSID'] = 'test';
+        $this->assertFalse($method->invoke($this->app, '/about', 'GET'));
+
+        $_COOKIE = $originalCookies;
+    }
+
+    public function testApplyAssetCacheHeadersSetsCacheControl(): void
+    {
+        if (function_exists('header_remove')) {
+            header_remove();
+        }
+
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('applyAssetCacheHeaders');
+        $method->invoke($this->app);
+
+        $headers = headers_list();
+        $this->assertContains('Cache-Control: public, max-age=31536000, immutable', $headers);
+
+        if (function_exists('header_remove')) {
+            header_remove();
+        }
+    }
+
+    public function testTreeCacheWritesFiles(): void
+    {
+        file_put_contents($this->testRoot . '/site/pages/page.md', "# Page");
+        file_put_contents($this->testRoot . '/site/blocks/nav.md', "Nav");
+
+        $reflection = new \ReflectionClass($this->app);
+        $listContentTree = $reflection->getMethod('listContentTree');
+        $listBlockTree = $reflection->getMethod('listBlockTree');
+        $treeCachePath = $reflection->getMethod('treeCachePath');
+
+        $listContentTree->invoke($this->app);
+        $listBlockTree->invoke($this->app);
+
+        $pagesCachePath = $treeCachePath->invoke($this->app, 'pages');
+        $blocksCachePath = $treeCachePath->invoke($this->app, 'blocks');
+
+        $this->assertFileExists($pagesCachePath);
+        $this->assertFileExists($blocksCachePath);
+    }
+
+    public function testRenderCacheWritesFile(): void
+    {
+        $filePath = $this->testRoot . '/site/pages/cache-test.md';
+        file_put_contents($filePath, "# Cache Test");
+
+        $parser = new \Flint\Parser($this->app);
+        $parsed = $parser->parseFile($filePath);
+
+        $reflection = new \ReflectionClass($parser);
+        $cachePathMethod = $reflection->getMethod('renderCachePath');
+        $cachePath = $cachePathMethod->invoke($parser, $filePath);
+
+        $this->assertFileExists($cachePath);
+        $payload = require $cachePath;
+        $this->assertSame(filemtime($filePath), $payload['mtime']);
+        $this->assertSame($parsed['content_html'], $payload['data']['content_html']);
+    }
+
+    public function testInlineMarkdownCacheStoresEntry(): void
+    {
+        $parser = new \Flint\Parser($this->app);
+        $parser->renderInlineMarkdown('**Hello**');
+
+        $reflection = new \ReflectionClass($parser);
+        $property = $reflection->getProperty('inlineCache');
+        $property->setAccessible(true);
+        $cache = $property->getValue($parser);
+
+        $this->assertCount(1, $cache);
+    }
+
+    public function testSitemapCacheWritesFile(): void
+    {
+        file_put_contents($this->testRoot . '/site/pages/index.md', "---\ntitle: Home\n---\n");
+
+        \Flint\ThemeContext::set(['app' => $this->app]);
+        try {
+            $html = \Components\Sitemap::render([], '');
+            $this->assertStringContainsString('/', $html);
+        } finally {
+            \Flint\ThemeContext::clear();
+        }
+
+        $cachePath = \Flint\Paths::$cacheDir . '/sitemap/sitemap-public.php';
+        $this->assertFileExists($cachePath);
+    }
+
+    public function testMinifyHtmlRemovesWhitespace(): void
+    {
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('minifyHtml');
+
+        $html = "<div>\n  <span>Hi</span>\n</div>";
+        $this->assertSame('<div><span>Hi</span></div>', $method->invoke($this->app, $html));
+    }
+
+    public function testLazyLoadingAddsAttributes(): void
+    {
+        $parser = new \Flint\Parser($this->app);
+        $reflection = new \ReflectionClass($parser);
+        $method = $reflection->getMethod('addLazyLoadingToImages');
+
+        $html = '<p><img src="/test.png" width="100" height="50"></p>';
+        $result = $method->invoke($parser, $html);
+
+        $this->assertStringContainsString('loading="lazy"', $result);
+        $this->assertStringContainsString('decoding="async"', $result);
+        $this->assertStringContainsString('aspect-ratio: 100 / 50', $result);
     }
 
     private function recursiveRemoveDirectory(string $dir): void
