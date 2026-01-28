@@ -47,6 +47,8 @@ These settings keep page loads fast without any build step:
     'micro_cache_ttl' => 10,    // seconds
     'minify_html' => true,      // remove whitespace between tags
     'lazy_images' => true,      // add loading="lazy" to markdown images
+    'render_cache' => true,     // cache parsed markdown by file mtime
+    'sitemap_cache' => true,    // cache sitemap markup by file mtime
 ],
 ```
 

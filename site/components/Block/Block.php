@@ -33,12 +33,9 @@ class Block extends RenderComponent
             return sprintf('<!-- Block "%s" not found. -->', esc_html($blockName));
         }
 
-        // Read and parse the block content through the CMS parser.
-        $blockContent = file_get_contents($blockPath);
-
-        // Create a fresh parser instance for isolated block rendering.
+        // Parse the block content through the CMS parser (cached by mtime).
         $parser = new \Flint\Parser($app);
-        $parsedBlock = $parser->parse($blockContent);
+        $parsedBlock = $parser->parseFile($blockPath);
 
         // Return the rendered HTML.
         return $parsedBlock['content_html'];

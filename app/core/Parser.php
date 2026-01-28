@@ -154,11 +154,27 @@ class Parser
      */
     public function parseFile(string $filePath): array
     {
+        $mtime = filemtime($filePath);
+        $cachePath = $this->renderCachePath($filePath);
+
+        if ($mtime !== false && $this->isRenderCacheEnabled()) {
+            $cached = $this->readRenderCache($cachePath, $mtime);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
+
         // Load the file contents from disk
         $rawFileContents = file_get_contents($filePath);
 
         // Parse the raw markdown text
-        return $this->parse($rawFileContents);
+        $parsed = $this->parse($rawFileContents);
+
+        if ($mtime !== false && $this->isRenderCacheEnabled()) {
+            $this->writeRenderCache($cachePath, $mtime, $parsed);
+        }
+
+        return $parsed;
     }
 
     /**
@@ -482,6 +498,78 @@ class Parser
 
             return $tagBody . $suffix;
         }, $html);
+    }
+
+    /**
+     * Check if persistent render cache is enabled.
+     */
+    private function isRenderCacheEnabled(): bool
+    {
+        $system = $this->application->config['system'] ?? [];
+        if (!is_array($system)) {
+            return true;
+        }
+
+        if (!array_key_exists('render_cache', $system)) {
+            return true;
+        }
+
+        $value = $system['render_cache'];
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Resolve the cache file path for a content file.
+     */
+    private function renderCachePath(string $filePath): string
+    {
+        $key = sha1($filePath);
+        return Paths::$cacheDir . '/rendered/' . $key . '.php';
+    }
+
+    /**
+     * Read cached render payload when it matches the file mtime.
+     */
+    private function readRenderCache(string $cachePath, int $mtime): ?array
+    {
+        if (!is_file($cachePath)) {
+            return null;
+        }
+
+        $cached = require $cachePath;
+        if (!is_array($cached) || !isset($cached['mtime'], $cached['data'])) {
+            return null;
+        }
+
+        if ((int)$cached['mtime'] !== $mtime) {
+            return null;
+        }
+
+        return is_array($cached['data']) ? $cached['data'] : null;
+    }
+
+    /**
+     * Persist rendered output to disk (mtime keyed).
+     */
+    private function writeRenderCache(string $cachePath, int $mtime, array $data): void
+    {
+        $cacheDir = dirname($cachePath);
+        if (!is_dir($cacheDir)) {
+            mkdir($cacheDir, 0755, true);
+        }
+
+        $payload = [
+            'mtime' => $mtime,
+            'data' => $data
+        ];
+
+        $exported = var_export($payload, true);
+        $contents = "<?php\n\nreturn {$exported};\n";
+        file_put_contents($cachePath, $contents, LOCK_EX);
     }
 
     /**

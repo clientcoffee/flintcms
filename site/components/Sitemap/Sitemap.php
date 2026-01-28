@@ -4,6 +4,7 @@ namespace Components;
 
 use Flint\Auth;
 use Flint\RenderComponent;
+use Flint\Paths;
 
 /**
  * Render a sitemap of all pages, including hidden/drafts for admins.
@@ -24,6 +25,17 @@ class Sitemap extends RenderComponent
         $auth = new Auth($app);
         $isAdmin = $auth->isAdmin();
         $pagesDir = $app->root . '/site/pages';
+
+        $cacheEnabled = self::isSitemapCacheEnabled($app);
+        $fingerprint = $cacheEnabled ? self::pagesFingerprint($pagesDir) : null;
+        $cachePath = $cacheEnabled ? self::sitemapCachePath($isAdmin) : null;
+
+        if ($cacheEnabled && $fingerprint !== null && $cachePath !== null) {
+            $cached = self::readSitemapCache($cachePath, $fingerprint);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
 
         // Build a tree of pages based on URL structure.
         $pages = self::collectPages($pagesDir, '', $isAdmin, $parser);
@@ -48,8 +60,102 @@ class Sitemap extends RenderComponent
         </ul>
         <?php
 
+        $markup = trim((string)ob_get_clean());
+
+        if ($cacheEnabled && $fingerprint !== null && $cachePath !== null) {
+            self::writeSitemapCache($cachePath, $fingerprint, $markup);
+        }
+
         // Return the final sitemap markup.
-        return trim((string)ob_get_clean());
+        return $markup;
+    }
+
+    private static function isSitemapCacheEnabled($app): bool
+    {
+        $system = $app->config['system'] ?? [];
+        if (!is_array($system)) {
+            return true;
+        }
+
+        if (!array_key_exists('sitemap_cache', $system)) {
+            return true;
+        }
+
+        $value = $system['sitemap_cache'];
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    private static function pagesFingerprint(string $pagesDir): ?string
+    {
+        if (!is_dir($pagesDir)) {
+            return null;
+        }
+
+        $count = 0;
+        $maxMtime = 0;
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($pagesDir, \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file->isFile()) {
+                continue;
+            }
+            $name = $file->getFilename();
+            if (!preg_match('/\.(md|mdx)$/i', $name)) {
+                continue;
+            }
+            $count++;
+            $mtime = $file->getMTime();
+            if ($mtime > $maxMtime) {
+                $maxMtime = $mtime;
+            }
+        }
+
+        return $count . ':' . $maxMtime;
+    }
+
+    private static function sitemapCachePath(bool $isAdmin): string
+    {
+        $cacheDir = Paths::$cacheDir . '/sitemap';
+        $suffix = $isAdmin ? 'admin' : 'public';
+        return $cacheDir . '/sitemap-' . $suffix . '.php';
+    }
+
+    private static function readSitemapCache(string $cachePath, string $fingerprint): ?string
+    {
+        if (!is_file($cachePath)) {
+            return null;
+        }
+
+        $payload = require $cachePath;
+        if (!is_array($payload) || ($payload['fingerprint'] ?? '') !== $fingerprint) {
+            return null;
+        }
+
+        $html = $payload['html'] ?? null;
+        return is_string($html) ? $html : null;
+    }
+
+    private static function writeSitemapCache(string $cachePath, string $fingerprint, string $html): void
+    {
+        $cacheDir = dirname($cachePath);
+        if (!is_dir($cacheDir)) {
+            mkdir($cacheDir, 0755, true);
+        }
+
+        $payload = [
+            'fingerprint' => $fingerprint,
+            'html' => $html
+        ];
+
+        $exported = var_export($payload, true);
+        $contents = "<?php\n\nreturn {$exported};\n";
+        file_put_contents($cachePath, $contents, LOCK_EX);
     }
 
     private static function collectPages(

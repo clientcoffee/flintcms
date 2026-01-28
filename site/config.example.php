@@ -31,6 +31,10 @@ return [
         'minify_html' => true,
         // Add lazy-loading attributes to markdown images.
         'lazy_images' => true,
+        // Persist rendered markdown output (mtime keyed).
+        'render_cache' => true,
+        // Cache sitemap markup (mtime keyed).
+        'sitemap_cache' => true,
         // Internal environment flag: development, local, or production
         'environment' => 'production',
         // Show detailed errors (SECURITY: Only enable during development!)
