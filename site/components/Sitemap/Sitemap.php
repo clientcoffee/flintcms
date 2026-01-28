@@ -19,6 +19,7 @@ class Sitemap extends RenderComponent
             return '';
         }
 
+        // Parser is used only for inline title rendering (no full page render).
         $parser = new \Flint\Parser($app);
 
         // Determine admin state for hidden/draft visibility.
@@ -26,6 +27,7 @@ class Sitemap extends RenderComponent
         $isAdmin = $auth->isAdmin();
         $pagesDir = $app->root . '/site/pages';
 
+        // Sitemap cache uses a fingerprint of page count + latest mtime.
         $cacheEnabled = self::isSitemapCacheEnabled($app);
         $fingerprint = $cacheEnabled ? self::pagesFingerprint($pagesDir) : null;
         $cachePath = $cacheEnabled ? self::sitemapCachePath($isAdmin) : null;
@@ -95,6 +97,7 @@ class Sitemap extends RenderComponent
             return null;
         }
 
+        // Track only markdown files for an inexpensive invalidation signal.
         $count = 0;
         $maxMtime = 0;
         $iterator = new \RecursiveIteratorIterator(
@@ -121,6 +124,7 @@ class Sitemap extends RenderComponent
 
     private static function sitemapCachePath(bool $isAdmin): string
     {
+        // Separate caches for admin vs public visibility rules.
         $cacheDir = Paths::$cacheDir . '/sitemap';
         $suffix = $isAdmin ? 'admin' : 'public';
         return $cacheDir . '/sitemap-' . $suffix . '.php';
@@ -132,6 +136,7 @@ class Sitemap extends RenderComponent
             return null;
         }
 
+        // Cache payload is a tiny PHP array for fast include.
         $payload = require $cachePath;
         if (!is_array($payload) || ($payload['fingerprint'] ?? '') !== $fingerprint) {
             return null;
@@ -148,6 +153,7 @@ class Sitemap extends RenderComponent
             mkdir($cacheDir, 0755, true);
         }
 
+        // Persist as PHP for low overhead reads.
         $payload = [
             'fingerprint' => $fingerprint,
             'html' => $html
