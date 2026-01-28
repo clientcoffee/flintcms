@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Flint\App;
+use Flint\Paths;
 
 /**
  * Unit tests for App class methods.
@@ -16,6 +17,8 @@ class AppTest extends TestCase
 
     protected function setUp(): void
     {
+        $this->resetPaths();
+
         // Create isolated test environment for each run to avoid collisions.
         $this->testRoot = sys_get_temp_dir() . '/flint_site_test_' . bin2hex(random_bytes(4));
         mkdir($this->testRoot . '/app', 0755, true);
@@ -55,13 +58,21 @@ return array (
   ),
 );
 PHP;
-        file_put_contents($this->testRoot . '/config.php', $configContent);
+        file_put_contents($this->testRoot . '/site/config.php', $configContent);
         $this->app = new App($this->testRoot . '/app', $this->testRoot);
     }
 
     protected function tearDown(): void
     {
         $this->recursiveRemoveDirectory($this->testRoot);
+    }
+
+    private function resetPaths(): void
+    {
+        $reflection = new \ReflectionClass(Paths::class);
+        $initialized = $reflection->getProperty('initialized');
+        $initialized->setAccessible(true);
+        $initialized->setValue(null, false);
     }
 
     /**

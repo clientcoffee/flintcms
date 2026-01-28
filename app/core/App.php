@@ -62,6 +62,14 @@ class App
     }
 
     /**
+     * Resolve the active configuration file path.
+     */
+    private function resolveConfigPath(): string
+    {
+        return Paths::$configFile;
+    }
+
+    /**
      * Resolve the current site domain from server state.
      */
     private function resolveSiteDomain(): string
