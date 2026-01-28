@@ -2299,8 +2299,7 @@ class App
         bool $writeMicroCache = false,
         string $microCacheKey = '',
         bool $isPublicVisitor = false
-    ): void
-    {
+    ): void {
         require_once $this->appDir . '/core/helpers.php';
 
         // Parse the content file into metadata and HTML.
