@@ -133,6 +133,7 @@ class App
         // Normalize the request path.
         $requestPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $requestPath = urldecode($requestPath);
+        $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
         // Security: Path Traversal Prevention.
         if (str_contains($requestPath, '..')) {
@@ -149,7 +150,6 @@ class App
         }
 
         // Trigger request_start hook (components can perform checks here).
-        $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         $clientIp = $this->getClientIp();
         HookManager::trigger('request_start', [
             'path' => $requestPath,
@@ -311,6 +311,15 @@ class App
             return;
         }
 
+        $microCacheEligible = $this->isMicroCacheEligible($requestPath, $requestMethod);
+        if ($microCacheEligible) {
+            $cached = $this->readMicroCache($requestPath);
+            if ($cached !== null) {
+                echo $cached;
+                return;
+            }
+        }
+
         // Resolve the content file for the request.
         $resolvedContentPath = $this->resolveContentFile($requestPath);
         if (!$resolvedContentPath) {
@@ -319,7 +328,7 @@ class App
         }
 
         // Render the resolved page through the theme.
-        $this->render($resolvedContentPath);
+        $this->render($resolvedContentPath, $microCacheEligible, $requestPath);
     }
 
     /**
@@ -2141,7 +2150,7 @@ class App
     /**
      * Render a content file through the configured theme.
      */
-    private function render(string $filePath): void
+    private function render(string $filePath, bool $writeMicroCache = false, string $microCacheKey = ''): void
     {
         require_once $this->appDir . '/core/helpers.php';
 
@@ -2246,6 +2255,15 @@ class App
             $finalHtml = $admin->injectAdminUI($finalHtml, $pageStatus);
         }
 
+        // Minify HTML output for public pages (whitespace-only).
+        if (!$isAdmin && $this->isHtmlMinifyEnabled()) {
+            $finalHtml = $this->minifyHtml($finalHtml);
+        }
+
+        if ($writeMicroCache && !$isAdmin && $pageStatus !== 'draft') {
+            $this->writeMicroCache($microCacheKey, $finalHtml);
+        }
+
         // Output final HTML.
         echo $finalHtml;
 
@@ -2277,6 +2295,161 @@ class App
         }
 
         echo 'Page Not Found';
+    }
+
+    /**
+     * Check if HTML minification is enabled.
+     */
+    private function isHtmlMinifyEnabled(): bool
+    {
+        $system = $this->config['system'] ?? [];
+        if (!is_array($system)) {
+            return true;
+        }
+
+        if (!array_key_exists('minify_html', $system)) {
+            return true;
+        }
+
+        $value = $system['minify_html'];
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Lightweight HTML minifier (remove whitespace between tags).
+     */
+    private function minifyHtml(string $html): string
+    {
+        $html = preg_replace('/>\\s+</', '><', $html);
+        return trim($html);
+    }
+
+    /**
+     * Check if micro-cache is enabled.
+     */
+    private function isMicroCacheEnabled(): bool
+    {
+        $system = $this->config['system'] ?? [];
+        if (!is_array($system)) {
+            return true;
+        }
+
+        if (!array_key_exists('micro_cache', $system)) {
+            return true;
+        }
+
+        $value = $system['micro_cache'];
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Determine the micro-cache TTL (seconds).
+     */
+    private function microCacheTtl(): int
+    {
+        $system = $this->config['system'] ?? [];
+        if (!is_array($system)) {
+            return 10;
+        }
+
+        $ttl = $system['micro_cache_ttl'] ?? 10;
+        $ttl = is_numeric($ttl) ? (int)$ttl : 10;
+        if ($ttl < 1) {
+            $ttl = 1;
+        }
+
+        return $ttl;
+    }
+
+    /**
+     * Decide if the current request can use micro-cache.
+     */
+    private function isMicroCacheEligible(string $requestPath, string $requestMethod): bool
+    {
+        if (!$this->isMicroCacheEnabled()) {
+            return false;
+        }
+
+        if ($requestMethod !== 'GET') {
+            return false;
+        }
+
+        if (!empty($_SERVER['QUERY_STRING'])) {
+            return false;
+        }
+
+        if (str_starts_with($requestPath, '/api/')) {
+            return false;
+        }
+
+        if (in_array($requestPath, ['/admin', '/login', '/logout', '/magic', '/setup/magic'], true)) {
+            return false;
+        }
+
+        if (!empty($_COOKIE)) {
+            return false;
+        }
+
+        $cacheControl = strtolower($_SERVER['HTTP_CACHE_CONTROL'] ?? '');
+        if (str_contains($cacheControl, 'no-cache') || str_contains($cacheControl, 'no-store')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Resolve micro-cache path for a request.
+     */
+    private function microCachePath(string $requestPath): string
+    {
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $key = sha1($host . '|' . $requestPath);
+        $cacheDir = Paths::$cacheDir . '/micro-cache';
+
+        return $cacheDir . '/' . $key . '.html';
+    }
+
+    /**
+     * Read micro-cache for a request.
+     */
+    private function readMicroCache(string $requestPath): ?string
+    {
+        $cachePath = $this->microCachePath($requestPath);
+        if (!is_file($cachePath)) {
+            return null;
+        }
+
+        $ttl = $this->microCacheTtl();
+        if ((time() - filemtime($cachePath)) > $ttl) {
+            @unlink($cachePath);
+            return null;
+        }
+
+        $contents = file_get_contents($cachePath);
+        return $contents === false ? null : $contents;
+    }
+
+    /**
+     * Write micro-cache response to disk.
+     */
+    private function writeMicroCache(string $requestPath, string $html): void
+    {
+        $cachePath = $this->microCachePath($requestPath);
+        $cacheDir = dirname($cachePath);
+        if (!is_dir($cacheDir)) {
+            mkdir($cacheDir, 0755, true);
+        }
+
+        file_put_contents($cachePath, $html, LOCK_EX);
     }
 
     /**

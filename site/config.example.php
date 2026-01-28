@@ -23,6 +23,14 @@ return [
     ],
     'system' => [
         'cache_enabled' => false,
+        // Micro-cache public HTML responses (short TTL).
+        'micro_cache' => true,
+        // Micro-cache TTL in seconds.
+        'micro_cache_ttl' => 10,
+        // Minify HTML output for public pages.
+        'minify_html' => true,
+        // Add lazy-loading attributes to markdown images.
+        'lazy_images' => true,
         // Internal environment flag: development, local, or production
         'environment' => 'production',
         // Show detailed errors (SECURITY: Only enable during development!)

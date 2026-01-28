@@ -222,6 +222,11 @@ class Parser
         // STEP 4: Convert markdown syntax to HTML
         $renderedHtmlOutput = $this->renderMarkdown($markdownBody);
 
+        // STEP 4.5: Enhance markdown-only images (lazy-loading + aspect ratio)
+        if ($this->isLazyLoadingEnabled()) {
+            $renderedHtmlOutput = $this->addLazyLoadingToImages($renderedHtmlOutput);
+        }
+
         // STEP 5: Restore component HTML from placeholders
         // Now that markdown parsing is done, it's safe to put back the component HTML
         $renderedHtmlOutput = $this->restoreComponents($renderedHtmlOutput);
@@ -410,6 +415,73 @@ class Parser
 
         // Component file not found in this directory
         return null;
+    }
+
+    /**
+     * Check if lazy-loading is enabled for markdown images.
+     */
+    private function isLazyLoadingEnabled(): bool
+    {
+        $system = $this->application->config['system'] ?? [];
+        if (!is_array($system)) {
+            return true;
+        }
+
+        if (!array_key_exists('lazy_images', $system)) {
+            return true;
+        }
+
+        $value = $system['lazy_images'];
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Add lazy-loading + aspect ratio hints to markdown images only.
+     */
+    private function addLazyLoadingToImages(string $html): string
+    {
+        return preg_replace_callback('/<img\\b[^>]*>/i', function (array $matches): string {
+            $tag = $matches[0];
+            $isSelfClosing = str_ends_with($tag, '/>');
+            $suffix = $isSelfClosing ? '/>' : '>';
+            $tagBody = substr($tag, 0, -strlen($suffix));
+
+            if (!preg_match('/\\bloading\\s*=/i', $tagBody)) {
+                $tagBody .= ' loading="lazy"';
+            }
+
+            if (!preg_match('/\\bdecoding\\s*=/i', $tagBody)) {
+                $tagBody .= ' decoding="async"';
+            }
+
+            $width = null;
+            $height = null;
+            if (preg_match('/\\bwidth\\s*=\\s*["\\\']?(\\d+)/i', $tagBody, $widthMatch)) {
+                $width = (int)$widthMatch[1];
+            }
+            if (preg_match('/\\bheight\\s*=\\s*["\\\']?(\\d+)/i', $tagBody, $heightMatch)) {
+                $height = (int)$heightMatch[1];
+            }
+
+            if ($width && $height) {
+                $ratio = $width . ' / ' . $height;
+                if (preg_match('/\\bstyle\\s*=\\s*([\"\\\'])(.*?)\\1/i', $tagBody, $styleMatch)) {
+                    $styleValue = $styleMatch[2];
+                    if (stripos($styleValue, 'aspect-ratio') === false) {
+                        $styleValue = rtrim($styleValue, " ;") . '; aspect-ratio: ' . $ratio . ';';
+                        $tagBody = str_replace($styleMatch[0], 'style="' . $styleValue . '"', $tagBody);
+                    }
+                } else {
+                    $tagBody .= ' style="aspect-ratio: ' . $ratio . ';"';
+                }
+            }
+
+            return $tagBody . $suffix;
+        }, $html);
     }
 
     /**

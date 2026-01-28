@@ -37,6 +37,19 @@ Optional components are served from registry manifests. Configure them in `site/
 ],
 ```
 
+## Performance (runtime)
+
+These settings keep page loads fast without any build step:
+
+```php
+'system' => [
+    'micro_cache' => true,      // short TTL HTML cache for public pages
+    'micro_cache_ttl' => 10,    // seconds
+    'minify_html' => true,      // remove whitespace between tags
+    'lazy_images' => true,      // add loading="lazy" to markdown images
+],
+```
+
 ## Updates settings
 
 `updates.auto_update` controls how updates are applied:
