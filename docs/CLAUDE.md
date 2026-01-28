@@ -126,7 +126,7 @@ Flint is built on these foundational principles:
 1. index.php
    ↓
 2. App::__construct()
-   - Load site/config.php (with legacy fallbacks)
+   - Load site/config.php
    - Enforce security measures
    - Initialize Scheduler
    - Initialize HookManager
@@ -207,8 +207,7 @@ flint/
 ├── public-docs/                # Public-facing CMS documentation
 ├── docs/                       # Maintainer docs
 ├── scripts/
-│   ├── build.sh
-│   └── migrate-content-to-site.sh
+│   └── build.sh
 ├── tests/
 ├── CHANGELOG.md
 ├── README.md
@@ -282,16 +281,6 @@ bun add -d husky
        ],
    ];
    ```
-
-### Migrating from legacy bundles
-
-Run the migration helper when moving from a release that still stored pages, blocks, or themes inside a monolithic `content/` directory:
-
-```bash
-./scripts/migrate-content-to-site.sh /path/to/legacy/content
-```
-
-The command syncs the former `pages`, `blocks`, `components`, `themes`, `uploads`, and `submissions` folders into the modern `site/` hierarchy.
 
 ### Configuration
 

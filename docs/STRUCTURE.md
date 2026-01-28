@@ -93,7 +93,7 @@ cd app
 php -S localhost:8000
 ```
 
-`app/index.php` resolves the site bundle and config from `../site/`. It will fall back to legacy `config.php` locations if present.
+`app/index.php` resolves the site bundle and config from `../site/`.
 
 ### Production
 
