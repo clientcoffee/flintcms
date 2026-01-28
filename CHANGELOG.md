@@ -10,12 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add one-line installer script and quick install instructions.
 - Add component registry support for optional components.
 - Add registry configuration defaults for component browsing and installs.
+- Add runtime performance toggles for micro-cache, lazy images, and render caching.
 
 ### Changed
 - Move optional components into external registry and keep core lean.
 - Convert core components to directory-based layout.
 - Deprecate legacy contact endpoint in favor of `/api/form`.
 - Update component documentation for registry-based installs.
+- Add persistent caches for rendered pages, blocks, and sitemap output.
 
 ## [0.2.3] - 2026-01-26
 ### Added

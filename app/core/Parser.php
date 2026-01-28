@@ -87,6 +87,13 @@ class Parser
     private array $componentAssets = [];
 
     /**
+     * Cache of inline markdown render results (per request).
+     *
+     * @var array<string,string>
+     */
+    private array $inlineCache = [];
+
+    /**
      * Static reference to current parser instance.
      * Used by the Block component to access the parser during rendering.
      *
@@ -129,7 +136,18 @@ class Parser
      */
     public function renderInlineMarkdown(string $inlineText): string
     {
-        return $this->processInlineMarkdown($inlineText);
+        if (!$this->isInlineCacheEnabled()) {
+            return $this->processInlineMarkdown($inlineText);
+        }
+
+        $key = sha1($inlineText);
+        if (isset($this->inlineCache[$key])) {
+            return $this->inlineCache[$key];
+        }
+
+        $rendered = $this->processInlineMarkdown($inlineText);
+        $this->inlineCache[$key] = $rendered;
+        return $rendered;
     }
 
     /**
@@ -498,6 +516,28 @@ class Parser
 
             return $tagBody . $suffix;
         }, $html);
+    }
+
+    /**
+     * Check if inline markdown caching is enabled.
+     */
+    private function isInlineCacheEnabled(): bool
+    {
+        $system = $this->application->config['system'] ?? [];
+        if (!is_array($system)) {
+            return true;
+        }
+
+        if (!array_key_exists('inline_cache', $system)) {
+            return true;
+        }
+
+        $value = $system['inline_cache'];
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**

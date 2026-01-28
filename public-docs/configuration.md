@@ -46,9 +46,15 @@ These settings keep page loads fast without any build step:
     'micro_cache' => true,      // short TTL HTML cache for public pages
     'micro_cache_ttl' => 10,    // seconds
     'minify_html' => true,      // remove whitespace between tags
+    'fast_public' => true,      // skip scheduler/admin checks for public GETs
+    'asset_cache' => true,      // add cache headers to static assets
+    'asset_cache_ttl' => 31536000, // seconds (1 year)
+    'uploads_cache' => false,   // optional cache headers for uploads
     'lazy_images' => true,      // add loading="lazy" to markdown images
     'render_cache' => true,     // cache parsed markdown by file mtime
     'sitemap_cache' => true,    // cache sitemap markup by file mtime
+    'tree_cache' => true,       // cache admin file trees by file mtime
+    'inline_cache' => true,     // cache inline markdown per request
 ],
 ```
 

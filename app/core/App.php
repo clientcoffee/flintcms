@@ -168,8 +168,10 @@ class App
             $this->abort(404, "Not found.");
         }
 
-        // Run scheduled tasks (lightweight check, skip for static assets).
-        if (!preg_match('/\.(js|mjs|css|jpg|jpeg|png|gif|svg|woff|woff2|ttf|eot)$/i', $requestPath)) {
+        $isPublicVisitor = $this->isPublicVisitor($requestPath, $requestMethod);
+
+        // Run scheduled tasks (skip for public GETs and static assets).
+        if (!$isPublicVisitor && !preg_match('/\.(js|mjs|css|jpg|jpeg|png|gif|svg|woff|woff2|ttf|eot)$/i', $requestPath)) {
             $this->scheduler->run();
         }
 
@@ -181,6 +183,7 @@ class App
                 // Set correct MIME type based on extension.
                 $extension = strtolower($extensionMatches[1]);
                 header('Content-Type: ' . $this->getMimeType($extension));
+                $this->applyAssetCacheHeaders();
                 readfile($publicFilePath);
                 exit;
             }
@@ -191,6 +194,7 @@ class App
             $adminJsPath = $this->appDir . '/assets/js/admin.js';
             if (file_exists($adminJsPath) && is_file($adminJsPath)) {
                 header('Content-Type: application/javascript');
+                $this->applyAssetCacheHeaders();
                 readfile($adminJsPath);
                 exit;
             }
@@ -203,6 +207,7 @@ class App
             $realAssetDir = realpath($assetDir);
             if ($realAssetPath !== false && $realAssetDir !== false && str_starts_with($realAssetPath, $realAssetDir) && is_file($realAssetPath)) {
                 header('Content-Type: text/css');
+                $this->applyAssetCacheHeaders();
                 readfile($realAssetPath);
                 exit;
             }
@@ -231,6 +236,9 @@ class App
                 }
 
                 header('Content-Type: ' . $mimeType);
+                if ($this->isUploadsCacheEnabled()) {
+                    $this->applyAssetCacheHeaders();
+                }
                 readfile($realUploadPath);
                 exit;
             }
@@ -251,6 +259,7 @@ class App
             if (file_exists($themeAssetPath) && is_file($themeAssetPath)) {
                 $extension = strtolower($themeMatches[3]);
                 header('Content-Type: ' . $this->getMimeType($extension));
+                $this->applyAssetCacheHeaders();
                 readfile($themeAssetPath);
                 exit;
             }
@@ -271,6 +280,7 @@ class App
             if (file_exists($componentAssetPath) && is_file($componentAssetPath)) {
                 $extension = strtolower($componentMatches[3]);
                 header('Content-Type: ' . $this->getMimeType($extension));
+                $this->applyAssetCacheHeaders();
                 readfile($componentAssetPath);
                 exit;
             }
@@ -328,7 +338,7 @@ class App
         }
 
         // Render the resolved page through the theme.
-        $this->render($resolvedContentPath, $microCacheEligible, $requestPath);
+        $this->render($resolvedContentPath, $microCacheEligible, $requestPath, $isPublicVisitor);
     }
 
     /**
@@ -1756,8 +1766,23 @@ class App
      */
     private function listContentTree(): array
     {
+        $cachePath = $this->treeCachePath('pages');
+        $fingerprint = $this->directoryFingerprint(Paths::$pagesDir);
+        if ($fingerprint !== null && $this->isTreeCacheEnabled()) {
+            $cached = $this->readTreeCache($cachePath, $fingerprint);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
+
         $parser = new Parser($this);
-        return $this->buildMarkdownTreeWithParser(Paths::$pagesDir, '', true, $parser);
+        $tree = $this->buildMarkdownTreeWithParser(Paths::$pagesDir, '', true, $parser);
+
+        if ($fingerprint !== null && $this->isTreeCacheEnabled()) {
+            $this->writeTreeCache($cachePath, $fingerprint, $tree);
+        }
+
+        return $tree;
     }
 
     /**
@@ -1765,7 +1790,126 @@ class App
      */
     private function listBlockTree(): array
     {
-        return $this->buildMarkdownTreeWithParser(Paths::$blocksDir, '', false, null);
+        $cachePath = $this->treeCachePath('blocks');
+        $fingerprint = $this->directoryFingerprint(Paths::$blocksDir);
+        if ($fingerprint !== null && $this->isTreeCacheEnabled()) {
+            $cached = $this->readTreeCache($cachePath, $fingerprint);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
+
+        $tree = $this->buildMarkdownTreeWithParser(Paths::$blocksDir, '', false, null);
+
+        if ($fingerprint !== null && $this->isTreeCacheEnabled()) {
+            $this->writeTreeCache($cachePath, $fingerprint, $tree);
+        }
+
+        return $tree;
+    }
+
+    /**
+     * Check if admin tree caching is enabled.
+     */
+    private function isTreeCacheEnabled(): bool
+    {
+        $system = $this->config['system'] ?? [];
+        if (!is_array($system)) {
+            return true;
+        }
+
+        if (!array_key_exists('tree_cache', $system)) {
+            return true;
+        }
+
+        $value = $system['tree_cache'];
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Create a lightweight fingerprint for markdown directories.
+     */
+    private function directoryFingerprint(string $baseDir): ?string
+    {
+        if (!is_dir($baseDir)) {
+            return null;
+        }
+
+        $count = 0;
+        $maxMtime = 0;
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($baseDir, \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file->isFile()) {
+                continue;
+            }
+
+            $name = $file->getFilename();
+            if (!preg_match('/\.(md|mdx)$/i', $name)) {
+                continue;
+            }
+
+            $count++;
+            $mtime = $file->getMTime();
+            if ($mtime > $maxMtime) {
+                $maxMtime = $mtime;
+            }
+        }
+
+        return $count . ':' . $maxMtime;
+    }
+
+    /**
+     * Resolve admin tree cache path.
+     */
+    private function treeCachePath(string $scope): string
+    {
+        $cacheDir = Paths::$cacheDir . '/tree';
+        return $cacheDir . '/tree-' . $scope . '.php';
+    }
+
+    /**
+     * Read cached tree payload when fingerprint matches.
+     */
+    private function readTreeCache(string $cachePath, string $fingerprint): ?array
+    {
+        if (!is_file($cachePath)) {
+            return null;
+        }
+
+        $payload = require $cachePath;
+        if (!is_array($payload) || ($payload['fingerprint'] ?? '') !== $fingerprint) {
+            return null;
+        }
+
+        $tree = $payload['tree'] ?? null;
+        return is_array($tree) ? $tree : null;
+    }
+
+    /**
+     * Write cached tree payload to disk.
+     */
+    private function writeTreeCache(string $cachePath, string $fingerprint, array $tree): void
+    {
+        $cacheDir = dirname($cachePath);
+        if (!is_dir($cacheDir)) {
+            mkdir($cacheDir, 0755, true);
+        }
+
+        $payload = [
+            'fingerprint' => $fingerprint,
+            'tree' => $tree
+        ];
+
+        $exported = var_export($payload, true);
+        $contents = "<?php\n\nreturn {$exported};\n";
+        file_put_contents($cachePath, $contents, LOCK_EX);
     }
 
     /**
@@ -2150,7 +2294,12 @@ class App
     /**
      * Render a content file through the configured theme.
      */
-    private function render(string $filePath, bool $writeMicroCache = false, string $microCacheKey = ''): void
+    private function render(
+        string $filePath,
+        bool $writeMicroCache = false,
+        string $microCacheKey = '',
+        bool $isPublicVisitor = false
+    ): void
     {
         require_once $this->appDir . '/core/helpers.php';
 
@@ -2158,9 +2307,12 @@ class App
         $parser = new Parser($this);
         $pagePayload = $parser->parseFile($filePath);
 
-        // Resolve admin status once per request.
-        $authService = new Auth($this);
-        $isAdmin = $authService->isAdmin();
+        // Resolve admin status once per request (skip session for public visitors).
+        $isAdmin = false;
+        if (!$isPublicVisitor || $this->hasSessionCookie()) {
+            $authService = new Auth($this);
+            $isAdmin = $authService->isAdmin();
+        }
 
         // Determine page visibility based on status metadata.
         $pageStatus = strtolower($pagePayload['meta']['status'] ?? 'published');
@@ -2326,6 +2478,145 @@ class App
     {
         $html = preg_replace('/>\\s+</', '><', $html);
         return trim($html);
+    }
+
+    /**
+     * Determine if this request is a public GET with no admin session cookie.
+     */
+    private function isPublicVisitor(string $requestPath, string $requestMethod): bool
+    {
+        if (!$this->isFastPublicEnabled()) {
+            return false;
+        }
+
+        if ($requestMethod !== 'GET') {
+            return false;
+        }
+
+        if (str_starts_with($requestPath, '/api/')) {
+            return false;
+        }
+
+        if (in_array($requestPath, ['/admin', '/login', '/logout', '/magic', '/setup/magic'], true)) {
+            return false;
+        }
+
+        if ($this->hasSessionCookie()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Check for a session cookie without starting a session.
+     */
+    private function hasSessionCookie(): bool
+    {
+        $sessionName = session_name();
+        return $sessionName !== '' && isset($_COOKIE[$sessionName]);
+    }
+
+    /**
+     * Check if fast public path is enabled.
+     */
+    private function isFastPublicEnabled(): bool
+    {
+        $system = $this->config['system'] ?? [];
+        if (!is_array($system)) {
+            return true;
+        }
+
+        if (!array_key_exists('fast_public', $system)) {
+            return true;
+        }
+
+        $value = $system['fast_public'];
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Check if asset caching headers are enabled.
+     */
+    private function isAssetCacheEnabled(): bool
+    {
+        $system = $this->config['system'] ?? [];
+        if (!is_array($system)) {
+            return true;
+        }
+
+        if (!array_key_exists('asset_cache', $system)) {
+            return true;
+        }
+
+        $value = $system['asset_cache'];
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Check if uploads should receive asset cache headers.
+     */
+    private function isUploadsCacheEnabled(): bool
+    {
+        $system = $this->config['system'] ?? [];
+        if (!is_array($system)) {
+            return false;
+        }
+
+        if (!array_key_exists('uploads_cache', $system)) {
+            return false;
+        }
+
+        $value = $system['uploads_cache'];
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Determine asset cache TTL (seconds).
+     */
+    private function assetCacheTtl(): int
+    {
+        $system = $this->config['system'] ?? [];
+        if (!is_array($system)) {
+            return 31536000;
+        }
+
+        $ttl = $system['asset_cache_ttl'] ?? 31536000;
+        $ttl = is_numeric($ttl) ? (int)$ttl : 31536000;
+        if ($ttl < 0) {
+            $ttl = 0;
+        }
+
+        return $ttl;
+    }
+
+    /**
+     * Apply cache headers for static assets.
+     */
+    private function applyAssetCacheHeaders(): void
+    {
+        if (!$this->isAssetCacheEnabled()) {
+            return;
+        }
+
+        $ttl = $this->assetCacheTtl();
+        if ($ttl <= 0) {
+            return;
+        }
+
+        header('Cache-Control: public, max-age=' . $ttl . ', immutable');
     }
 
     /**
