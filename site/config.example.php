@@ -23,6 +23,30 @@ return [
     ],
     'system' => [
         'cache_enabled' => false,
+        // Micro-cache public HTML responses (short TTL).
+        'micro_cache' => true,
+        // Micro-cache TTL in seconds.
+        'micro_cache_ttl' => 10,
+        // Minify HTML output for public pages.
+        'minify_html' => true,
+        // Skip scheduler/admin checks for public GETs without a session cookie.
+        'fast_public' => true,
+        // Add cache headers to static assets (themes/components/assets).
+        'asset_cache' => true,
+        // Asset cache TTL in seconds (default: 1 year).
+        'asset_cache_ttl' => 31536000,
+        // Optional cache headers for uploads (off by default).
+        'uploads_cache' => false,
+        // Add lazy-loading attributes to markdown images.
+        'lazy_images' => true,
+        // Persist rendered markdown output (mtime keyed).
+        'render_cache' => true,
+        // Cache sitemap markup (mtime keyed).
+        'sitemap_cache' => true,
+        // Cache admin file trees (mtime keyed).
+        'tree_cache' => true,
+        // Cache inline markdown renders (per request).
+        'inline_cache' => true,
         // Internal environment flag: development, local, or production
         'environment' => 'production',
         // Show detailed errors (SECURITY: Only enable during development!)
