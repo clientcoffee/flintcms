@@ -108,8 +108,8 @@ $footerAssets = ob_get_clean();
         <meta name="keywords" content="<?= $keywords ?>">
     <?php endif; ?>
 
-    <!-- Theme's main stylesheet (Tailwind CSS) -->
-    <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
+    <!-- Theme's main stylesheet (Tailwind CSS) served from the app asset bundle -->
+    <link rel="stylesheet" href="/assets/css/tailwind.min.css">
     <?= $headAssets ?>
 </head>
 <body class="bg-[#FAFAFA] text-gray-800 antialiased">
