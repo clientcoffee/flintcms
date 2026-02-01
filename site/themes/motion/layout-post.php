@@ -94,8 +94,8 @@ $hasNeighborNav = $neighborNavHtml !== '';
     <?php if ($hasKeywords) : ?>
         <meta name="keywords" content="<?= $keywords ?>">
     <?php endif; ?>
-    <!-- Tailwind and theme styles are injected through the CMS asset pipeline. -->
-    <link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
+    <!-- Tailwind is loaded from the app's asset bundle -->
+    <link rel="stylesheet" href="/assets/css/tailwind.min.css">
     <?= $headAssets ?>
 </head>
 <body class="bg-[#FAFAFA] text-gray-800 antialiased">

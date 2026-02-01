@@ -105,6 +105,12 @@ else
   run_with_spinner "Sync app/ -> dist/app/" rsync -a --delete "${app_root}/" "${dist_root}/app/"
 fi
 
+# Prevent the dev-only Tailwind source from being packaged.
+tailwind_src="${dist_root}/app/assets/css/tailwind.css"
+if [[ -f "${tailwind_src}" ]]; then
+  rm -f "${tailwind_src}"
+fi
+
 # Copy index-dist.php to dist root if present
 index_dist_src="${app_root}/index-dist.php"
 if [[ -f "${index_dist_src}" ]]; then

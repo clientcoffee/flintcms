@@ -2,7 +2,7 @@
 title: Blog
 description: Notes, updates, and stories from Flint.
 icon: book
-type: section
+type: list
 ---
 
 # Blog

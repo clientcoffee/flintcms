@@ -33,7 +33,7 @@ $siteName = esc_html($site['name'] ?? 'Flint');
 // Collect theme styles via the CMS hook system.
 ob_start();
 ?>
-<link rel="stylesheet" href="<?= theme_asset('tailwind.min.css') ?>">
+    <link rel="stylesheet" href="/assets/css/tailwind.min.css">
 <?php
 theme_styles();
 $headAssets = ob_get_clean();
