@@ -2322,6 +2322,14 @@ class App
             return;
         }
 
+        // If this section is password protected, enforce the wall before rendering.
+        $protectedSection = $this->resolveWalledGardenSection($filePath);
+        if ($protectedSection !== null && !$isAdmin) {
+            if (!$this->handleWalledGardenAccess($protectedSection, $microCacheKey)) {
+                return;
+            }
+        }
+
         // Locate the active theme directory.
         $themeName = $this->config['site']['theme'] ?? 'motion';
         $themeDirectory = $this->root . '/site/themes/' . $themeName;
@@ -2419,6 +2427,141 @@ class App
         echo $finalHtml;
 
         ThemeContext::clear();
+    }
+
+    /**
+     * Resolve the nearest index file that declares a password for the given path.
+     *
+     * @return array{dir:string,relativeDir:string,indexFile:string,password:string,title:string}|null
+     */
+    private function resolveWalledGardenSection(string $contentFile): ?array
+    {
+        $pagesDir = Paths::$pagesDir ?? '';
+        if ($pagesDir === '' || !is_dir($pagesDir)) {
+            return null;
+        }
+
+        $realPagesDir = realpath($pagesDir) ?: $pagesDir;
+        $currentDir = realpath(dirname($contentFile));
+        if ($currentDir === false) {
+            return null;
+        }
+
+        while (str_starts_with($currentDir, $realPagesDir)) {
+            $indexFile = $this->findIndexFile($currentDir);
+            if ($indexFile !== null) {
+                $meta = extract_frontmatter($indexFile);
+                $password = trim((string)($meta['password'] ?? ''));
+                if ($password !== '') {
+                    $relativeDir = ltrim(str_replace($realPagesDir, '', $currentDir), '/');
+                    if ($relativeDir === '') {
+                        $relativeDir = '';
+                    }
+                    return [
+                        'dir' => $currentDir,
+                        'relativeDir' => $relativeDir,
+                        'indexFile' => $indexFile,
+                        'password' => $password,
+                        'title' => trim((string)($meta['title'] ?? '')),
+                    ];
+                }
+            }
+
+            if ($currentDir === $realPagesDir) {
+                break;
+            }
+            $currentDir = dirname($currentDir);
+        }
+
+        return null;
+    }
+
+    /**
+     * Locate the index entry for a directory.
+     */
+    private function findIndexFile(string $directory): ?string
+    {
+        foreach (['index.md', 'index.mdx'] as $candidate) {
+            $path = $directory . '/' . $candidate;
+            if (file_exists($path)) {
+                return $path;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Handle walled-garden protection and render the landing page when needed.
+     */
+    private function handleWalledGardenAccess(array $section, string $requestPath): bool
+    {
+        $this->ensureSessionStarted();
+        $sessionKey = $this->generateWalledGardenSessionKey($section['relativeDir']);
+        $expected = hash('sha256', $section['dir'] . '|' . $section['password']);
+        $authorized = isset($_SESSION[$sessionKey]) && hash_equals((string)$_SESSION[$sessionKey], $expected);
+
+        $error = null;
+        if (!$authorized && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            $submitted = trim((string)($_POST['walled_garden_password'] ?? ''));
+            if ($submitted === '') {
+                $error = 'Password is required.';
+            } elseif (hash_equals($section['password'], $submitted)) {
+                $_SESSION[$sessionKey] = $expected;
+                $authorized = true;
+            } else {
+                $error = 'Invalid password.';
+            }
+        }
+
+        if ($authorized) {
+            return true;
+        }
+
+        $this->renderWalledGardenPage($section, $requestPath, $error);
+        return false;
+    }
+
+    /**
+     * Render the password landing page for a protected section.
+     */
+    private function renderWalledGardenPage(array $section, string $requestPath, ?string $error = null): void
+    {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        http_response_code(401);
+
+        $site = $this->config['site'] ?? [];
+        $siteName = $site['name'] ?? 'Flint';
+        $displayDir = $section['relativeDir'] === '' ? '/' : '/' . $section['relativeDir'];
+        $title = $section['title'] !== '' ? $section['title'] : 'Protected section';
+        $formAction = htmlspecialchars($requestPath, ENT_QUOTES);
+
+        $template = $this->appDir . '/views/walled-garden.php';
+        if (!file_exists($template)) {
+            throw new \Exception('Walled garden template missing.');
+        }
+
+        require $template;
+        exit;
+    }
+
+    /**
+     * Generate a consistent session key for the protected section.
+     */
+    private function generateWalledGardenSessionKey(string $relativeDir): string
+    {
+        $normalized = $relativeDir === '' ? '/' : '/' . trim($relativeDir, '/');
+        return 'walled_garden:' . $normalized;
+    }
+
+    /**
+     * Ensure PHP session is active before writing protections.
+     */
+    private function ensureSessionStarted(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
     }
 
     /**
