@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add inline markdown cache (per-request) to reduce repeat parsing.
 - Add static asset cache headers with configurable TTLs (uploads optional).
 - Add fast public path to skip admin/scheduler checks for logged-out visitors.
+- Implement walled-garden landing page that protects directories by checking `password:` frontmatter on index files.
 - Add the “World in Brief” layout (brief theme) with a blog list layout triggered by `type: list`.
 
 ### Changed
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deprecate legacy contact endpoint in favor of `/api/form`.
 - Update component documentation for registry-based installs.
 - Add lazy-loading + aspect-ratio hints to markdown-rendered images.
+- Serve `/assets/css/tailwind.min.css` from the app bundle for every theme, upgrade the Tailwind pipeline to v3 (typography plugin) and strip the dev-only `tailwind.css` before packaging.
 - Serve `/assets/css/tailwind.min.css` from the app bundle for every theme, upgrade the Tailwind pipeline to v3 (typography plugin) and strip the dev-only `tailwind.css` before packaging.
 
 ## [0.2.3] - 2026-01-26
