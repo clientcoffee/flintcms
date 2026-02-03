@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add editable page location controls and in-place filename renaming that respects `.md`/`.mdx` requirements.
 - Implement walled-garden landing page that protects directories by checking `password:` frontmatter on index files.
 - Add the “World in Brief” layout (brief theme) with a blog list layout triggered by `type: list`.
+- Add `sanitize_page_title` helper to normalize title metadata without stripping digits or symbols.
 
 ### Changed
 - Move optional components into external registry and keep core lean.
@@ -29,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add lazy-loading + aspect-ratio hints to markdown-rendered images.
 - Serve `/assets/css/tailwind.min.css` from the app bundle for every theme, upgrade the Tailwind pipeline to v3 (typography plugin) and strip the dev-only `tailwind.css` before packaging.
 - Serve `/assets/css/tailwind.min.css` from the app bundle for every theme, upgrade the Tailwind pipeline to v3 (typography plugin) and strip the dev-only `tailwind.css` before packaging.
+- Improve admin edit targeting across theme layouts to keep live edit links working.
+- Use title sanitization in Motion layouts to preserve currency symbols, digits, and slashes while normalizing whitespace.
+- Update admin editor shortcuts to use the primary modifier key and avoid browser Ctrl collisions.
+- Add basic markdown editor behaviors (wrap selections and continue lists).
 
 ## [0.2.3] - 2026-01-26
 ### Added

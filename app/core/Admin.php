@@ -48,7 +48,16 @@ class Admin
     const editButton = document.getElementById('edit-btn');
     const saveButton = document.getElementById('save-btn');
     const cancelButton = document.getElementById('cancel-btn');
-    const contentDisplay = document.getElementById('content-display');
+    const getContentDisplayElement = () => {
+        return (
+            document.getElementById('content-display')
+            || document.querySelector('.motion-content')
+            || document.querySelector('article')
+            || document.querySelector('main')
+            || null
+        );
+    };
+    const contentDisplay = getContentDisplayElement();
     const contentEditorWrap = document.getElementById('content-editor-wrap');
     const contentEditor = document.getElementById('content-editor');
     const logoutButton = document.getElementById('admin-logout-btn');
@@ -59,10 +68,12 @@ class Admin
 
     // Toggle edit UI states in a single helper
     const setEditMode = (shouldEnable) => {
-        if (!contentDisplay || !contentEditor || !editButton || !saveButton || !cancelButton) {
+        if (!contentEditor || !editButton || !saveButton || !cancelButton) {
             return;
         }
-        contentDisplay.classList.toggle('hidden', shouldEnable);
+        if (contentDisplay) {
+            contentDisplay.classList.toggle('hidden', shouldEnable);
+        }
         if (contentEditorWrap) {
             contentEditorWrap.classList.toggle('hidden', !shouldEnable);
         }
@@ -133,15 +144,122 @@ class Admin
         setEditMode(false);
     });
 
+    // Use Alt as the editor modifier to avoid browser Cmd/Ctrl collisions.
+    const isPrimaryShortcut = (event) => event.altKey && !event.metaKey && !event.ctrlKey;
+
+    // Wrap the current selection in a pair of characters and keep the highlight.
+    const wrapSelection = (editor, open, close) => {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        if (start === null || end === null || start > end) {
+            return false;
+        }
+
+        const value = editor.value;
+        const selected = value.slice(start, end);
+        editor.value = value.slice(0, start) + open + selected + close + value.slice(end);
+        const newStart = start + open.length;
+        const newEnd = newStart + selected.length;
+        editor.setSelectionRange(newStart, newEnd);
+        return true;
+    };
+
+    // Basic markdown pairing for selection wraps (brackets, quotes, emphasis).
+    const handleMarkdownWrapping = (event, editor) => {
+        if (event.metaKey || event.ctrlKey || event.altKey) {
+            return false;
+        }
+
+        const pairs = {
+            '[': ']',
+            '(': ')',
+            '{': '}',
+            '"': '"',
+            "'": "'",
+            '`': '`',
+            '*': '*',
+            '_': '_'
+        };
+        const closer = pairs[event.key];
+        if (!closer) {
+            return false;
+        }
+
+        event.preventDefault();
+        return wrapSelection(editor, event.key, closer);
+    };
+
+    // Continue list items on Enter; exit list on empty item.
+    const handleListContinuation = (event, editor) => {
+        if (event.key !== 'Enter' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
+            return false;
+        }
+
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        if (start === null || end === null || start !== end) {
+            return false;
+        }
+
+        const value = editor.value;
+        const lineStart = value.lastIndexOf('\\n', start - 1) + 1;
+        const nextBreak = value.indexOf('\\n', start);
+        const lineEnd = nextBreak === -1 ? value.length : nextBreak;
+        const line = value.slice(lineStart, lineEnd);
+
+        const bulletMatch = line.match(/^(\\s*)([-*+])\\s+(.*)$/);
+        const orderedMatch = line.match(/^(\\s*)(\\d+)([.)])\\s+(.*)$/);
+        if (!bulletMatch && !orderedMatch) {
+            return false;
+        }
+
+        const content = bulletMatch ? bulletMatch[3] : orderedMatch[4];
+        const hasContent = content.trim().length > 0;
+        event.preventDefault();
+
+        if (!hasContent) {
+            const before = value.slice(0, lineStart);
+            const after = value.slice(lineEnd);
+            const insertBreak = lineEnd === value.length ? '\\n' : '';
+            editor.value = before + insertBreak + after;
+            editor.setSelectionRange(before.length, before.length);
+            return true;
+        }
+
+        let nextMarker = '';
+        if (bulletMatch) {
+            nextMarker = bulletMatch[1] + bulletMatch[2] + ' ';
+        } else {
+            const nextNumber = Number.parseInt(orderedMatch[2], 10) + 1;
+            nextMarker = orderedMatch[1] + nextNumber + orderedMatch[3] + ' ';
+        }
+
+        const before = value.slice(0, start);
+        const after = value.slice(start);
+        const insertion = '\\n' + nextMarker;
+        editor.value = before + insertion + after;
+        const cursor = before.length + insertion.length;
+        editor.setSelectionRange(cursor, cursor);
+        return true;
+    };
+
     // Keyboard shortcuts for saving or exiting edit mode
     document.addEventListener('keydown', (event) => {
         if (!isEditing) {
             return;
         }
 
-        if (event.ctrlKey && event.key === 's') {
+        if (isPrimaryShortcut(event) && event.key === 's') {
             event.preventDefault();
             saveButton?.click();
+            return;
+        }
+
+        if (contentEditor && handleMarkdownWrapping(event, contentEditor)) {
+            return;
+        }
+
+        if (contentEditor && handleListContinuation(event, contentEditor)) {
             return;
         }
 

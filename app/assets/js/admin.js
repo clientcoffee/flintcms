@@ -2029,6 +2029,108 @@
     editor.state.activeButton = setActiveButton(null, editor.state.activeButton);
   };
 
+  // Use Alt as the editor modifier to avoid browser Cmd/Ctrl collisions.
+  const isPrimaryShortcut = (event) => event.altKey && !event.metaKey && !event.ctrlKey;
+
+  // Wrap the current selection in a pair of characters and keep it selected.
+  const wrapSelection = (editorArea, open, close) => {
+    const start = editorArea.selectionStart;
+    const end = editorArea.selectionEnd;
+    if (start === null || end === null || start > end) {
+      return false;
+    }
+
+    const value = editorArea.value;
+    const selected = value.slice(start, end);
+    const nextValue = `${value.slice(0, start)}${open}${selected}${close}${value.slice(end)}`;
+    editorArea.value = nextValue;
+    const newStart = start + open.length;
+    const newEnd = newStart + selected.length;
+    editorArea.setSelectionRange(newStart, newEnd);
+    return true;
+  };
+
+  // Basic markdown pairing for selection wraps (quotes, brackets, emphasis).
+  const handleMarkdownWrapping = (event, editorArea) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      return false;
+    }
+
+    const pairs = {
+      "[": "]",
+      "(": ")",
+      "{": "}",
+      "\"": "\"",
+      "'": "'",
+      "`": "`",
+      "*": "*",
+      _: "_"
+    };
+    const closer = pairs[event.key];
+    if (!closer) {
+      return false;
+    }
+
+    event.preventDefault();
+    return wrapSelection(editorArea, event.key, closer);
+  };
+
+  // Continue list items on Enter; exit list when the line has no content.
+  const handleListContinuation = (event, editorArea) => {
+    if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
+      return false;
+    }
+
+    const start = editorArea.selectionStart;
+    const end = editorArea.selectionEnd;
+    if (start === null || end === null || start !== end) {
+      return false;
+    }
+
+    const value = editorArea.value;
+    const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+    const lineEnd = (() => {
+      const nextBreak = value.indexOf("\n", start);
+      return nextBreak === -1 ? value.length : nextBreak;
+    })();
+    const line = value.slice(lineStart, lineEnd);
+
+    const bulletMatch = line.match(/^(\s*)([-*+])\s+(.*)$/);
+    const orderedMatch = line.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
+    if (!bulletMatch && !orderedMatch) {
+      return false;
+    }
+
+    const content = bulletMatch ? bulletMatch[3] : orderedMatch[4];
+    const hasContent = content.trim().length > 0;
+    event.preventDefault();
+
+    if (!hasContent) {
+      const before = value.slice(0, lineStart);
+      const after = value.slice(lineEnd);
+      const insertBreak = lineEnd === value.length ? "\n" : "";
+      editorArea.value = `${before}${insertBreak}${after}`;
+      editorArea.setSelectionRange(before.length, before.length);
+      return true;
+    }
+
+    let nextMarker = "";
+    if (bulletMatch) {
+      nextMarker = `${bulletMatch[1]}${bulletMatch[2]} `;
+    } else {
+      const nextNumber = Number.parseInt(orderedMatch[2], 10) + 1;
+      nextMarker = `${orderedMatch[1]}${nextNumber}${orderedMatch[3]} `;
+    }
+
+    const before = value.slice(0, start);
+    const after = value.slice(start);
+    const insertion = `\n${nextMarker}`;
+    editorArea.value = `${before}${insertion}${after}`;
+    const cursor = before.length + insertion.length;
+    editorArea.setSelectionRange(cursor, cursor);
+    return true;
+  };
+
   // Wire editor buttons for a given editor definition.
   const initEditor = (editor) => {
     if (editor.saveButton) {
@@ -2043,9 +2145,17 @@
 
     if (editor.editorArea) {
       editor.editorArea.addEventListener("keydown", (event) => {
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        if (isPrimaryShortcut(event) && event.key.toLowerCase() === "s") {
           event.preventDefault();
           saveEditorContent(editor);
+          return;
+        }
+
+        if (handleMarkdownWrapping(event, editor.editorArea)) {
+          return;
+        }
+
+        if (handleListContinuation(event, editor.editorArea)) {
           return;
         }
 
@@ -2466,7 +2576,7 @@
     initEditor(blockEditor);
 
     document.addEventListener("keydown", (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") {
+      if (isPrimaryShortcut(event) && event.key.toLowerCase() === "n") {
         event.preventDefault();
         startNewContentDraft();
         return;

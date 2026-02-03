@@ -25,9 +25,8 @@
  * We compute everything up front to keep the HTML clean and predictable.
  */
 $siteName = $site['name'] ?? '';
-$pageTitleRaw = (string)($page['meta']['title'] ?? $siteName);
-$pageTitle = render_inline_markdown($pageTitleRaw);
-$pageTitlePlain = trim(strip_tags($pageTitle));
+$pageTitleRaw = (string)($page['meta']['title'] ?? '');
+$pageTitlePlain = sanitize_page_title($pageTitleRaw);
 if ($pageTitlePlain === '') {
     $pageTitlePlain = $siteName;
 }

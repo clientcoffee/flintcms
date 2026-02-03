@@ -1032,6 +1032,39 @@ if (!function_exists('strip_inline_markdown')) {
     }
 }
 
+if (!function_exists('sanitize_page_title')) {
+    /**
+     * Prepare a frontmatter title for HTML attributes and metadata.
+     *
+     * Only collapses whitespace/newlines while leaving digits, currency
+     * symbols, and slashes untouched (per the public docs guideline).
+     */
+    function sanitize_page_title(string $text): string
+    {
+        $trimmed = trim((string)$text);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $rendered = render_inline_markdown($trimmed);
+        if ($rendered === '') {
+            return '';
+        }
+
+        $plain = trim(strip_tags($rendered));
+        if ($plain === '') {
+            return '';
+        }
+
+        $normalized = preg_replace('/\\s+/u', ' ', $plain);
+        if ($normalized === null) {
+            return html_entity_decode($plain, ENT_QUOTES, 'UTF-8');
+        }
+
+        return html_entity_decode(trim($normalized), ENT_QUOTES, 'UTF-8');
+    }
+}
+
 if (!function_exists('hook')) {
     /**
      * Trigger a hook event.

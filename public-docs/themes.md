@@ -318,3 +318,17 @@ class Badge extends RenderComponent
 - **Icons not showing**: update `site/themes/motion/helpers.php` with the slug you want to support.
 - **Banner missing**: check that `banner` is set in frontmatter and the file lives under `site/uploads/`.
 - **Layout not switching**: confirm the frontmatter `type` matches the layout filename (for example, `layout-post.php` requires `type: post`).
+
+## brief theme strategy
+
+The Brief theme lives alongside Motion in `site/themes/brief/` (working files live at `Root/flint-themes/brief/`). It's a second, standalone theme rather than a Motion child, targeting the Economist "World in Brief" aesthetic with a serif-forward body, restrained color accents, and a page/blog hybrid layout. Activate it through `site/config.php` by setting `site.theme` to `brief`.
+
+- **Tailwind ownership**: Brief relies on the central Tailwind v3 build shared by the CMS app (`app/assets/css/tailwind.css`). Do not ship `tailwind.min.css` or `tailwind.config.js` from the theme—those files live in dev only. During development, run the standard Tailwind build and copy the compiled CSS into the theme's asset folder before bundling, then remove the source configs from the release artifacts in `dist/`.
+- **Styling migration**: Port Motion's layout and new Economist-inspired sections by translating existing CSS into Tailwind utility classes or reusable components (cards, metadata badges, timeline rows). Use theme partials to keep markup clean, and rely on helpers/components for repeated elements.
+- **Content layouts**: Brief ships `layout.php` (pages), `layout-post.php` (articles), and a `layout-blog.php` for the index. The blog index iterates `status: published` posts, surfaces dates/authors, and links to each article. The single post page shows an admin edit link when `$isAdmin` is true, keeping the entry editable without a separate child theme.
+- **Title rendering**: Use a simple sanitizer for the rendered `<title>` and heading text that removes only leading/trailing whitespace and normalizes newlines. Keep digits, currency symbols, and slashes intact so titles like `Get Started For As Little As $19/mo` render exactly as entered.
+- **Theme config**: `site/themes/brief/config.php` exports metadata/settings such as `accent`, `max_width`, and `font_family`. Reference `$themeConfig` in templates so the typography and spacing feel configuration-driven.
+
+## deploying theme builds
+
+- **Dist hygiene**: The build process copies `app/` and `site/` into `dist/`. Ensure Tailwind configs, `.git/` metadata, and other dev-only files (like `tailwind.config.js` or `.github/` snapshots) are omitted from `dist/` before release. Generated CSS is the only theme asset that should ship. Maintain the same `scripts/build.sh` pipeline to keep dev tooling separate from release outputs.
