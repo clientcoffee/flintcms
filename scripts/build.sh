@@ -41,6 +41,7 @@ app_root="${workspace_root}/app"
 site_root="${workspace_root}/site"
 dist_root="${workspace_root}/dist"
 clean_script="${workspace_root}/scripts/clean.sh"
+rsync_excludes=(--exclude=".git" --exclude=".gitignore" --exclude=".gitmodules")
 
 FLINT_VERBOSE="${VERBOSE}"
 
@@ -99,10 +100,11 @@ if [[ "${VERBOSE}" == "true" ]]; then
   ui_step "Sync app/ -> dist/app/"
   rsync -av \
     --delete \
+    "${rsync_excludes[@]}" \
     "${app_root}/" \
     "${dist_root}/app/"
 else
-  run_with_spinner "Sync app/ -> dist/app/" rsync -a --delete "${app_root}/" "${dist_root}/app/"
+  run_with_spinner "Sync app/ -> dist/app/" rsync -a --delete "${rsync_excludes[@]}" "${app_root}/" "${dist_root}/app/"
 fi
 
 # Prevent the dev-only Tailwind source from being packaged.
@@ -110,6 +112,13 @@ tailwind_src="${dist_root}/app/assets/css/tailwind.css"
 if [[ -f "${tailwind_src}" ]]; then
   rm -f "${tailwind_src}"
 fi
+
+# Drop any git metadata or build-specific files that sneaked in.
+for gitfile in "${dist_root}/app/.git" "${dist_root}/app/.gitignore" "${dist_root}/app/.gitmodules"; do
+  if [[ -e "${gitfile}" ]]; then
+    rm -rf "${gitfile}"
+  fi
+done
 
 # Copy index-dist.php to dist root if present
 index_dist_src="${app_root}/index-dist.php"
@@ -198,6 +207,11 @@ Commit: ${build_hash}
 Built From: app/ and site/
 Build Script: scripts/build.sh
 EOF
+
+# Remove the metadata file from the release so it does not ship.
+if [[ -f "${dist_root}/.build-info" ]]; then
+  rm -f "${dist_root}/.build-info"
+fi
 
 # Post-build validation
 ui_step "Validate build output"
