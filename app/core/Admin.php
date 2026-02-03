@@ -144,8 +144,10 @@ class Admin
         setEditMode(false);
     });
 
+    // Prefer the platform primary modifier (Cmd on macOS) to avoid browser Ctrl conflicts.
     const isPrimaryShortcut = (event) => event.metaKey && !event.altKey;
 
+    // Wrap the current selection in a pair of characters and keep the highlight.
     const wrapSelection = (editor, open, close) => {
         const start = editor.selectionStart;
         const end = editor.selectionEnd;
@@ -162,6 +164,7 @@ class Admin
         return true;
     };
 
+    // Basic markdown pairing for selection wraps (brackets, quotes, emphasis).
     const handleMarkdownWrapping = (event, editor) => {
         if (event.metaKey || event.ctrlKey || event.altKey) {
             return false;
@@ -186,6 +189,7 @@ class Admin
         return wrapSelection(editor, event.key, closer);
     };
 
+    // Continue list items on Enter; exit list on empty item.
     const handleListContinuation = (event, editor) => {
         if (event.key !== 'Enter' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
             return false;

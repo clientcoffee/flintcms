@@ -2029,8 +2029,10 @@
     editor.state.activeButton = setActiveButton(null, editor.state.activeButton);
   };
 
+  // Use the platform primary modifier (Cmd on macOS) to avoid browser Ctrl collisions.
   const isPrimaryShortcut = (event) => event.metaKey && !event.altKey;
 
+  // Wrap the current selection in a pair of characters and keep it selected.
   const wrapSelection = (editorArea, open, close) => {
     const start = editorArea.selectionStart;
     const end = editorArea.selectionEnd;
@@ -2048,6 +2050,7 @@
     return true;
   };
 
+  // Basic markdown pairing for selection wraps (quotes, brackets, emphasis).
   const handleMarkdownWrapping = (event, editorArea) => {
     if (event.metaKey || event.ctrlKey || event.altKey) {
       return false;
@@ -2072,6 +2075,7 @@
     return wrapSelection(editorArea, event.key, closer);
   };
 
+  // Continue list items on Enter; exit list when the line has no content.
   const handleListContinuation = (event, editorArea) => {
     if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
       return false;

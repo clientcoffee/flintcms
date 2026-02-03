@@ -56,6 +56,12 @@ Components live in `site/components/` (site‑specific) or in the active theme u
 - Admin flow: theme layouts (e.g., `layout-post.php`) should surface edit links when `$isAdmin` is true so blog posts can be edited directly from the live page.
 - Title metadata: sanitize only whitespace/newlines; preserve digits, currency symbols, and slashes (e.g., `Get Started For As Little As $19/mo`) so rendered headings match the frontmatter text.
 
+## Admin editor basics
+
+- Shortcuts use the primary modifier (Cmd on macOS) to avoid browser Ctrl conflicts: `Cmd+S` saves, `Cmd+N` starts a new page draft, `Esc` cancels.
+- Markdown helpers: typing `[` `(` `{` `"` `'` `` ` `` `*` `_` wraps the current selection and keeps it highlighted.
+- Lists continue on `Enter`; hitting `Enter` on an empty list item exits the list.
+
 ## walled garden (password-protected subtrees)
 
 - Setting `password: your-secret` in a directory's `index.md(x)` frontmatter activates a walled garden. All pages under that directory inherit the password requirement and render a password prompt landing page before any content is shown.
