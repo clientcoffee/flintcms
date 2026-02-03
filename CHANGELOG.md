@@ -32,8 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Serve `/assets/css/tailwind.min.css` from the app bundle for every theme, upgrade the Tailwind pipeline to v3 (typography plugin) and strip the dev-only `tailwind.css` before packaging.
 - Improve admin edit targeting across theme layouts to keep live edit links working.
 - Use title sanitization in Motion layouts to preserve currency symbols, digits, and slashes while normalizing whitespace.
-- Update admin editor shortcuts to use the primary modifier key and avoid browser Ctrl collisions.
+- Update admin editor shortcuts to use the Alt modifier and avoid browser Ctrl/Cmd collisions.
 - Add basic markdown editor behaviors (wrap selections and continue lists).
+- Normalize spacing in the About page content.
 
 ## [0.2.3] - 2026-01-26
 ### Added
