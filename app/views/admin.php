@@ -158,28 +158,33 @@ ob_start();
                     <div class="bg-white border border-gray-200 rounded-2xl p-4">
                         <div class="flex items-center justify-between mb-3">
                             <p class="text-sm font-semibold text-gray-900">Pages</p>
-                            <div class="relative">
-                                <button type="button" id="content-parent-btn" class="inline-flex items-center justify-center w-8 h-8 rounded-md text-gray-500 hover:text-indigo-600 hover:bg-indigo-50" aria-label="Choose parent folder">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
-                                    </svg>
-                                </button>
-                                <div id="content-parent-menu" class="hidden absolute right-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-lg p-3 z-10">
-                                    <p class="text-xs font-semibold text-gray-600 mb-2">New page parent</p>
-                                    <select id="content-parent-select" class="w-full rounded-md border border-gray-200 px-2 py-1 text-sm">
-                                        <option value="">Loading...</option>
-                                    </select>
-                                    <p class="text-xs text-gray-500 mt-2">New pages will be created in this folder.</p>
-                                </div>
-                            </div>
+                            <button type="button" id="content-new-page-btn" class="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700">
+                                New Page
+                            </button>
                         </div>
                         <div id="content-list" class="space-y-1 text-sm text-gray-700"></div>
                     </div>
                     <div class="bg-white border border-gray-200 rounded-2xl p-4">
-                        <div class="flex items-start justify-between mb-3">
+                        <div class="flex items-start justify-between mb-3 gap-6">
                             <div>
                                 <p id="content-editor-title" class="text-sm font-semibold text-gray-900">Select a page</p>
-                                <p id="content-editor-path" class="text-xs text-gray-500"></p>
+                                <div id="content-editor-path" class="text-xs text-gray-500 hidden">
+                                    <span id="content-editor-path-display" class="block"></span>
+                                    <input id="content-editor-path-input" type="text" placeholder="new-page" autocomplete="off" class="mt-1 hidden w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-mono focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="relative">
+                                    <button type="button" id="content-location-btn" class="px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200 rounded-lg hover:border-indigo-300 hover:text-indigo-700">Page Location</button>
+                                    <div id="content-location-menu" class="hidden absolute right-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-lg p-3 z-10">
+                                        <p class="text-xs font-semibold text-gray-600 mb-2">Parent folder</p>
+                                        <select id="content-parent-select" class="w-full rounded-md border border-gray-200 px-2 py-1 text-sm">
+                                            <option value="">Loading...</option>
+                                        </select>
+                                        <p class="text-xs text-gray-500 mt-2">New pages will be created in this folder.</p>
+                                    </div>
+                                </div>
+                                <span id="content-location-display" class="text-xs text-gray-500 hidden"></span>
                             </div>
                         </div>
                         <div id="content-editor-placeholder" class="text-sm text-gray-500">Choose a page from the list to edit its markdown.</div>

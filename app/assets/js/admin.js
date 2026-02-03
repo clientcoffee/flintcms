@@ -1849,8 +1849,14 @@
       editor.saveButton.textContent = "Save";
     }
     editor.title.textContent = label;
-    editor.pathLabel.textContent = path;
+    if (editor.pathDisplay) {
+      editor.pathDisplay.textContent = path;
+      editor.pathDisplay.classList.remove("hidden");
+    }
     editor.pathLabel.classList.remove("hidden");
+    if (editor.pathInput) {
+      editor.pathInput.classList.add("hidden");
+    }
     setEditorState(editor, true);
 
     try {
@@ -2068,9 +2074,13 @@
 
   // Initialize content and block editors.
   const initEditors = () => {
-    const parentButton = query("#content-parent-btn");
-    const parentMenu = query("#content-parent-menu");
+    const parentButton = query("#content-location-btn");
+    const parentMenu = query("#content-location-menu");
     const parentSelect = query("#content-parent-select");
+    const pathDisplay = query("#content-editor-path-display");
+    const pathInput = query("#content-editor-path-input");
+    const locationDisplay = query("#content-location-display");
+    const newPageButton = query("#content-new-page-btn");
 
     const contentEditor = {
       list: query("#content-list"),
@@ -2080,14 +2090,18 @@
       cancelButton: query("#content-cancel-btn"),
       title: query("#content-editor-title"),
       pathLabel: query("#content-editor-path"),
+      pathDisplay,
+      pathInput,
       parentButton,
       parentMenu,
       parentSelect,
+      locationDisplay,
       defaultTitle: "Select a page",
       endpoints: {
         list: "/api/site/list",
         load: "/api/site",
         save: "/api/save",
+        rename: "/api/site/rename",
         create: "/api/site/create",
         move: "/api/site/move"
       },
@@ -2176,7 +2190,7 @@
       }
     };
 
-    const setParentMenuOpen = (isOpen) => {
+    const setLocationMenuOpen = (isOpen) => {
       if (!parentMenu || !parentButton) {
         return;
       }
@@ -2206,6 +2220,19 @@
       return options;
     };
 
+    const updateLocationDisplay = () => {
+      if (!locationDisplay || !parentSelect) {
+        return;
+      }
+      const selectedOption = parentSelect.selectedOptions[0];
+      if (!selectedOption) {
+        locationDisplay.classList.add("hidden");
+        return;
+      }
+      locationDisplay.textContent = selectedOption.textContent;
+      locationDisplay.classList.remove("hidden");
+    };
+
     const populateParentSelect = (items) => {
       if (!parentSelect) {
         return;
@@ -2223,6 +2250,7 @@
       } else {
         contentEditor.state.parentPath = parentSelect.value || "";
       }
+      updateLocationDisplay();
     };
 
     const moveContentItem = async (sourcePath, destinationPath) => {
@@ -2289,6 +2317,89 @@
       }
     };
 
+    const normalizePathInput = (value) => {
+      if (typeof value !== "string") {
+        return "";
+      }
+      let normalized = value.trim();
+      normalized = normalized.replace(/^\/+|\/+$/g, "");
+      normalized = normalized.replace(/\/{2,}/g, "/");
+      return normalized;
+    };
+
+    const deriveParentFromFile = (file) => {
+      if (!file) {
+        return "";
+      }
+      const segments = file.split("/");
+      segments.pop();
+      return segments.join("/");
+    };
+
+    const showPathEditor = (editor) => {
+      if (!editor.pathLabel || !editor.pathDisplay || !editor.pathInput) {
+        return;
+      }
+      if (!editor.state.currentPath) {
+        return;
+      }
+      editor.pathDisplay.classList.add("hidden");
+      editor.pathInput.classList.remove("hidden");
+      editor.pathInput.value = normalizePathInput(editor.state.currentPath.replace(/^\/+/, ""));
+      editor.pathInput.select();
+    };
+
+    const hidePathEditor = (editor) => {
+      if (!editor.pathLabel || !editor.pathDisplay || !editor.pathInput) {
+        return;
+      }
+      editor.pathInput.classList.add("hidden");
+      editor.pathDisplay.classList.remove("hidden");
+    };
+
+    const renameContentItem = async (editor, targetValue) => {
+      if (!editor.state.currentPath) {
+        return false;
+      }
+      const normalized = normalizePathInput(targetValue);
+      if (!normalized) {
+        alert("Enter a valid page name.");
+        return false;
+      }
+      const currentNormalized = editor.state.currentPath.replace(/^\/+/, "");
+      if (normalized === currentNormalized) {
+        return true;
+      }
+      try {
+        const { data } = await postJson(editor.endpoints.rename, {
+          path: editor.state.currentPath,
+          target: normalized
+        });
+        if (!data.success) {
+          alert(data.error || "Failed to rename file.");
+          return false;
+        }
+        const newPath = data.path || editor.state.currentPath;
+        editor.state.currentPath = newPath;
+        if (editor.pathDisplay) {
+          editor.pathDisplay.textContent = newPath;
+          editor.pathLabel.classList.remove("hidden");
+        }
+        const parentPath = deriveParentFromFile(data.file || normalized);
+        contentEditor.state.parentPath = parentPath;
+        if (parentSelect) {
+          parentSelect.value = parentPath;
+          updateLocationDisplay();
+        }
+        editor.state.loaded = false;
+        loadTreeList(editor, true);
+        return true;
+      } catch (error) {
+        alert("Failed to rename file.");
+        return false;
+      }
+    };
+
     contentEditor.restoreDraft = () => restoreViewState(contentEditor.state.returnState);
     contentEditor.treeOptions = {
       treeMode: "url",
@@ -2301,11 +2412,11 @@
       parentButton.addEventListener("click", (event) => {
         event.stopPropagation();
         const isOpen = !parentMenu.classList.contains("hidden");
-        setParentMenuOpen(!isOpen);
+        setLocationMenuOpen(!isOpen);
       });
 
       document.addEventListener("click", () => {
-        setParentMenuOpen(false);
+        setLocationMenuOpen(false);
       });
     }
 
@@ -2318,6 +2429,36 @@
     if (parentSelect) {
       parentSelect.addEventListener("change", () => {
         contentEditor.state.parentPath = parentSelect.value || "";
+        updateLocationDisplay();
+      });
+    }
+
+    if (newPageButton) {
+      newPageButton.addEventListener("click", startNewContentDraft);
+    }
+
+    if (contentEditor.pathLabel && contentEditor.pathInput) {
+      contentEditor.pathLabel.addEventListener("dblclick", (event) => {
+        event.preventDefault();
+        showPathEditor(contentEditor);
+      });
+
+      contentEditor.pathInput.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          const success = await renameContentItem(contentEditor, contentEditor.pathInput.value);
+          if (success) {
+            hidePathEditor(contentEditor);
+          }
+        }
+
+        if (event.key === "Escape") {
+          hidePathEditor(contentEditor);
+        }
+      });
+
+      contentEditor.pathInput.addEventListener("blur", () => {
+        hidePathEditor(contentEditor);
       });
     }
 

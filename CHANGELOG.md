@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add inline markdown cache (per-request) to reduce repeat parsing.
 - Add static asset cache headers with configurable TTLs (uploads optional).
 - Add fast public path to skip admin/scheduler checks for logged-out visitors.
+- Add editable page location controls and in-place filename renaming that respects `.md`/`.mdx` requirements.
 - Implement walled-garden landing page that protects directories by checking `password:` frontmatter on index files.
 - Add the “World in Brief” layout (brief theme) with a blog list layout triggered by `type: list`.
 

@@ -1058,6 +1058,103 @@ class App
             return;
         }
 
+        // Rename existing content file (admin only).
+        if ($requestPath === '/api/site/rename' && $requestMethod === 'POST') {
+            $payload = $this->readJsonPayload();
+            if ($payload === null) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid JSON body']);
+                return;
+            }
+
+            $sourcePath = trim((string)($payload['path'] ?? ''));
+            $targetPathRaw = trim((string)($payload['target'] ?? ''));
+            if ($sourcePath === '' || $targetPathRaw === '') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Source and target paths are required']);
+                return;
+            }
+
+            $resolvedSource = $this->resolveContentFile($sourcePath);
+            if (!$resolvedSource || !file_exists($resolvedSource)) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Source file not found']);
+                return;
+            }
+
+            $rawTarget = str_replace("\\", "/", $targetPathRaw);
+            $normalizedTarget = preg_replace('/\/+/', '/', trim($rawTarget, "/ \t\n\r"));
+            $segments = array_values(array_filter(
+                explode("/", $normalizedTarget),
+                fn ($value) => trim($value, "/") !== ""
+            ));
+            if (empty($segments)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Target path is invalid']);
+                return;
+            }
+
+            $slugSegments = array_map(fn ($segment) => $this->slugify($segment), $segments);
+            if (in_array("", $slugSegments, true)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Target path contains invalid characters']);
+                return;
+            }
+
+            $fileSlug = array_pop($slugSegments);
+            $relativeDir = $slugSegments ? implode("/", $slugSegments) : "";
+            $targetDir = $relativeDir === "" ? Paths::$pagesDir : Paths::$pagesDir . "/" . $relativeDir;
+            if (!is_dir($targetDir)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Target directory not found']);
+                return;
+            }
+
+            $content = file_get_contents($resolvedSource);
+            $needsMdx = $content !== false && $this->contentNeedsMdx($content);
+            $extension = $needsMdx ? "mdx" : "md";
+            $newFileName = $fileSlug . "." . $extension;
+
+            $targetPath = $targetDir . "/" . $newFileName;
+            try {
+                $validatedTarget = $this->validateSecurePath($targetPath, Paths::$pagesDir);
+            } catch (\Exception $e) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid target path']);
+                return;
+            }
+
+            if ($resolvedSource === $validatedTarget) {
+                $relativeFile = ltrim(($relativeDir === "" ? "" : $relativeDir . "/") . $newFileName, "/");
+                echo json_encode([
+                    'success' => true,
+                    'path' => $this->contentSlugFromRelative($relativeFile),
+                    'file' => $relativeFile
+                ]);
+                return;
+            }
+
+            if (file_exists($validatedTarget)) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => 'Target already exists']);
+                return;
+            }
+
+            if (!safe_rename($resolvedSource, $validatedTarget, Paths::$pagesDir, Paths::$pagesDir)) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Failed to rename file']);
+                return;
+            }
+
+            $relativeFile = ltrim(($relativeDir === "" ? "" : $relativeDir . "/") . $newFileName, "/");
+            echo json_encode([
+                'success' => true,
+                'path' => $this->contentSlugFromRelative($relativeFile),
+                'file' => $relativeFile
+            ]);
+            return;
+        }
+
         // Move content file between directories (admin only).
         if ($requestPath === '/api/site/move' && $requestMethod === 'POST') {
             $payload = $this->readJsonPayload();
@@ -5109,6 +5206,41 @@ class App
         $text = trim($text, '-');
 
         return $text;
+    }
+
+    private function stripFrontmatter(string $content): string
+    {
+        if (!str_starts_with($content, "---")) {
+            return $content;
+        }
+
+        $parts = preg_split('/^---$/m', $content, 3);
+        if (is_array($parts) && count($parts) === 3) {
+            return $parts[2];
+        }
+
+        return $content;
+    }
+
+    private function contentNeedsMdx(?string $content): bool
+    {
+        if ($content === null) {
+            return false;
+        }
+
+        $meta = extract_frontmatter($content);
+        foreach (['components', 'component'] as $key) {
+            if (!empty($meta[$key])) {
+                return true;
+            }
+        }
+
+        $body = $this->stripFrontmatter($content);
+        if (preg_match('/<([A-Z][\w-]*)\\b/', $body)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
