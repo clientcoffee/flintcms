@@ -2029,8 +2029,8 @@
     editor.state.activeButton = setActiveButton(null, editor.state.activeButton);
   };
 
-  // Use the platform primary modifier (Cmd on macOS) to avoid browser Ctrl collisions.
-  const isPrimaryShortcut = (event) => event.metaKey && !event.altKey;
+  // Use Alt as the editor modifier to avoid browser Cmd/Ctrl collisions.
+  const isPrimaryShortcut = (event) => event.altKey && !event.metaKey && !event.ctrlKey;
 
   // Wrap the current selection in a pair of characters and keep it selected.
   const wrapSelection = (editorArea, open, close) => {

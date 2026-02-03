@@ -144,8 +144,8 @@ class Admin
         setEditMode(false);
     });
 
-    // Prefer the platform primary modifier (Cmd on macOS) to avoid browser Ctrl conflicts.
-    const isPrimaryShortcut = (event) => event.metaKey && !event.altKey;
+    // Use Alt as the editor modifier to avoid browser Cmd/Ctrl collisions.
+    const isPrimaryShortcut = (event) => event.altKey && !event.metaKey && !event.ctrlKey;
 
     // Wrap the current selection in a pair of characters and keep the highlight.
     const wrapSelection = (editor, open, close) => {

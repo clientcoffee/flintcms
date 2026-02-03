@@ -58,7 +58,7 @@ Components live in `site/components/` (site‑specific) or in the active theme u
 
 ## Admin editor basics
 
-- Shortcuts use the primary modifier (Cmd on macOS) to avoid browser Ctrl conflicts: `Cmd+S` saves, `Cmd+N` starts a new page draft, `Esc` cancels.
+- Shortcuts use `Alt` to avoid browser Ctrl/Cmd conflicts: `Alt+S` saves, `Alt+N` starts a new page draft, `Esc` cancels.
 - Markdown helpers: typing `[` `(` `{` `"` `'` `` ` `` `*` `_` wraps the current selection and keeps it highlighted.
 - Lists continue on `Enter`; hitting `Enter` on an empty list item exits the list.
 
