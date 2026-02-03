@@ -10,7 +10,7 @@
 $siteName = $site['name'] ?? '';
 $postTitleRaw = (string)($page['meta']['title'] ?? 'Untitled Post');
 $postTitle = $postTitleRaw !== '' ? render_inline_markdown($postTitleRaw) : '';
-$postTitlePlain = trim(strip_tags($postTitle));
+$postTitlePlain = sanitize_page_title($postTitleRaw);
 $pageTitle = $postTitlePlain !== '' ? $postTitlePlain : $siteName;
 // Keywords are optional metadata from the markdown frontmatter.
 $keywords = page_meta('keywords');
@@ -151,7 +151,7 @@ $hasNeighborNav = $neighborNavHtml !== '';
 
     <!-- Post Content -->
     <main class="py-12 sm:py-16">
-        <article class="max-w-3xl mx-auto px-6 sm:px-12">
+        <article id="content-display" class="max-w-3xl mx-auto px-6 sm:px-12">
             <!-- $viewContent is the rendered HTML from view.php + markdown parser. -->
             <?= $viewContent ?>
         </article>

@@ -48,7 +48,16 @@ class Admin
     const editButton = document.getElementById('edit-btn');
     const saveButton = document.getElementById('save-btn');
     const cancelButton = document.getElementById('cancel-btn');
-    const contentDisplay = document.getElementById('content-display');
+    const getContentDisplayElement = () => {
+        return (
+            document.getElementById('content-display')
+            || document.querySelector('.motion-content')
+            || document.querySelector('article')
+            || document.querySelector('main')
+            || null
+        );
+    };
+    const contentDisplay = getContentDisplayElement();
     const contentEditorWrap = document.getElementById('content-editor-wrap');
     const contentEditor = document.getElementById('content-editor');
     const logoutButton = document.getElementById('admin-logout-btn');
@@ -59,10 +68,12 @@ class Admin
 
     // Toggle edit UI states in a single helper
     const setEditMode = (shouldEnable) => {
-        if (!contentDisplay || !contentEditor || !editButton || !saveButton || !cancelButton) {
+        if (!contentEditor || !editButton || !saveButton || !cancelButton) {
             return;
         }
-        contentDisplay.classList.toggle('hidden', shouldEnable);
+        if (contentDisplay) {
+            contentDisplay.classList.toggle('hidden', shouldEnable);
+        }
         if (contentEditorWrap) {
             contentEditorWrap.classList.toggle('hidden', !shouldEnable);
         }

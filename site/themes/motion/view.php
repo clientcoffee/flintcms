@@ -15,10 +15,9 @@ $allowBanner = $contentType !== 'post';
 $bannerUrl = $page['meta']['banner'] ?? ($themeConfig['settings']['default_banner'] ?? '');
 // Theme config is loaded from site/themes/motion/config.php by the CMS.
 $hasBanner = $allowBanner && $bannerUrl !== '';
-// Title can contain inline markdown, so render it here for display.
 $pageTitleRaw = (string)($page['meta']['title'] ?? '');
 $pageTitle = $pageTitleRaw !== '' ? render_inline_markdown($pageTitleRaw) : '';
-$pageTitlePlain = trim(strip_tags($pageTitle));
+$pageTitlePlain = sanitize_page_title($pageTitleRaw);
 $hasTitle = $pageTitlePlain !== '';
 $renderPageHeader = $contentType !== 'post' && $hasTitle;
 

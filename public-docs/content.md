@@ -53,3 +53,12 @@ Components live in `site/components/` (site‑specific) or in the active theme u
 - Keep media under `site/uploads/` and reference via absolute paths.
 - Reuse `site/blocks/` for shared content like navigation.
 - Keep components small and focused on one task.
+- Admin flow: theme layouts (e.g., `layout-post.php`) should surface edit links when `$isAdmin` is true so blog posts can be edited directly from the live page.
+- Title metadata: sanitize only whitespace/newlines; preserve digits, currency symbols, and slashes (e.g., `Get Started For As Little As $19/mo`) so rendered headings match the frontmatter text.
+
+## walled garden (password-protected subtrees)
+
+- Setting `password: your-secret` in a directory's `index.md(x)` frontmatter activates a walled garden. All pages under that directory inherit the password requirement and render a password prompt landing page before any content is shown.
+- Admins bypass the prompt while logged in, but the frontmatter password still protects public viewers.
+- Use the site-wide helper (or a theme helper) to detect the nearest parent index file with `password` set and compare it against a session-backed value before returning content.
+- When editing content in the Admin, the folder-level password is still required for previewing or publishing, encouraging editors to share the credential securely.
