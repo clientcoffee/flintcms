@@ -269,10 +269,24 @@ PHP;
         $coreKeys = $method->invoke($this->app, [
             'name' => 'Test Site',
             'theme' => 'motion',
+            'logo' => '/uploads/logo.png',
         ]);
         $this->assertContains('site.name', $coreKeys);
         $this->assertContains('site.theme', $coreKeys);
+        $this->assertContains('site.logo', $coreKeys);
         $this->assertNotContains('site.custom_key', $coreKeys);
+    }
+
+    public function testSetSiteLogoSettingPersistsValue(): void
+    {
+        $reflection = new \ReflectionClass($this->app);
+        $method = $reflection->getMethod('setSiteLogoSetting');
+
+        $logoPath = '/uploads/2026-02/smoke-logo.png';
+        $this->assertTrue($method->invoke($this->app, $logoPath));
+
+        $config = require $this->testRoot . '/site/config.php';
+        $this->assertSame($logoPath, $config['site']['logo'] ?? null);
     }
 
     public function testCountTreeFilesCountsNestedItems(): void
