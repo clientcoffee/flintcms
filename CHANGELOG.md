@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add the “World in Brief” layout (brief theme) with a blog list layout triggered by `type: list`.
 - Add `sanitize_page_title` helper to normalize title metadata without stripping digits or symbols.
 - Allow gzip, zip, tar, 7z, and rar uploads and serve them from `/uploads` with explicit archive MIME + download headers.
+- Add site logo support in admin settings with strict image upload validation and Motion header fallback to site name text.
 
 ### Changed
 - Move optional components into external registry and keep core lean.

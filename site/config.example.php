@@ -16,6 +16,8 @@ return [
         'name' => 'Flint',
         'theme' => 'motion',
         'website' => 'https://example.com',
+        // Optional logo URL (prefer /uploads/... set via admin settings).
+        'logo' => '',
     ],
     'mail' => [
         'admin_email' => 'admin@example.com',

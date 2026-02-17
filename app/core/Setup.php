@@ -96,6 +96,7 @@ class Setup
                 'name' => $formData['site_name'],
                 'theme' => $formData['theme'],
                 'website' => $formData['site_website'],
+                'logo' => '',
             ],
             'mail' => [
                 'admin_email' => $formData['admin_email'],
