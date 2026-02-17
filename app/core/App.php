@@ -1356,6 +1356,55 @@ class App
             return;
         }
 
+        // Upload a site logo used by supported themes (JPG, JPEG, PNG, GIF).
+        if ($requestPath === '/api/settings/logo' && $requestMethod === 'POST') {
+            if (!$this->validateCsrfToken()) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+                return;
+            }
+
+            if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'No logo file uploaded']);
+                return;
+            }
+
+            $result = $this->handleSiteLogoUpload($_FILES['file']);
+            if (!$result['success']) {
+                http_response_code($result['status']);
+                echo json_encode(['success' => false, 'error' => $result['error']]);
+                return;
+            }
+
+            echo json_encode([
+                'success' => true,
+                'url' => $result['url'],
+                'filename' => $result['filename'],
+                'size' => $result['size'],
+                'type' => $result['type'],
+            ]);
+            return;
+        }
+
+        // Remove the configured site logo and fall back to site name text in themes.
+        if ($requestPath === '/api/settings/logo/remove' && $requestMethod === 'POST') {
+            if (!$this->validateCsrfToken()) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+                return;
+            }
+
+            if (!$this->setSiteLogoSetting('')) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Failed to remove site logo']);
+                return;
+            }
+
+            echo json_encode(['success' => true]);
+            return;
+        }
+
         // Handle settings endpoint.
         if ($requestPath === '/api/settings') {
             if ($requestMethod === 'GET') {
@@ -2334,7 +2383,7 @@ class App
      */
     private function coreSiteKeys(array $siteSettings): array
     {
-        $baseKeys = ['name', 'theme', 'website', 'tagline'];
+        $baseKeys = ['name', 'theme', 'website', 'tagline', 'logo'];
         $exampleKeys = $this->loadExampleSiteKeys();
         $candidates = array_unique(array_merge($baseKeys, $exampleKeys));
 
@@ -3748,6 +3797,204 @@ class App
         }
 
         return $filename;
+    }
+
+    /**
+     * Handle strict site logo uploads and persist site.logo setting.
+     *
+     * @param array<string,mixed> $file
+     * @return array{success:bool,status:int,error:string,url:string,filename:string,size:int,type:string}
+     */
+    private function handleSiteLogoUpload(array $file): array
+    {
+        $errorCode = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            return [
+                'success' => false,
+                'status' => 400,
+                'error' => 'No logo file uploaded',
+                'url' => '',
+                'filename' => '',
+                'size' => 0,
+                'type' => '',
+            ];
+        }
+
+        $originalName = (string)($file['name'] ?? '');
+        $tmpPath = (string)($file['tmp_name'] ?? '');
+        $size = (int)($file['size'] ?? 0);
+
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        $baseName = pathinfo($originalName, PATHINFO_FILENAME);
+
+        $allowedByExtension = [
+            'jpg' => ['image/jpeg', 'image/pjpeg'],
+            'jpeg' => ['image/jpeg', 'image/pjpeg'],
+            'png' => ['image/png', 'image/x-png'],
+            'gif' => ['image/gif'],
+        ];
+
+        if (!isset($allowedByExtension[$extension])) {
+            return [
+                'success' => false,
+                'status' => 400,
+                'error' => 'Invalid logo format. Allowed: JPG, JPEG, PNG, GIF',
+                'url' => '',
+                'filename' => '',
+                'size' => 0,
+                'type' => '',
+            ];
+        }
+
+        // Block dangerous double-extension payload names (example: payload.php.jpg).
+        $dangerousExtensions = ['php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'phar', 'phps'];
+        $nameParts = explode('.', strtolower($originalName));
+        if (count($nameParts) > 2) {
+            for ($index = 1; $index < count($nameParts) - 1; $index++) {
+                if (in_array($nameParts[$index], $dangerousExtensions, true)) {
+                    return [
+                        'success' => false,
+                        'status' => 400,
+                        'error' => 'Invalid logo filename',
+                        'url' => '',
+                        'filename' => '',
+                        'size' => 0,
+                        'type' => '',
+                    ];
+                }
+            }
+        }
+
+        if ($size <= 0 || $size > 5 * 1024 * 1024) {
+            return [
+                'success' => false,
+                'status' => 400,
+                'error' => 'Logo size must be 5MB or less',
+                'url' => '',
+                'filename' => '',
+                'size' => 0,
+                'type' => '',
+            ];
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo ? (finfo_file($finfo, $tmpPath) ?: '') : '';
+
+        if (!in_array($mimeType, $allowedByExtension[$extension], true)) {
+            return [
+                'success' => false,
+                'status' => 400,
+                'error' => 'Logo MIME type does not match file extension',
+                'url' => '',
+                'filename' => '',
+                'size' => 0,
+                'type' => '',
+            ];
+        }
+
+        $safeName = $this->sanitizeFilename($baseName);
+        $suffix = substr(bin2hex(random_bytes(3)), 0, 6);
+        $finalFilename = $safeName . '-logo-' . $suffix . '.' . $extension;
+
+        $yearMonth = date('Y-m');
+        $uploadDir = Paths::$uploadsDir . '/' . $yearMonth;
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+            return [
+                'success' => false,
+                'status' => 500,
+                'error' => 'Failed to prepare upload directory',
+                'url' => '',
+                'filename' => '',
+                'size' => 0,
+                'type' => '',
+            ];
+        }
+
+        $targetPath = $uploadDir . '/' . $finalFilename;
+        try {
+            $validatedPath = $this->validateSecurePath($targetPath, Paths::$uploadsDir);
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'status' => 400,
+                'error' => 'Invalid logo upload path',
+                'url' => '',
+                'filename' => '',
+                'size' => 0,
+                'type' => '',
+            ];
+        }
+
+        $oldUmask = umask(0133);
+        $moved = move_uploaded_file($tmpPath, $validatedPath);
+        umask($oldUmask);
+
+        if (!$moved) {
+            return [
+                'success' => false,
+                'status' => 500,
+                'error' => 'Failed to save logo file',
+                'url' => '',
+                'filename' => '',
+                'size' => 0,
+                'type' => '',
+            ];
+        }
+
+        chmod($validatedPath, 0644);
+
+        $logoUrl = '/uploads/' . $yearMonth . '/' . $finalFilename;
+        if (!$this->setSiteLogoSetting($logoUrl)) {
+            @unlink($validatedPath);
+            return [
+                'success' => false,
+                'status' => 500,
+                'error' => 'Failed to persist site logo setting',
+                'url' => '',
+                'filename' => '',
+                'size' => 0,
+                'type' => '',
+            ];
+        }
+
+        return [
+            'success' => true,
+            'status' => 200,
+            'error' => '',
+            'url' => $logoUrl,
+            'filename' => $finalFilename,
+            'size' => $size,
+            'type' => $mimeType,
+        ];
+    }
+
+    /**
+     * Persist site.logo in config.php and sync in-memory config.
+     */
+    private function setSiteLogoSetting(string $logoUrl): bool
+    {
+        $configPath = $this->resolveConfigPath();
+        if (!file_exists($configPath)) {
+            return false;
+        }
+
+        $configData = require $configPath;
+        if (!is_array($configData)) {
+            return false;
+        }
+
+        if (!isset($configData['site']) || !is_array($configData['site'])) {
+            $configData['site'] = [];
+        }
+
+        $configData['site']['logo'] = $logoUrl;
+        $this->writePhpConfig($configPath, $configData);
+        clearstatcache(true, $configPath);
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($configPath, true);
+        }
+
+        return true;
     }
 
     /**

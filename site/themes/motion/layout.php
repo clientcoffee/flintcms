@@ -25,6 +25,8 @@
  * We compute everything up front to keep the HTML clean and predictable.
  */
 $siteName = $site['name'] ?? '';
+$siteLogo = trim((string)($site['logo'] ?? ''));
+$hasSiteLogo = $siteLogo !== '';
 $pageTitleRaw = (string)($page['meta']['title'] ?? '');
 $pageTitlePlain = sanitize_page_title($pageTitleRaw);
 if ($pageTitlePlain === '') {
@@ -118,12 +120,12 @@ $footerAssets = ob_get_clean();
         <div class="max-w-5xl mx-auto px-6 sm:px-12 py-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
             <!-- Site Logo/Home Link -->
             <a href="/" class="flex items-center gap-2 text-gray-900 hover:text-gray-600 font-semibold text-sm nav-link">
-                <!-- Home icon (SVG) -->
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                </svg>
-                <!-- Site name from configuration -->
-                <?= esc_html($siteName) ?>
+                <?php if ($hasSiteLogo) : ?>
+                    <img src="<?= esc_html($siteLogo) ?>" alt="<?= esc_html($siteName !== '' ? $siteName : 'Site logo') ?>" class="h-8 w-auto max-w-[180px] object-contain">
+                <?php else : ?>
+                    <!-- Site name from configuration -->
+                    <?= esc_html($siteName) ?>
+                <?php endif; ?>
             </a>
 
             <!-- Navigation Menu -->

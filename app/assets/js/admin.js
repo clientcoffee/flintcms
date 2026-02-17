@@ -13,10 +13,13 @@
   };
   const SENSITIVE_KEY_PATTERN = /(password|secret|token|api_key|smtp_pass|smtp_password)/i;
   const SPINNER_ICON = "<svg class=\"animate-spin h-4 w-4 mr-2\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\" fill=\"none\"></circle><path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\"></path></svg>";
+  const LOGO_ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif"]);
+  const LOGO_ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/pjpeg", "image/png", "image/x-png", "image/gif"]);
   // Track non-removable site keys and pending deletions.
   const settingsState = {
     coreKeys: new Set(),
-    removed: new Set()
+    removed: new Set(),
+    logoUrl: ""
   };
 
   // DOM helpers keep selectors terse.
@@ -355,6 +358,170 @@
     });
   };
 
+  const setLogoStatus = (text, tone = "info") => {
+    const status = query("#settings-logo-status");
+    if (!status) {
+      return;
+    }
+
+    status.classList.remove(
+      "hidden",
+      "border-emerald-200",
+      "bg-emerald-50",
+      "text-emerald-700",
+      "border-red-200",
+      "bg-red-50",
+      "text-red-700",
+      "border-indigo-200",
+      "bg-indigo-50",
+      "text-indigo-700"
+    );
+
+    const toneClasses = {
+      success: ["border-emerald-200", "bg-emerald-50", "text-emerald-700"],
+      error: ["border-red-200", "bg-red-50", "text-red-700"],
+      info: ["border-indigo-200", "bg-indigo-50", "text-indigo-700"]
+    };
+
+    status.textContent = text || "";
+    status.classList.add(...(toneClasses[tone] || toneClasses.info));
+  };
+
+  const setLogoPreview = (value) => {
+    const preview = query("#settings-logo-preview");
+    const placeholder = query("#settings-logo-placeholder");
+    const removeButton = query("#settings-logo-remove-btn");
+    if (!preview || !placeholder || !removeButton) {
+      return;
+    }
+
+    const safeUrl = sanitizeUrl(value);
+    settingsState.logoUrl = safeUrl;
+
+    if (!safeUrl) {
+      preview.src = "";
+      preview.classList.add("hidden");
+      placeholder.classList.remove("hidden");
+      removeButton.disabled = true;
+      removeButton.classList.add("opacity-50", "cursor-not-allowed");
+      return;
+    }
+
+    preview.src = safeUrl;
+    preview.classList.remove("hidden");
+    placeholder.classList.add("hidden");
+    removeButton.disabled = false;
+    removeButton.classList.remove("opacity-50", "cursor-not-allowed");
+  };
+
+  const uploadSiteLogo = async (file) => {
+    const uploadButton = query("#settings-logo-upload-btn");
+    const fileInput = query("#settings-logo-file");
+    if (!uploadButton || !fileInput || !file) {
+      return;
+    }
+
+    const extension = (file.name.split(".").pop() || "").toLowerCase();
+    if (!LOGO_ALLOWED_EXTENSIONS.has(extension)) {
+      setLogoStatus("Invalid logo format. Allowed: JPG, JPEG, PNG, GIF.", "error");
+      fileInput.value = "";
+      return;
+    }
+
+    if (file.type && !LOGO_ALLOWED_MIME_TYPES.has(file.type)) {
+      setLogoStatus("Invalid logo file type. Allowed: JPG, JPEG, PNG, GIF.", "error");
+      fileInput.value = "";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const originalLabel = uploadButton.textContent;
+    setButtonState(uploadButton, { loading: true, html: `${SPINNER_ICON}Uploading...` });
+    setLogoStatus("Uploading logo...", "info");
+
+    try {
+      const { data: responseData } = await fetchJson("/api/settings/logo", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!responseData.success) {
+        setLogoStatus(responseData.error || "Failed to upload logo.", "error");
+        return;
+      }
+
+      setLogoPreview(responseData.url || "");
+      setLogoStatus("Site logo updated.", "success");
+      loadSettings();
+    } catch (error) {
+      setLogoStatus("Failed to upload logo.", "error");
+    } finally {
+      setButtonState(uploadButton, { loading: false, label: originalLabel });
+      fileInput.value = "";
+    }
+  };
+
+  const removeSiteLogo = async () => {
+    const removeButton = query("#settings-logo-remove-btn");
+    if (!removeButton || !settingsState.logoUrl) {
+      return;
+    }
+
+    if (!confirm("Remove the current site logo?")) {
+      return;
+    }
+
+    const originalLabel = removeButton.textContent;
+    setButtonState(removeButton, { loading: true, label: "Removing..." });
+    setLogoStatus("Removing logo...", "info");
+
+    try {
+      const { data: responseData } = await fetchJson("/api/settings/logo/remove", {
+        method: "POST"
+      });
+
+      if (!responseData.success) {
+        setLogoStatus(responseData.error || "Failed to remove logo.", "error");
+        return;
+      }
+
+      setLogoPreview("");
+      setLogoStatus("Site logo removed. Header will use site name text.", "success");
+      loadSettings();
+    } catch (error) {
+      setLogoStatus("Failed to remove logo.", "error");
+    } finally {
+      setButtonState(removeButton, { loading: false, label: originalLabel });
+    }
+  };
+
+  const initLogoSettings = () => {
+    const uploadButton = query("#settings-logo-upload-btn");
+    const removeButton = query("#settings-logo-remove-btn");
+    const fileInput = query("#settings-logo-file");
+    if (!uploadButton || !removeButton || !fileInput) {
+      return;
+    }
+
+    setLogoPreview("");
+
+    uploadButton.addEventListener("click", () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener("change", () => {
+      const [file] = fileInput.files || [];
+      if (!file) {
+        return;
+      }
+      uploadSiteLogo(file);
+    });
+
+    removeButton.addEventListener("click", removeSiteLogo);
+  };
+
   // Render editable settings for the Settings tab.
   const renderSettings = (settings) => {
     const container = query("#settings-container");
@@ -365,7 +532,10 @@
     container.innerHTML = "";
     settingsState.removed.clear();
 
-    const entries = Object.entries(settings || {});
+    const logoValue = settings && typeof settings["site.logo"] === "string" ? settings["site.logo"] : "";
+    setLogoPreview(logoValue);
+
+    const entries = Object.entries(settings || {}).filter(([key]) => key !== "site.logo");
     if (entries.length === 0) {
       container.innerHTML = "<p class=\"text-sm text-gray-500\">No site settings yet.</p>";
       return;
@@ -453,6 +623,11 @@
     }
 
     const key = `site.${normalized}`;
+    if (key === "site.logo") {
+      alert("Use the Site Logo upload control for logo changes.");
+      return;
+    }
+
     const form = query("#settings-form");
     if (form) {
       const existing = Array.from(form.querySelectorAll("input[name]")).find((input) => input.name === key);
@@ -481,6 +656,7 @@
   const initSettings = () => {
     const form = query("#settings-form");
     const addButton = query("#add-setting-btn");
+    initLogoSettings();
 
     if (form) {
       form.addEventListener("submit", saveSettings);

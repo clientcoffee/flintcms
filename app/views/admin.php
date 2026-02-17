@@ -94,6 +94,24 @@ ob_start();
                 <h2 class="text-2xl font-bold text-gray-900 mb-6">Settings</h2>
                 <div class="bg-white border border-gray-200 rounded-2xl p-6">
                     <form id="settings-form" class="space-y-6">
+                        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-900">Site Logo</h3>
+                                <p class="text-xs text-gray-500 mt-1">Upload a JPG, JPEG, PNG, or GIF logo. Motion uses this logo in the header and falls back to the site name when empty.</p>
+                            </div>
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                                <div class="w-24 h-24 rounded-lg border border-gray-200 bg-white flex items-center justify-center overflow-hidden">
+                                    <img id="settings-logo-preview" src="" alt="Site logo preview" class="hidden w-full h-full object-contain">
+                                    <span id="settings-logo-placeholder" class="text-xs text-gray-400 px-2 text-center">No logo</span>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <input id="settings-logo-file" type="file" accept=".jpg,.jpeg,.png,.gif,image/jpeg,image/png,image/gif" class="hidden">
+                                    <button type="button" id="settings-logo-upload-btn" class="px-3 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700">Upload Logo</button>
+                                    <button type="button" id="settings-logo-remove-btn" class="px-3 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200">Remove Logo</button>
+                                </div>
+                            </div>
+                            <p id="settings-logo-status" class="hidden rounded-lg border px-3 py-2 text-xs"></p>
+                        </div>
                         <div id="settings-container"></div>
                         <div class="flex gap-3 pt-4 border-t border-gray-200">
                             <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700">Save Settings</button>
