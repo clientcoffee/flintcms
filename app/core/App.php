@@ -227,10 +227,16 @@ class App
                 strpos($realUploadPath, $realUploadsDir) === 0 &&
                 is_file($realUploadPath)
             ) {
-                $mimeType = mime_content_type($realUploadPath);
+                $mimeType = $this->resolveUploadMimeType($realUploadPath);
+                $extension = strtolower(pathinfo($realUploadPath, PATHINFO_EXTENSION));
 
                 // Security: Prevent SVG XSS by forcing download.
                 if ($mimeType === 'image/svg+xml') {
+                    header('Content-Disposition: attachment; filename="' . basename($realUploadPath) . '"');
+                    header('X-Content-Type-Options: nosniff');
+                }
+                // Serve archives as attachment for predictable download behavior.
+                if (in_array($extension, ['gzip', 'gz', 'zip', 'tar', '7z', 'rar'], true)) {
                     header('Content-Disposition: attachment; filename="' . basename($realUploadPath) . '"');
                     header('X-Content-Type-Options: nosniff');
                 }
@@ -508,9 +514,11 @@ class App
                     }
                 }
             }
-            $maxSize = ($extension === 'zip') ? 50 * 1024 * 1024 : 5 * 1024 * 1024;
+            $archiveExtensions = ['zip', 'gzip', 'gz', 'tar', '7z', 'rar'];
+            $isArchiveUpload = in_array($extension, $archiveExtensions, true);
+            $maxSize = $isArchiveUpload ? 50 * 1024 * 1024 : 5 * 1024 * 1024;
             if ($file['size'] > $maxSize) {
-                $limitText = ($extension === 'zip') ? '50MB' : '5MB';
+                $limitText = $isArchiveUpload ? '50MB' : '5MB';
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => "File size exceeds {$limitText} limit"]);
                 return;
@@ -521,6 +529,10 @@ class App
                 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
                 'application/pdf',
                 'application/zip', 'application/x-zip-compressed',
+                'application/gzip', 'application/x-gzip',
+                'application/x-tar', 'application/tar', 'application/x-gtar',
+                'application/x-7z-compressed',
+                'application/vnd.rar', 'application/x-rar', 'application/x-rar-compressed',
                 'text/markdown', 'text/plain'
             ];
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -802,7 +814,21 @@ class App
                 $fileType = 'image';
             } elseif ($mimeType === 'application/pdf') {
                 $fileType = 'pdf';
-            } elseif (in_array($mimeType, ['application/zip', 'application/x-zip-compressed'])) {
+            } elseif (
+                in_array($mimeType, [
+                    'application/zip',
+                    'application/x-zip-compressed',
+                    'application/gzip',
+                    'application/x-gzip',
+                    'application/x-tar',
+                    'application/tar',
+                    'application/x-gtar',
+                    'application/x-7z-compressed',
+                    'application/vnd.rar',
+                    'application/x-rar',
+                    'application/x-rar-compressed',
+                ], true) || $isArchiveUpload
+            ) {
                 $fileType = 'zip';
             }
 
@@ -3760,13 +3786,50 @@ class App
             'jpeg' => 'image/jpeg',
             'png' => 'image/png',
             'gif' => 'image/gif',
+            'webp' => 'image/webp',
             'svg' => 'image/svg+xml',
+            'pdf' => 'application/pdf',
+            'zip' => 'application/zip',
+            'gz' => 'application/gzip',
+            'gzip' => 'application/gzip',
+            'tar' => 'application/x-tar',
+            '7z' => 'application/x-7z-compressed',
+            'rar' => 'application/vnd.rar',
+            'md' => 'text/markdown',
+            'mdx' => 'text/markdown',
             'woff' => 'font/woff',
             'woff2' => 'font/woff2',
             'ttf' => 'font/ttf',
             'eot' => 'application/vnd.ms-fontobject'
         ];
         return $mimeTypes[strtolower($extension)] ?? 'application/octet-stream';
+    }
+
+    /**
+     * Resolve MIME type for uploads with explicit archive support fallback.
+     */
+    private function resolveUploadMimeType(string $filePath): string
+    {
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $archiveTypes = [
+            'gzip' => 'application/gzip',
+            'gz' => 'application/gzip',
+            'zip' => 'application/zip',
+            'tar' => 'application/x-tar',
+            '7z' => 'application/x-7z-compressed',
+            'rar' => 'application/vnd.rar',
+        ];
+
+        if (isset($archiveTypes[$extension])) {
+            return $archiveTypes[$extension];
+        }
+
+        $mimeType = @mime_content_type($filePath);
+        if (is_string($mimeType) && trim($mimeType) !== '') {
+            return $mimeType;
+        }
+
+        return $this->getMimeType($extension);
     }
 
     /**
